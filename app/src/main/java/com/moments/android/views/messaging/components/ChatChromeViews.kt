@@ -691,3 +691,22 @@ fun ChatInThreadSearchField(text: String, onTextChange: (String) -> Unit, adapti
         if (text.isNotEmpty()) Icon(Icons.Default.Close, stringResource(R.string.chat_attachment_clear_accessibility), tint = adaptiveColors.secondary.copy(alpha = .65f), modifier = Modifier.size(16.dp).clickable(onClick = onClear))
     }
 }
+
+@Composable
+fun ChatHistoryLoadingRow(modifier: Modifier = Modifier) {
+    androidx.compose.foundation.layout.Row(
+        modifier.fillMaxWidth().height(44.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.material3.CircularProgressIndicator(
+            modifier = Modifier.size(14.dp), strokeWidth = 2.dp,
+        )
+        androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
+        androidx.compose.material3.Text(
+            text = stringResource(R.string.chat_loading_older_messages),
+            style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}

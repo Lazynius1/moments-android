@@ -305,6 +305,11 @@ internal fun normalizeTransactionKind(
 ): ChatListUpdateKind {
     if (oldIds.isEmpty()) return ChatListUpdateKind.INITIAL
     if (requested == ChatListUpdateKind.JUMP) return ChatListUpdateKind.JUMP
+    val loadingRowId = "row:synthetic:history-loading"
+    if (oldIds != newIds && oldIds.filterNot { it == loadingRowId } == newIds.filterNot { it == loadingRowId }) {
+        // Adding/removing progress must not finish the pending page restoration.
+        return ChatListUpdateKind.RECONFIGURE_ROWS
+    }
     if (requested == ChatListUpdateKind.PREPEND_HISTORY) return ChatListUpdateKind.PREPEND_HISTORY
 
     if (anchorRowId != null) {
@@ -347,6 +352,7 @@ fun chatRenderRowVisualSignature(row: ChatRenderRow): Int = when (row) {
     is ChatRenderRow.Buzz ->
         31 * 2 + row.event.id.hashCode() + row.event.senderId.hashCode() + row.event.createdAt.time.hashCode()
     ChatRenderRow.Typing -> 3
+    ChatRenderRow.HistoryLoading -> 11
     ChatRenderRow.HistoryStart -> 4
 }
 

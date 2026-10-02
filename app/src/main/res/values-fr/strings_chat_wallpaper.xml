@@ -1,0 +1,14 @@
+<resources>
+    <string name="chat_wallpaper_title">Fond de discussion</string>
+    <string name="chat_wallpaper_private">Toi seul vois ce fond. Il est enregistré pour cette discussion et synchronisé avec ton compte.</string>
+    <string name="chat_wallpaper_photo">Choisir une photo</string>
+    <string name="chat_wallpaper_color">Couleur</string>
+    <string name="chat_wallpaper_default">Utiliser le fond par défaut</string>
+    <string name="chat_wallpaper_dimming">Assombrir le fond</string>
+    <string name="chat_wallpaper_save">Enregistrer</string>
+    <string name="chat_wallpaper_preview">Voici comment apparaîtront tes messages</string>
+    <string name="chat_wallpaper_error">Impossible d’enregistrer ou de charger le fond. Réessaie.</string>
+    <string name="chat_wallpaper_crop">Déplace la photo pour la cadrer et utilise le curseur pour zoomer.</string>
+    <string name="chat_wallpaper_back">Retour</string>
+    <string name="chat_wallpaper_saved">Fond de discussion enregistré</string>
+</resources>

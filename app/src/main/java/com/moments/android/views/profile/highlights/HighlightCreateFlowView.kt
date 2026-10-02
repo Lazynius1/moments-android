@@ -3,6 +3,7 @@ package com.moments.android.views.profile.highlights
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -81,7 +82,8 @@ fun HighlightCreateFlowView(
                         stringResource(R.string.highlighted_stories_add_to_highlights),
                         color = primary,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
+                        maxLines = 1,
+                        autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = 16.sp),
                         modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                     )
                     Icon(

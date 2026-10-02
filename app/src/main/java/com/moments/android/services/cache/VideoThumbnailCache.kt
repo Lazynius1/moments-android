@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.moments.android.extensions.AvAssetThumbnailDefaults
 import com.moments.android.extensions.extractVideoThumbnailFromUrl
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -23,6 +25,8 @@ object VideoThumbnailCache {
         },
     )
     private const val COUNT_LIMIT = 150
+    private val requestScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val requests = SharedThumbnailRequests<Bitmap?>(requestScope)
 
     @Volatile private var appContext: Context? = null
     private lateinit var directory: File
@@ -35,7 +39,12 @@ object VideoThumbnailCache {
 
     fun cachedThumbnail(forUrl: String): Bitmap? = memoryCache[forUrl]
 
-    suspend fun thumbnail(forUrl: String): Bitmap? = withContext(Dispatchers.IO) {
+    suspend fun thumbnail(forUrl: String): Bitmap? {
+        memoryCache[forUrl]?.let { return it }
+        return requests.get(forUrl) { generateThumbnail(forUrl) }
+    }
+
+    private suspend fun generateThumbnail(forUrl: String): Bitmap? = withContext(Dispatchers.IO) {
         memoryCache[forUrl]?.let { return@withContext it }
         val file = fileURL(forUrl)
         if (file.exists()) {

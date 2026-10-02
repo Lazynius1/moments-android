@@ -1,0 +1,14 @@
+<resources>
+    <string name="chat_wallpaper_title">Fons del xat</string>
+    <string name="chat_wallpaper_private">Només tu veus aquest fons. Es desa per a aquesta conversa i se sincronitza amb el teu compte.</string>
+    <string name="chat_wallpaper_photo">Tria una foto</string>
+    <string name="chat_wallpaper_color">Color</string>
+    <string name="chat_wallpaper_default">Utilitza el fons predeterminat</string>
+    <string name="chat_wallpaper_dimming">Enfosqueix el fons</string>
+    <string name="chat_wallpaper_save">Desa</string>
+    <string name="chat_wallpaper_preview">Així es veuran els teus missatges</string>
+    <string name="chat_wallpaper_error">No s’ha pogut desar o carregar el fons. Torna-ho a provar.</string>
+    <string name="chat_wallpaper_crop">Arrossega la foto per enquadrar-la i utilitza el control per ampliar-la.</string>
+    <string name="chat_wallpaper_back">Enrere</string>
+    <string name="chat_wallpaper_saved">Fons del xat desat</string>
+</resources>

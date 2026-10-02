@@ -166,20 +166,20 @@ object ChatMenuDimming {
 fun Modifier.chatMenuDimmedUnlessSelected(isSelected: Boolean, menuOpen: Boolean): Modifier =
     alpha(if (menuOpen && !isSelected) ChatMenuDimming.inactiveOpacity else 1f)
         .blur(
-            radius = if (menuOpen && !isSelected) 9.dp else 0.dp,
+            radius = if (menuOpen && !isSelected) 5.dp else 0.dp,
             edgeTreatment = BlurredEdgeTreatment.Unbounded,
         )
 
 fun Modifier.chatMenuDimmedWhenOpen(menuOpen: Boolean): Modifier =
     alpha(if (menuOpen) ChatMenuDimming.inactiveOpacity else 1f)
         .blur(
-            radius = if (menuOpen) 9.dp else 0.dp,
+            radius = if (menuOpen) 5.dp else 0.dp,
             edgeTreatment = BlurredEdgeTreatment.Unbounded,
         )
 
 fun Modifier.chatMenuBlurredWhenOpen(menuOpen: Boolean): Modifier =
     blur(
-        radius = if (menuOpen) 9.dp else 0.dp,
+        radius = if (menuOpen) 5.dp else 0.dp,
         edgeTreatment = BlurredEdgeTreatment.Unbounded,
     )
 

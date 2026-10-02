@@ -182,6 +182,7 @@ fun GlassmorphicChatRenderRow(
         ChatRenderRow.Typing -> ChatIncomingTypingIndicatorRow(
             modifier = modifier.chatMenuDimmedWhenOpen(menuOpen),
         )
+        ChatRenderRow.HistoryLoading -> com.moments.android.views.messaging.components.ChatHistoryLoadingRow(modifier)
         ChatRenderRow.HistoryStart -> ChatHistoryStartHeader(
             adaptiveColors,
             modifier.chatMenuDimmedWhenOpen(menuOpen),
@@ -219,11 +220,9 @@ fun GlassmorphicChatRootContent(
     }
     CompositionLocalProvider(LocalChatFailedMessageRetryAction provides failedRetry) {
         Box(modifier.fillMaxSize().background(adaptiveColors.chatBackground.first())) {
-            ChatGlassmorphicBackground(
-                adaptiveColors,
-                // La incoming bubble es translúcida: modificar el fondo bajo ella
-                // también modificaría su color aparente durante el long press.
-                Modifier.fillMaxSize(),
+            com.moments.android.views.messaging.components.ChatWallpaperBackground(
+                conversationId = viewModel.conversation.id.orEmpty(),
+                fallback = adaptiveColors.chatBackground.first(), modifier = Modifier.fillMaxSize(),
             )
             Box(Modifier.fillMaxSize()) { content() }
             // Android: sin ChatBottomWallpaperEdgeFade (iOS lo necesita por el chrome; aquí tapa mensajes).

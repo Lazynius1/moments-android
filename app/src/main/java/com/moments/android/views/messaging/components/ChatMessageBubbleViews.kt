@@ -339,7 +339,7 @@ fun DeletedMessageBubble(message: EnhancedMessage, isCurrentUser: Boolean, modif
     Row(
         modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(colors.messageBubbleBackground.copy(alpha = 0.5f))
+            .background(colors.messageBubbleBackground)
             .border(0.5.dp, colors.messageBubbleStroke, RoundedCornerShape(20.dp))
             .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),

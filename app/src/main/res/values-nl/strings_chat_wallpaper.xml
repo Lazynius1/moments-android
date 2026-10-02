@@ -1,0 +1,14 @@
+<resources>
+    <string name="chat_wallpaper_title">Chatachtergrond</string>
+    <string name="chat_wallpaper_private">Alleen jij ziet deze achtergrond. Hij wordt voor dit gesprek opgeslagen en met je account gesynchroniseerd.</string>
+    <string name="chat_wallpaper_photo">Foto kiezen</string>
+    <string name="chat_wallpaper_color">Kleur</string>
+    <string name="chat_wallpaper_default">Standaardachtergrond gebruiken</string>
+    <string name="chat_wallpaper_dimming">Achtergrond dimmen</string>
+    <string name="chat_wallpaper_save">Opslaan</string>
+    <string name="chat_wallpaper_preview">Zo zien je berichten eruit</string>
+    <string name="chat_wallpaper_error">De achtergrond kon niet worden opgeslagen of geladen. Probeer het opnieuw.</string>
+    <string name="chat_wallpaper_crop">Sleep de foto om het kader aan te passen en gebruik de schuifregelaar om in te zoomen.</string>
+    <string name="chat_wallpaper_back">Terug</string>
+    <string name="chat_wallpaper_saved">Chatachtergrond opgeslagen</string>
+</resources>

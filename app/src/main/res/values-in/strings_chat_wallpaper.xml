@@ -1,0 +1,14 @@
+<resources>
+    <string name="chat_wallpaper_title">Latar chat</string>
+    <string name="chat_wallpaper_private">Hanya kamu yang melihat latar ini. Latar disimpan untuk percakapan ini dan disinkronkan dengan akunmu.</string>
+    <string name="chat_wallpaper_photo">Pilih foto</string>
+    <string name="chat_wallpaper_color">Warna</string>
+    <string name="chat_wallpaper_default">Gunakan latar default</string>
+    <string name="chat_wallpaper_dimming">Gelapkan latar</string>
+    <string name="chat_wallpaper_save">Simpan</string>
+    <string name="chat_wallpaper_preview">Seperti ini tampilan pesanmu</string>
+    <string name="chat_wallpaper_error">Latar tidak dapat disimpan atau dimuat. Coba lagi.</string>
+    <string name="chat_wallpaper_crop">Geser foto untuk mengatur bingkai dan gunakan penggeser untuk memperbesar.</string>
+    <string name="chat_wallpaper_back">Kembali</string>
+    <string name="chat_wallpaper_saved">Latar chat disimpan</string>
+</resources>

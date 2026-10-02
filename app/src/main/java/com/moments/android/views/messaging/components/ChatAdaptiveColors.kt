@@ -27,7 +27,7 @@ val AdaptiveColors.recordingIndicator: Color
     get() = if (isDark) Color.White else Color.Black
 
 val AdaptiveColors.messageBubbleBackground: Color
-    get() = if (isDark) Color(0xFFFAF9F6).copy(alpha = 0.14f) else Color(0xFF0B1215).copy(alpha = 0.07f)
+    get() = if (isDark) Color(0xFF2C3235) else Color(0xFFE9E9E6)
 
 val AdaptiveColors.messageBubbleStroke: Color
     get() = if (isDark) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.15f)

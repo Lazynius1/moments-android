@@ -1,0 +1,14 @@
+<resources>
+    <string name="chat_wallpaper_title">チャットの背景</string>
+    <string name="chat_wallpaper_private">この背景は自分にだけ表示されます。この会話用に保存され、アカウントと同期されます。</string>
+    <string name="chat_wallpaper_photo">写真を選択</string>
+    <string name="chat_wallpaper_color">色</string>
+    <string name="chat_wallpaper_default">標準の背景を使う</string>
+    <string name="chat_wallpaper_dimming">背景を暗くする</string>
+    <string name="chat_wallpaper_save">保存</string>
+    <string name="chat_wallpaper_preview">メッセージはこのように表示されます</string>
+    <string name="chat_wallpaper_error">背景を保存または読み込めませんでした。もう一度お試しください。</string>
+    <string name="chat_wallpaper_crop">写真をドラッグして位置を調整し、スライダーで拡大できます。</string>
+    <string name="chat_wallpaper_back">戻る</string>
+    <string name="chat_wallpaper_saved">チャットの背景を保存しました</string>
+</resources>

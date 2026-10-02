@@ -65,7 +65,7 @@ import com.moments.android.views.components.EchoesIconViewBrandHorizontal
 import com.moments.android.views.feed.stories.StoryRingTrayLoadingTail
 import com.moments.android.views.feed.stories.StoryRingTraySkeletonRow
 import com.moments.android.views.feed.controls.FeedType
-import com.moments.android.views.feed.controls.FloatingGlassFeedToggle
+import com.moments.android.views.feed.controls.FloatingFeedMenu
 import com.moments.android.views.feed.rememberAdaptiveColors
 
 /** Port 1:1 de `FeedHeaderSection.swift`. */
@@ -348,7 +348,7 @@ fun FeedFloatingSelector(
     pendingEchoesCount: Int,
     modifier: Modifier = Modifier,
 ) {
-    // iOS: VStack { Spacer().frame(height: inset); FloatingGlassFeedToggle; … }
+    // Keep the floating tabs below the animated story header.
     // El inset ya viene animado desde FeedView (altura real del header).
     Column(
         modifier
@@ -357,16 +357,10 @@ fun FeedFloatingSelector(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(floatingSelectorTopInset))
-        FloatingGlassFeedToggle(
+        FloatingFeedMenu(
             selectedFeedType = selectedFeedType,
             onSelect = onSelectFeedType,
-            modifier = Modifier.shadow(
-                elevation = 12.dp,
-                shape = RoundedCornerShape(percent = 50),
-                clip = false,
-                ambientColor = Color.Black.copy(alpha = 0.15f),
-                spotColor = Color.Black.copy(alpha = 0.15f),
-            ),
+            enabled = !isFeedHeaderHidden,
         )
         // iOS: chip solo si `#unavailable(iOS 26)` (en 26+ va Liquid Glass).
         // Android no tiene esa gota → mantener FeedRefreshIndicator (= rama pre-26).

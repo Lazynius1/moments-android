@@ -1,0 +1,14 @@
+<resources>
+    <string name="chat_wallpaper_title">Chat wallpaper</string>
+    <string name="chat_wallpaper_private">Only you see this wallpaper. It is saved for this conversation and synced with your account.</string>
+    <string name="chat_wallpaper_photo">Choose photo</string>
+    <string name="chat_wallpaper_color">Color</string>
+    <string name="chat_wallpaper_default">Use default wallpaper</string>
+    <string name="chat_wallpaper_dimming">Dim wallpaper</string>
+    <string name="chat_wallpaper_save">Save</string>
+    <string name="chat_wallpaper_preview">This is how your messages will look</string>
+    <string name="chat_wallpaper_error">Could not save or load the wallpaper. Try again.</string>
+    <string name="chat_wallpaper_crop">Drag the photo to frame it and use the slider to zoom.</string>
+    <string name="chat_wallpaper_back">Back</string>
+    <string name="chat_wallpaper_saved">Chat wallpaper saved</string>
+</resources>

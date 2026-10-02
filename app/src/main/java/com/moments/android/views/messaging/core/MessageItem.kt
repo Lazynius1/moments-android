@@ -65,6 +65,10 @@ sealed interface ChatRenderRow {
         override val id: String = "row:synthetic:typing-indicator"
     }
 
+    data object HistoryLoading : ChatRenderRow {
+        override val id: String = "row:synthetic:history-loading"
+    }
+
     data object HistoryStart : ChatRenderRow {
         override val id: String = "row:synthetic:history-start"
     }

@@ -98,6 +98,7 @@ fun MomentReactionButton(
     emojiSizeSp: Float = ReactionButtonMetrics.emojiSizeSp,
     pickerXOffset: Float = 0f,
     modifier: Modifier = Modifier,
+    embeddedInBar: Boolean = false,
 ) {
     EpicReactionButton(
         moment = moment,
@@ -106,6 +107,7 @@ fun MomentReactionButton(
         emojiSizeSp = emojiSizeSp,
         pickerXOffset = pickerXOffset,
         modifier = modifier,
+        embeddedInBar = embeddedInBar,
     )
 }
 
@@ -152,6 +154,7 @@ fun EpicReactionButton(
     pickerXOffset: Float = 0f,
     chromeOnMedia: Boolean = false,
     modifier: Modifier = Modifier,
+    embeddedInBar: Boolean = false,
 ) {
     val isDark = isSystemInDarkTheme()
     val scope = rememberCoroutineScope()
@@ -302,6 +305,9 @@ fun EpicReactionButton(
                 Modifier
                     .size(sizeDp.dp)
                     .scale(if (isPressed) 0.85f else if (hasReacted) 1.15f else 1f)
+                    .then(
+                        if (embeddedInBar) Modifier.clip(RoundedCornerShape(8.dp))
+                        else Modifier
                     .shadow(
                         elevation = if (hasReacted) 8.dp else 4.dp,
                         shape = CircleShape,
@@ -321,6 +327,7 @@ fun EpicReactionButton(
                         CircleShape,
                         interactive = true,
                         tint = if (chromeOnMedia) Color.fromHex("151D21") else null,
+                    )
                     )
                     .combinedClickable(
                         onClick = {

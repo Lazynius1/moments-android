@@ -49,6 +49,8 @@ import com.moments.android.R
 import com.moments.android.models.AppUser
 import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.searchUsers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -76,8 +78,15 @@ fun UserSearchView(
             return@LaunchedEffect
         }
         isSearching = true
-        results = withContext(Dispatchers.IO) {
-            runCatching { FirestoreService().searchUsers(query, limit = 10) }.getOrDefault(emptyList())
+        delay(300)
+        try {
+            results = withContext(Dispatchers.IO) {
+                FirestoreService().searchUsers(query, limit = 10)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Preserve the current results on a temporary request failure.
         }
         isSearching = false
     }
@@ -183,7 +192,7 @@ fun UserSearchView(
             }
         }
 
-        if (isSearching) {
+        if (isSearching && results.isEmpty()) {
             Row(
                 Modifier
                     .fillMaxWidth()

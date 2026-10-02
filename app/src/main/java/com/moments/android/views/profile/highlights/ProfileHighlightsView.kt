@@ -65,6 +65,8 @@ import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.views.profile.core.ProfileColors
 import com.moments.android.views.shared.AppErrorBanner
 import com.moments.android.views.story.storyviewer.StoryStaticPreviewSurface
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -93,17 +95,33 @@ fun ProfileHighlightsView(
     var errorMessage by remember(userId) { mutableStateOf<String?>(null) }
     val presentation = remember { HighlightPresentationCoordinator() }
 
-    suspend fun reload() {
+    val reloadMutex = remember(userId) { Mutex() }
+    var reloadAfterCurrent by remember(userId) { mutableStateOf(false) }
+
+    suspend fun reload(forceRefresh: Boolean = false) {
         if (userId.isBlank()) return
-        isLoading = true
-        val result = runCatching { loadVisibleHighlights(userId) }
-        result.onSuccess { highlights = it; errorMessage = null }
-            .onFailure {
-                highlights = emptyList()
-                // Un PERMISSION_DENIED es "no visible", no un error que enseñar (igual que iOS).
-                errorMessage = if (isPermissionDenied(it)) null else it.message
-            }
-        isLoading = false
+        if (!reloadMutex.tryLock()) {
+            reloadAfterCurrent = reloadAfterCurrent || forceRefresh
+            return
+        }
+        try {
+            do {
+                reloadAfterCurrent = false
+                isLoading = true
+                errorMessage = null
+                try {
+                    highlights = loadVisibleHighlights(userId)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (isPermissionDenied(error)) highlights = emptyList()
+                    else errorMessage = error.message
+                }
+            } while (reloadAfterCurrent)
+        } finally {
+            isLoading = false
+            reloadMutex.unlock()
+        }
     }
 
     LaunchedEffect(userId, refreshTrigger) { reload() }
@@ -228,7 +246,7 @@ fun ProfileHighlightsView(
                                                     InAppNotificationService.showActionToast(InAppActionToast.highlightDeleted())
                                                 }
                                                 .onFailure { errorMessage = it.message }
-                                            reload()
+                                            reload(forceRefresh = true)
                                         }
                                     },
                                     leadingIcon = { Icon(Icons.Filled.Delete, null, tint = Color.Red) },
@@ -243,7 +261,7 @@ fun ProfileHighlightsView(
 
     presentation.sheet?.let { sheet ->
         Dialog(
-            onDismissRequest = { presentation.dismissSheet(); scope.launch { reload() } },
+            onDismissRequest = { presentation.dismissSheet(); scope.launch { reload(forceRefresh = true) } },
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
             HighlightCreateFlowView(
@@ -251,7 +269,7 @@ fun ProfileHighlightsView(
                     is HighlightSheet.Create -> HighlightFlowMode.Create
                     is HighlightSheet.Edit -> HighlightFlowMode.Edit(sheet.highlight)
                 },
-                onDismiss = { presentation.dismissSheet(); scope.launch { reload() } },
+                onDismiss = { presentation.dismissSheet(); scope.launch { reload(forceRefresh = true) } },
             )
         }
     }

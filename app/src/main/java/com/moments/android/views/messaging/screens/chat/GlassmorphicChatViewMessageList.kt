@@ -99,6 +99,7 @@ fun chatListRows(
     hasCompletedInitialScroll: Boolean,
     hasTypingUsers: Boolean,
     isGroup: Boolean = false,
+    isLoadingHistory: Boolean = false,
 ): List<ChatRenderRow> {
     val rows = baseRows.toMutableList()
     val pending = pendingChatContext != null
@@ -137,6 +138,7 @@ fun chatListRows(
         }
     }
     if (hasTypingUsers) rows += ChatRenderRow.Typing
+    if (isLoadingHistory) rows.add(0, ChatRenderRow.HistoryLoading)
     return rows
 }
 
@@ -282,6 +284,7 @@ internal fun GlassmorphicChatMessageList(
                         is ChatRenderRow.PendingRequestMessage -> callbacks.renderPendingRequest(row.message)
                         is ChatRenderRow.IncomingRequestActions -> callbacks.renderIncomingRequestActions(row.isLoading)
                         is ChatRenderRow.OutgoingRequestControls -> callbacks.renderOutgoingRequestControls(row.messageCount, row.limitReached)
+                        ChatRenderRow.HistoryLoading -> com.moments.android.views.messaging.components.ChatHistoryLoadingRow()
                         is ChatRenderRow.HistoryStart -> ChatHistoryStartHeader(
                             adaptiveColors,
                             Modifier.chatMenuDimmedWhenOpen(menuOpen),
@@ -304,8 +307,8 @@ internal fun GlassmorphicChatMessageList(
                     adaptiveColors = adaptiveColors,
                     textRes = presentation.historyNoticeTextRes(viewModel),
                     showsProgress = false,
-                    retryTextRes = if (presentation.shouldShowRetry(viewModel)) R.string.messaging_retry else null,
-                    onTap = if (presentation.shouldShowRetry(viewModel)) {
+                    retryTextRes = if (!isLoadingMore && presentation.shouldShowRetry(viewModel)) R.string.messaging_retry else null,
+                    onTap = if (!isLoadingMore && presentation.shouldShowRetry(viewModel)) {
                         { viewModel.clearHistoryLoadNotice(); callbacks.retryHistoryLoad() }
                     } else null,
                 )

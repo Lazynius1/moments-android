@@ -233,6 +233,13 @@ fun ArchivedStoriesView(
                     }
                 }
 
+                viewModel.hasLoadError && viewModel.groupedStories.isEmpty() -> {
+                    com.moments.android.views.shared.AppErrorBanner(
+                        message = stringResource(R.string.highlighted_stories_load_failed),
+                        modifier = Modifier.align(Alignment.Center).padding(16.dp),
+                        onRetry = { viewModel.retryArchivedStories(displayMode == ArchiveDisplayMode.MAP) },
+                    )
+                }
                 viewModel.groupedStories.isEmpty() -> {
                     Column(
                         Modifier
@@ -302,7 +309,7 @@ fun ArchivedStoriesView(
                                                 },
                                             )
                                         }
-                                        if (viewModel.canLoadMore) {
+                                        if (viewModel.canLoadMore && !viewModel.hasLoadError) {
                                             item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
                                                 Box(Modifier.fillMaxWidth().padding(14.dp), contentAlignment = Alignment.Center) {
                                                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -317,7 +324,7 @@ fun ArchivedStoriesView(
                                 ArchiveCalendarView(
                                     allStories = storiesForGrid,
                                     textColor = textColor,
-                                    canLoadMore = viewModel.canLoadMore,
+                                    canLoadMore = viewModel.canLoadMore && !viewModel.hasLoadError,
                                     isLoadingMore = viewModel.isLoadingMore,
                                     onLoadMore = viewModel::loadMoreArchivedStories,
                                     onOpenDay = { dayStories ->
@@ -345,6 +352,13 @@ fun ArchivedStoriesView(
                     }
                 }
             }
+                if (viewModel.hasLoadError && viewModel.groupedStories.isNotEmpty()) {
+                    com.moments.android.views.shared.AppErrorBanner(
+                        message = stringResource(R.string.highlighted_stories_load_failed),
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                        onRetry = { viewModel.retryArchivedStories(displayMode == ArchiveDisplayMode.MAP) },
+                    )
+                }
                 MomentRefreshOverlayHost(Modifier.align(Alignment.TopCenter))
             }
         }

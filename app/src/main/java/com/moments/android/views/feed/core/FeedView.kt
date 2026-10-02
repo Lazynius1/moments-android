@@ -90,7 +90,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 
 private val FeedHeaderHeight = 88.dp
-private val FeedSelectorHeight = 35.dp
+private val FeedSelectorHeight = 48.dp
 
 /**
  * Port 1:1 de `FeedView.swift` — misma superficie de estado, ciclo de vida,
@@ -129,16 +129,13 @@ fun FeedView(
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     // Altura real del header (incluye status bar). La pill se ancla justo debajo.
     var headerHeightDp by remember { mutableStateOf(statusBarTop + FeedHeaderHeight) }
-    val floatingSelectorTopInsetTarget: Dp =
-        if (isFeedHeaderHidden) statusBarTop + 18.dp else headerHeightDp
-    val floatingSelectorTopInset by androidx.compose.animation.core.animateDpAsState(
-        targetValue = floatingSelectorTopInsetTarget,
+    val floatingSelectorTopInset = headerHeightDp
+    val feedContentTopInset by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isFeedHeaderHidden) statusBarTop + 12.dp
+            else headerHeightDp + FeedSelectorHeight + 25.dp,
         animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.86f, stiffness = 400f),
-        label = "feedFloatingInset",
+        label = "feedContentTopInset",
     )
-    // iOS: floatingSelectorTopInset + feedSelectorHeight + 25
-    val feedContentTopInset: Dp =
-        floatingSelectorTopInset + FeedSelectorHeight + 25.dp
     val headerHideTranslationPx = with(density) { -(headerHeightDp + 20.dp).toPx() }
     val headerAlpha by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (isFeedHeaderHidden) 0f else 1f,
@@ -762,6 +759,10 @@ fun FeedView(
                 pendingEchoesCount = pendingEchoes.size,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
+                    .graphicsLayer {
+                        alpha = headerAlpha
+                        translationY = headerTranslationY
+                    }
                     .zIndex(998f),
             )
 

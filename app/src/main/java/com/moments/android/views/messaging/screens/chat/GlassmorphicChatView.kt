@@ -727,7 +727,9 @@ fun GlassmorphicChatView(
     }
 
     val effectivePendingContext = composer.pendingChatContext ?: pendingChatContext
+    val isLoadingHistory by session.isLoadingMore.collectAsState()
     val rows = remember(
+        isLoadingHistory,
         session.chatRenderRows,
         effectivePendingContext,
         conversationIntroContext,
@@ -751,6 +753,7 @@ fun GlassmorphicChatView(
             hasCompletedInitialScroll = scroll.hasCompletedInitialScroll,
             hasTypingUsers = typingUsers.isNotEmpty(),
             isGroup = conversation.isGroup,
+            isLoadingHistory = isLoadingHistory,
         )
     }
     val transaction = remember(rows, timelineMutation) {
@@ -1254,7 +1257,7 @@ fun GlassmorphicChatView(
                 onSearchSubmit = search::scrollToCurrentSearchMatch,
             ),
             modifier = Modifier.blur(
-                radius = if (messagePresentation.menuSelection != null) 9.dp else 0.dp,
+                radius = if (messagePresentation.menuSelection != null) 5.dp else 0.dp,
                 edgeTreatment = BlurredEdgeTreatment.Unbounded,
             ),
         )
@@ -1308,7 +1311,7 @@ fun GlassmorphicChatView(
                 onSearchSubmit = search::scrollToCurrentSearchMatch,
             ),
             modifier = Modifier.blur(
-                radius = if (messagePresentation.menuSelection != null) 9.dp else 0.dp,
+                radius = if (messagePresentation.menuSelection != null) 5.dp else 0.dp,
                 edgeTreatment = BlurredEdgeTreatment.Unbounded,
             ),
         )

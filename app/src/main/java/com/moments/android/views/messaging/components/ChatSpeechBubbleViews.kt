@@ -71,7 +71,7 @@ enum class ChatMessageGroupPosition { SINGLE, FIRST, MIDDLE, LAST }
 
 object ChatTextBubbleMetrics {
     val horizontalPadding = 15.dp
-    val verticalPadding = 10.dp
+    val verticalPadding = 12.dp
     val lineSpacing = 2.dp
     val cornerRadius = 20.dp
     val joinedRadius = 4.dp
@@ -123,12 +123,12 @@ object ChatBubbleLayoutWidth {
     }
 }
 
-/** ≡ iOS `ChatMessageFont.bubble` (~15pt escalado con tamaño de texto del sistema). */
+/** ≡ iOS `ChatMessageFont.bubble` (~16pt escalado con tamaño de texto del sistema). */
 object ChatMessageFont {
     @Composable
     fun bubbleSizeSp(): Float {
         val scale = LocalConfiguration.current.fontScale.coerceIn(0.85f, 1.6f)
-        return 15f * scale
+        return 16f * scale
     }
 
     @Composable

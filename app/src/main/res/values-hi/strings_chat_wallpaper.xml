@@ -1,0 +1,14 @@
+<resources>
+    <string name="chat_wallpaper_title">चैट का बैकग्राउंड</string>
+    <string name="chat_wallpaper_private">यह बैकग्राउंड केवल आपको दिखता है। यह इस बातचीत के लिए सहेजा जाता है और आपके खाते से सिंक होता है।</string>
+    <string name="chat_wallpaper_photo">फ़ोटो चुनें</string>
+    <string name="chat_wallpaper_color">रंग</string>
+    <string name="chat_wallpaper_default">डिफ़ॉल्ट बैकग्राउंड इस्तेमाल करें</string>
+    <string name="chat_wallpaper_dimming">बैकग्राउंड गहरा करें</string>
+    <string name="chat_wallpaper_save">सहेजें</string>
+    <string name="chat_wallpaper_preview">आपके संदेश ऐसे दिखेंगे</string>
+    <string name="chat_wallpaper_error">बैकग्राउंड सहेजा या लोड नहीं किया जा सका। फिर कोशिश करें।</string>
+    <string name="chat_wallpaper_crop">फ़ोटो को खींचकर फ़्रेम करें और स्लाइडर से ज़ूम करें।</string>
+    <string name="chat_wallpaper_back">वापस</string>
+    <string name="chat_wallpaper_saved">चैट का बैकग्राउंड सहेजा गया</string>
+</resources>

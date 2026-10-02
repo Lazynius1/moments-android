@@ -1,0 +1,14 @@
+<resources>
+    <string name="chat_wallpaper_title">채팅 배경</string>
+    <string name="chat_wallpaper_private">이 배경은 나에게만 보여요. 이 대화에 저장되고 계정과 동기화돼요.</string>
+    <string name="chat_wallpaper_photo">사진 선택</string>
+    <string name="chat_wallpaper_color">색상</string>
+    <string name="chat_wallpaper_default">기본 배경 사용</string>
+    <string name="chat_wallpaper_dimming">배경 어둡게</string>
+    <string name="chat_wallpaper_save">저장</string>
+    <string name="chat_wallpaper_preview">메시지가 이렇게 보여요</string>
+    <string name="chat_wallpaper_error">배경을 저장하거나 불러올 수 없어요. 다시 시도해 주세요.</string>
+    <string name="chat_wallpaper_crop">사진을 드래그해 위치를 조절하고 슬라이더로 확대하세요.</string>
+    <string name="chat_wallpaper_back">뒤로</string>
+    <string name="chat_wallpaper_saved">채팅 배경이 저장됐어요</string>
+</resources>

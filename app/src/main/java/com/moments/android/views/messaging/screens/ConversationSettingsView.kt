@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Notifications
@@ -1066,6 +1067,7 @@ fun ConversationSettingsView(
     var showStarred by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var showPreferences by remember { mutableStateOf(false) }
+    var showWallpaper by remember { mutableStateOf(false) }
     var showVanish by remember { mutableStateOf(false) }
     var showGroupManagement by remember { mutableStateOf(false) }
     var showGroupEdit by remember { mutableStateOf(false) }
@@ -1300,6 +1302,7 @@ fun ConversationSettingsView(
                     },
                     onVanish = { showVanish = true },
                     onPreferences = { showPreferences = true },
+                    onWallpaper = { showWallpaper = true },
                 )
                 SharedContentTabs(tab, { tab = it }, model, colors, onOpenMedia = { model.openMediaForViewing(it) { resolved -> selectedMedia = resolved } })
                 if (!conversation.isGroup) SettingsFooter(model, colors)
@@ -1326,6 +1329,12 @@ fun ConversationSettingsView(
         // Preferences / Vanish = push full-screen (≡ navigationDestination iOS).
         // Chat edge-to-edge: mismo padding que ChatCamera (status+nav), no solo statusBarsPadding
         // (puede quedar a 0 si un ancestro ya consumió insets).
+        if (showWallpaper) {
+            com.moments.android.views.messaging.components.ConversationWallpaperView(
+                conversationId = conversation.id.orEmpty(), onDismiss = { showWallpaper = false },
+                modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars)),
+            )
+        }
         if (showPreferences) {
             ConversationChatPreferencesView(
                 model = model,
@@ -1765,6 +1774,7 @@ private fun SettingsRows(
     onInviteLink: (() -> Unit)?,
     onVanish: () -> Unit,
     onPreferences: () -> Unit,
+    onWallpaper: () -> Unit,
 ) {
     Column(Modifier.padding(horizontal = 16.dp)) {
         SettingsRow(Icons.Default.Star, R.string.conversation_settings_starred, model.starredMessages.size.takeIf { it > 0 }?.toString() ?: stringResource(R.string.conversation_settings_starred_none), colors, onStarred)
@@ -1784,6 +1794,7 @@ private fun SettingsRows(
             colors,
             onVanish,
         )
+        SettingsRow(Icons.Default.Photo, R.string.chat_wallpaper_title, null, colors, onWallpaper)
         SettingsRow(
             Icons.Default.Lock,
             R.string.conversation_settings_privacy_and_security,

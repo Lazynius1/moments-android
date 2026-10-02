@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -16,8 +20,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import coil.ImageLoader
-import coil.compose.SubcomposeAsyncImage
-import coil.compose.SubcomposeAsyncImageContent
+import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Size
 import com.moments.android.views.messaging.core.EnhancedMessage
@@ -40,38 +43,39 @@ fun ChatKFImage(
     }
     val context = LocalContext.current
     val density = LocalDensity.current
-    val request = ImageRequest.Builder(context)
-        .data(url)
-        .crossfade(200)
-        .apply {
-            if (downsamplingSize != null) {
-                val w = with(density) { downsamplingSize.width.roundToPx() }
-                val h = with(density) { downsamplingSize.height.roundToPx() }
-                size(Size(w, h))
+    var showPreview by remember(url) { mutableStateOf(true) }
+    val request = remember(context, density, url, downsamplingSize) {
+        ImageRequest.Builder(context)
+            .data(url)
+            .crossfade(200)
+            .apply {
+                if (downsamplingSize != null) {
+                    val w = with(density) { downsamplingSize.width.roundToPx() }
+                    val h = with(density) { downsamplingSize.height.roundToPx() }
+                    size(Size(w, h))
+                }
+            }
+            .build()
+    }
+    Box(modifier) {
+        if (showPreview) {
+            if (!previewUrl.isNullOrBlank() && previewUrl != url) {
+                ChatKFImage(previewUrl, Modifier.fillMaxSize(), downsamplingSize)
+            } else {
+                ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
             }
         }
-        .build()
-    SubcomposeAsyncImage(
-        model = request,
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = modifier,
-        loading = {
-            if (!previewUrl.isNullOrBlank() && previewUrl != url) {
-                ChatKFImage(previewUrl, Modifier.fillMaxSize(), downsamplingSize)
-            } else {
-                ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
-            }
-        },
-        error = {
-            if (!previewUrl.isNullOrBlank() && previewUrl != url) {
-                ChatKFImage(previewUrl, Modifier.fillMaxSize(), downsamplingSize)
-            } else {
-                ChatMediaResolvingPlaceholder(Modifier.fillMaxSize())
-            }
-        },
-        success = { SubcomposeAsyncImageContent(Modifier.fillMaxSize()) },
-    )
+        AsyncImage(
+            model = request,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+            onLoading = { showPreview = true },
+            onError = { showPreview = true },
+            onSuccess = { showPreview = false },
+        )
+    }
+
 }
 
 /**

@@ -416,7 +416,7 @@ fun ChatEphemeralExpiredCard(layout: ChatEphemeralLayout, modifier: Modifier = M
         modifier
             .size(layout.width, layout.height)
             .clip(shape)
-            .background(Color.White.copy(alpha = 0.06f))
+            .background(Color(0xFF272727))
             .border(1.dp, Color.White.copy(alpha = 0.12f), shape),
         contentAlignment = Alignment.Center,
     ) {

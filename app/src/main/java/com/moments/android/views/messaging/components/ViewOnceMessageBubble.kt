@@ -112,7 +112,7 @@ private fun ViewOncePillBubble(
     Row(
         modifier
             .clip(pillShape)
-            .background(colors.messageBubbleBackground.copy(alpha = 0.3f))
+            .background(colors.messageBubbleBackground)
             .border(0.8.dp, colors.messageBubbleStroke, pillShape)
             .then(if (onTap != null) Modifier.clickable(onClick = onTap) else Modifier)
             .padding(horizontal = 14.dp, vertical = 10.dp),

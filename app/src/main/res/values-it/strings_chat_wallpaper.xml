@@ -1,0 +1,14 @@
+<resources>
+    <string name="chat_wallpaper_title">Sfondo della chat</string>
+    <string name="chat_wallpaper_private">Solo tu vedi questo sfondo. Viene salvato per questa conversazione e sincronizzato con il tuo account.</string>
+    <string name="chat_wallpaper_photo">Scegli una foto</string>
+    <string name="chat_wallpaper_color">Colore</string>
+    <string name="chat_wallpaper_default">Usa lo sfondo predefinito</string>
+    <string name="chat_wallpaper_dimming">Scurisci lo sfondo</string>
+    <string name="chat_wallpaper_save">Salva</string>
+    <string name="chat_wallpaper_preview">Ecco come appariranno i tuoi messaggi</string>
+    <string name="chat_wallpaper_error">Impossibile salvare o caricare lo sfondo. Riprova.</string>
+    <string name="chat_wallpaper_crop">Trascina la foto per inquadrarla e usa il cursore per ingrandirla.</string>
+    <string name="chat_wallpaper_back">Indietro</string>
+    <string name="chat_wallpaper_saved">Sfondo della chat salvato</string>
+</resources>

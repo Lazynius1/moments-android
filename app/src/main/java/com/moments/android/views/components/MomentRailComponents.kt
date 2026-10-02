@@ -30,6 +30,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import com.moments.android.views.components.MomentsCircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -73,7 +76,7 @@ import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 
-private val RailActionCircle = 44.dp
+private val RailActionCircle = 48.dp
 /** Tamaño visual del contador (cápsula iOS ~padding 6/2 + font 10). */
 private val RailCountBadgeVisual = 20.dp
 
@@ -143,12 +146,7 @@ fun ModernActionButtons(
 ) {
     val colors = rememberAdaptiveColors()
     val isDark = isSystemInDarkTheme()
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp.toFloat()
-    // El iPhone de referencia dibuja el media a 432 pt. En el Android actual
-    // son ~385 dp: mantener 44 dp hacía que el rail ocupase más imagen y tapase
-    // una zona que en iOS queda visible. Escalamos todo el rail como una unidad.
-    val railScale = ((screenWidthDp - 8f) / 432f).coerceIn(0.86f, 1f)
-    val railInset = (16f * railScale).dp
+    val railInset = 16.dp
     val uid = FirebaseAuth.getInstance().currentUser?.uid
     val showReactionCount = moment.authorId == uid || !moment.hideLikeCounts
     val immersiveAlpha by animateFloatAsState(
@@ -162,36 +160,29 @@ fun ModernActionButtons(
             .padding(end = railInset, bottom = railInset),
         contentAlignment = Alignment.BottomEnd,
     ) {
-        // Glass en capa hermana (clip solo del chrome). El Row no se clippea:
-        // el picker de reacciones / badges pueden dibujar fuera (como iOS overlays).
+        // Separate surface: badges and reaction feedback remain outside its clipping bounds.
         Box(
             Modifier.graphicsLayer {
                 alpha = immersiveAlpha
-                scaleX = railScale
-                scaleY = railScale
                 transformOrigin = TransformOrigin(1f, 1f)
             },
         ) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .shadow(
-                        10.dp,
-                        RoundedCornerShape(percent = 50),
-                        clip = false,
-                        ambientColor = Color.Black.copy(alpha = 0.3f),
-                        spotColor = Color.Black.copy(alpha = 0.3f),
-                    )
-                    .momentsChromeGlass(RoundedCornerShape(percent = 50), interactive = true),
-            )
+            Surface(
+                modifier = Modifier.matchParentSize(),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shadowElevation = 4.dp,
+            ) {}
             Row(
-                Modifier.padding(6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Modifier.padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(0.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 MomentReactionButton(
                     moment = moment,
                     showCount = showReactionCount,
+                    sizeDp = 48f,
+                    embeddedInBar = true,
                 )
 
                 if (!moment.disableComments) {
@@ -250,24 +241,13 @@ private fun RailIconButton(
     onClick: () -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
-    val interaction = remember { MutableInteractionSource() }
     Box(contentAlignment = Alignment.TopEnd) {
-        Box(
-            Modifier
-                .size(RailActionCircle)
-                .scale(if (isActive) 1.05f else 1f)
-                .momentsPress(
-                    interaction,
-                    MomentsPressSpec(
-                        scale = 0.9f,
-                        pressedOpacity = 0.88f,
-                        haptic = MomentsPressDefaults.PressHaptic.LIGHT,
-                    ),
-                )
-                .clip(CircleShape)
-                .background(if (isDark) Color.White.copy(alpha = 0.05f) else Color.Black.copy(alpha = 0.05f))
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick),
-            contentAlignment = Alignment.Center,
+        IconButton(
+            onClick = {
+                HapticManager.shared.lightImpact()
+                onClick()
+            },
+            modifier = Modifier.size(RailActionCircle),
         ) {
             // iOS: LinearGradient(color → secondaryColor); tint ≈ color del gradiente
             @Suppress("UNUSED_VARIABLE")

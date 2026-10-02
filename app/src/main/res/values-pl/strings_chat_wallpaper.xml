@@ -1,0 +1,14 @@
+<resources>
+    <string name="chat_wallpaper_title">Tło czatu</string>
+    <string name="chat_wallpaper_private">Tylko Ty widzisz to tło. Jest zapisywane dla tej rozmowy i synchronizowane z Twoim kontem.</string>
+    <string name="chat_wallpaper_photo">Wybierz zdjęcie</string>
+    <string name="chat_wallpaper_color">Kolor</string>
+    <string name="chat_wallpaper_default">Użyj domyślnego tła</string>
+    <string name="chat_wallpaper_dimming">Przyciemnij tło</string>
+    <string name="chat_wallpaper_save">Zapisz</string>
+    <string name="chat_wallpaper_preview">Tak będą wyglądać Twoje wiadomości</string>
+    <string name="chat_wallpaper_error">Nie udało się zapisać lub wczytać tła. Spróbuj ponownie.</string>
+    <string name="chat_wallpaper_crop">Przeciągnij zdjęcie, aby je wykadrować, i użyj suwaka, aby je powiększyć.</string>
+    <string name="chat_wallpaper_back">Wstecz</string>
+    <string name="chat_wallpaper_saved">Tło czatu zapisane</string>
+</resources>

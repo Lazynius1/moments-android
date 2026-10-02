@@ -84,6 +84,7 @@ object ChatRowHeightEstimator {
             is ChatRenderRow.Header -> headerHeight
             is ChatRenderRow.Buzz -> buzzHeight
             ChatRenderRow.Typing -> typingHeight
+            ChatRenderRow.HistoryLoading -> 44.dp
             ChatRenderRow.HistoryStart -> historyStartHeight
             is ChatRenderRow.Message -> estimatedHeight(row.item, bubbleWidth)
         }

@@ -400,7 +400,7 @@ fun StackedReplyQuote(
             Row(
                 Modifier
                     .clip(RoundedCornerShape(13.dp))
-                    .background(colors.messageBubbleBackground.copy(alpha = 0.55f))
+                    .background(colors.messageBubbleBackground)
                     .border(0.5.dp, colors.messageBubbleStroke.copy(alpha = 0.4f), RoundedCornerShape(13.dp))
                     .padding(horizontal = 9.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
@@ -478,7 +478,7 @@ private fun ReplyBarBody(
     val name = if (fromSelf) stringResource(R.string.chat_reply_you) else otherParticipantName
     val preview = message.preview(context)
     val corner = if (large) 12.dp else 10.dp
-    val bg = if (large) colors.replyBarBackground else colors.messageBubbleBackground.copy(alpha = 0.4f)
+    val bg = if (large) colors.replyBarBackground else colors.messageBubbleBackground
     Row(
         modifier
             .then(if (large) Modifier.padding(start = 8.dp, end = 8.dp, bottom = 4.dp) else Modifier)
