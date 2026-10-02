@@ -44,4 +44,14 @@
 
     <string name="chat_wallpaper_preset_citrus">Jeruk</string>
     <string name="chat_wallpaper_current">Gaya saat ini</string>
+    <string name="chat_wallpaper_preset_pearl">Neon</string>
+    <string name="chat_wallpaper_preset_paper">Kertas</string>
+    <string name="chat_wallpaper_preset_ink">Tinta</string>
+    <string name="chat_wallpaper_preset_ripple">Riak</string>
+    <string name="chat_wallpaper_preset_prism">Prisma</string>
+    <string name="chat_wallpaper_preset_orbit">Orbit</string>
+    <string name="chat_wallpaper_preset_brush">Sapuan kuas</string>
+    <string name="chat_wallpaper_preset_watercolor">Cat air</string>
+    <string name="chat_wallpaper_preset_sketch">Sketsa</string>
+    <string name="chat_wallpaper_preset_canvas">Kanvas</string>
 </resources>

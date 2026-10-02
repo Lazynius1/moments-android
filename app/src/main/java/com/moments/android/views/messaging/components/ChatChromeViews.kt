@@ -232,7 +232,7 @@ fun ChatConversationIntroRow(
     val relationship = context?.let { relationshipText(it) }
 
     androidx.compose.foundation.layout.Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 22.dp).padding(top = 46.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 22.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -272,7 +272,7 @@ internal fun ChatGroupConversationIntroRow(
             .fillMaxWidth()
             .clickable(onClick = onTap)
             .padding(horizontal = 24.dp, vertical = 22.dp)
-            .padding(top = 46.dp),
+            ,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {

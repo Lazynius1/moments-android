@@ -88,7 +88,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
-private data class RootKeyboardMetrics(
+internal data class RootKeyboardMetrics(
     val visible: Boolean,
     val bottomInsetPx: Int,
 )
@@ -105,7 +105,7 @@ internal fun measureRootKeyboardBottomInsetPx(view: android.view.View): Int {
  * Medimos la ventana raíz (como SizeNotifierFrameLayout) y fijamos altura al grabar.
  */
 @Composable
-private fun rememberRootKeyboardMetrics(): RootKeyboardMetrics {
+internal fun rememberRootKeyboardMetrics(): RootKeyboardMetrics {
     val view = LocalView.current
     var keyboardVisible by remember(view) { mutableStateOf(false) }
     var bottomInsetPx by remember(view) { mutableIntStateOf(0) }
@@ -670,9 +670,6 @@ class ChatMessagePresentationState {
     var flashingMessageIds by mutableStateOf(emptySet<String>())
     /** ≡ iOS `chatListController.frameInWindow(forRowId:)`. */
     var rowFrameProvider: ((String) -> Rect?)? = null
-    var hideKeyboardBeforeMenu: (() -> Boolean)? = null
-    var requestComposerFocus: (() -> Unit)? = null
-    private var restoreComposerFocusAfterMenu = false
 
     fun presentMessageOptions(
         message: EnhancedMessage,
@@ -686,10 +683,7 @@ class ChatMessagePresentationState {
             ?: Rect.Zero
         // ≡ iOS guard anchorFrame.width > 0, height > 0
         if (frame.width <= 0f || frame.height <= 0f) return
-        if (menuSelection == null) {
-            restoreComposerFocusAfterMenu = hideKeyboardBeforeMenu?.invoke() == true
-        }
-        // ≡ iOS: menú al instante; el teclado baja en paralelo.
+        // Preserve composer focus and IME visibility while presenting the menu.
         menuSelection = ChatMessageMenuSelection(
             rowId = rowId,
             message = message,
@@ -713,10 +707,7 @@ class ChatMessagePresentationState {
     }
 
     fun clearMessageOptions() {
-        val restore = restoreComposerFocusAfterMenu
-        restoreComposerFocusAfterMenu = false
         menuSelection = null
-        if (restore) requestComposerFocus?.invoke()
     }
     fun updateMenuLiftOffset(rowId: String, offsetY: Float) {
         val current = menuSelection ?: return

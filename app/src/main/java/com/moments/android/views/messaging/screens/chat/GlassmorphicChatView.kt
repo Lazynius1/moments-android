@@ -57,6 +57,7 @@ import com.moments.android.views.messaging.services.ChatNavigationIntentStore
 import com.moments.android.views.messaging.services.ChatSessionEngine
 import com.moments.android.views.messaging.services.rememberChatKeyboardScrollCoordinator
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
@@ -64,9 +65,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import android.view.inputmethod.InputMethodManager
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -264,22 +263,8 @@ fun GlassmorphicChatView(
     val forwardingPreferences by session.forwardingPreferences.collectAsState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val rootView = LocalView.current
     val scope = rememberCoroutineScope()
 
-    messagePresentation.hideKeyboardBeforeMenu = {
-        val open = keyboardScrollCoordinator.isVisible ||
-            keyboardScrollCoordinator.keyboardHeightPx > 0f ||
-            rootKeyboardInsetPx(rootView) > 8f
-        focusManager.clearFocus(force = true)
-        keyboardController?.hide()
-        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-        imm?.hideSoftInputFromWindow(rootView.windowToken, 0)
-        open
-    }
-    messagePresentation.requestComposerFocus = {
-        composerFocusEpoch += 1
-    }
 
     // ≡ iOS onChange(of: activeAttachmentSheet) → isTextFieldFocused = false
     LaunchedEffect(attachmentSheet) {
@@ -537,6 +522,7 @@ fun GlassmorphicChatView(
     fun activateReply(message: EnhancedMessage) {
         replyingTo = message
         editingMessage = null
+        composerFocusEpoch += 1
         scope.launch { messagePresentation.pulseBubbleHighlight(message.id) }
         if (scroll.hasCompletedInitialScroll && !scroll.isPinnedToBottom) {
             scroll.scrollToTarget(ChatScrollTarget.HighlightedMessage(message.id), animated = !MotionPolicy.reduceMotion)
@@ -726,8 +712,18 @@ fun GlassmorphicChatView(
         }
     }
 
+    val headerDensity = androidx.compose.ui.platform.LocalDensity.current
+    var headerHeight by remember { mutableStateOf(0.dp) }
     val effectivePendingContext = composer.pendingChatContext ?: pendingChatContext
-    val isLoadingHistory by session.isLoadingMore.collectAsState()
+    val isLoadingHistoryRequest by session.isLoadingMore.collectAsState()
+    var isLoadingHistory by remember(conversation.id) { mutableStateOf(false) }
+    LaunchedEffect(isLoadingHistoryRequest) {
+        if (isLoadingHistoryRequest) isLoadingHistory = true
+        else {
+            if (isLoadingHistory) delay(250)
+            isLoadingHistory = false
+        }
+    }
     val rows = remember(
         isLoadingHistory,
         session.chatRenderRows,
@@ -924,6 +920,7 @@ fun GlassmorphicChatView(
                     listController = listController,
                     presentation = listPresentation,
                     viewModel = session,
+                    headerInset = headerHeight,
                     adaptiveColors = colors,
                     fallbackName = displayName,
                     fallbackUserId = conversation.otherParticipantId,
@@ -1256,7 +1253,9 @@ fun GlassmorphicChatView(
                 onSearchClear = search::clearSearchQueryKeepingMode,
                 onSearchSubmit = search::scrollToCurrentSearchMatch,
             ),
-            modifier = Modifier.blur(
+            modifier = Modifier.onSizeChanged { size ->
+                headerHeight = with(headerDensity) { size.height.toDp() }
+            }.blur(
                 radius = if (messagePresentation.menuSelection != null) 5.dp else 0.dp,
                 edgeTreatment = BlurredEdgeTreatment.Unbounded,
             ),
@@ -1310,7 +1309,9 @@ fun GlassmorphicChatView(
                 onSearchClear = search::clearSearchQueryKeepingMode,
                 onSearchSubmit = search::scrollToCurrentSearchMatch,
             ),
-            modifier = Modifier.blur(
+            modifier = Modifier.onSizeChanged { size ->
+                headerHeight = with(headerDensity) { size.height.toDp() }
+            }.blur(
                 radius = if (messagePresentation.menuSelection != null) 5.dp else 0.dp,
                 edgeTreatment = BlurredEdgeTreatment.Unbounded,
             ),
@@ -1847,12 +1848,7 @@ private fun Context.findActivity(): Activity? = when (this) {
 }
 
 /** Inset IME real vía visible display frame (el host a veces come WindowInsets.ime). */
-private fun rootKeyboardInsetPx(view: android.view.View): Float {
-    val root = view.rootView
-    val visible = android.graphics.Rect()
-    root.getWindowVisibleDisplayFrame(visible)
-    return (root.height - visible.bottom).toFloat().coerceAtLeast(0f)
-}
+
 
 private fun messageIds(item: MessageItem): Set<String> = when (item) {
     is MessageItem.Single -> setOf(item.message.id)

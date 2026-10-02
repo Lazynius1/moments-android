@@ -44,4 +44,14 @@
 
     <string name="chat_wallpaper_preset_citrus">Narenciye</string>
     <string name="chat_wallpaper_current">Mevcut stil</string>
+    <string name="chat_wallpaper_preset_pearl">Neon</string>
+    <string name="chat_wallpaper_preset_paper">Kâğıt</string>
+    <string name="chat_wallpaper_preset_ink">Mürekkep</string>
+    <string name="chat_wallpaper_preset_ripple">Dalgalar</string>
+    <string name="chat_wallpaper_preset_prism">Prizma</string>
+    <string name="chat_wallpaper_preset_orbit">Yörünge</string>
+    <string name="chat_wallpaper_preset_brush">Fırça darbeleri</string>
+    <string name="chat_wallpaper_preset_watercolor">Suluboya</string>
+    <string name="chat_wallpaper_preset_sketch">Eskiz</string>
+    <string name="chat_wallpaper_preset_canvas">Tuval</string>
 </resources>

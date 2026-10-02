@@ -199,6 +199,7 @@ internal fun GlassmorphicChatMessageList(
     callbacks: ChatMessageListCallbacks,
     /** ≡ iOS `composerBottomInset` → contentInset.bottom (LazyColumn reverseLayout: contentPadding.bottom). */
     composerChromeHeight: Dp = ChatComposerChromeMetrics.estimatedComposerChromeHeight,
+    headerInset: Dp = 0.dp,
     /** Separación visual entre la última fila y el compositor. */
     composerGap: Dp = ChatComposerChromeMetrics.messageListGap,
     /** ≡ iOS `isVanishGestureEnabled` */
@@ -254,7 +255,7 @@ internal fun GlassmorphicChatMessageList(
                 contentPadding = PaddingValues(
                     start = 8.dp,
                     end = 8.dp,
-                    top = ChatComposerChromeMetrics.messageListGap,
+                    top = headerInset + ChatComposerChromeMetrics.messageListGap,
                     bottom = listBottomInset,
                 ),
                 rowContent = { listRow ->
@@ -301,7 +302,7 @@ internal fun GlassmorphicChatMessageList(
             )
             AnimatedVisibility(
                 presentation.shouldShowHistoryLoadNotice(viewModel),
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = headerInset + 10.dp),
             ) {
                 ChatHistoryLoadingIndicator(
                     adaptiveColors = adaptiveColors,

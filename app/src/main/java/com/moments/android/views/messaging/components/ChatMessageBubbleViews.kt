@@ -146,7 +146,7 @@ fun GlassmorphicMessageRow(
     val revealOffset = timestampRevealState.offset
     val tail = groupPosition == ChatMessageGroupPosition.LAST || groupPosition == ChatMessageGroupPosition.SINGLE
     val head = groupPosition == ChatMessageGroupPosition.FIRST || groupPosition == ChatMessageGroupPosition.SINGLE
-    val resolvedReactions = if (isMenuSelected) null else displayReactions ?: message.reactions
+    val resolvedReactions = displayReactions ?: message.reactions
     val hasReactions = !resolvedReactions.isNullOrEmpty()
     val reactionSpacing = if (hasReactions || isStarred) 6.dp else 4.dp
     val bottomPad = run {

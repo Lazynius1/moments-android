@@ -44,4 +44,14 @@
 
     <string name="chat_wallpaper_preset_citrus">柑橘</string>
     <string name="chat_wallpaper_current">現在のスタイル</string>
+    <string name="chat_wallpaper_preset_pearl">ネオン</string>
+    <string name="chat_wallpaper_preset_paper">紙</string>
+    <string name="chat_wallpaper_preset_ink">インク</string>
+    <string name="chat_wallpaper_preset_ripple">波紋</string>
+    <string name="chat_wallpaper_preset_prism">プリズム</string>
+    <string name="chat_wallpaper_preset_orbit">軌道</string>
+    <string name="chat_wallpaper_preset_brush">筆跡</string>
+    <string name="chat_wallpaper_preset_watercolor">水彩</string>
+    <string name="chat_wallpaper_preset_sketch">スケッチ</string>
+    <string name="chat_wallpaper_preset_canvas">キャンバス</string>
 </resources>

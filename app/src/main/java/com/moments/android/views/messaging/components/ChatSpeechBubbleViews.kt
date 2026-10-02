@@ -204,7 +204,7 @@ fun ChatTextBubbleView(
 
     val segments = remember(text) { chatTextSegments(text) }
     val hasSpoilers = segments.any { it.isSpoiler }
-    val hasReactions = !reactions.isNullOrEmpty()
+    val hasReactions = !LocalChatMenuBadgesHidden.current && !reactions.isNullOrEmpty()
     val hasReply = repliedMessage != null
     val linkUrl = remember(text) { ChatLinkOpener.firstUrl(text) }
     val hasLink = linkUrl != null

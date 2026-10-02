@@ -44,4 +44,14 @@
 
     <string name="chat_wallpaper_preset_citrus">साइट्रस</string>
     <string name="chat_wallpaper_current">मौजूदा शैली</string>
+    <string name="chat_wallpaper_preset_pearl">नियॉन</string>
+    <string name="chat_wallpaper_preset_paper">कागज़</string>
+    <string name="chat_wallpaper_preset_ink">स्याही</string>
+    <string name="chat_wallpaper_preset_ripple">लहरें</string>
+    <string name="chat_wallpaper_preset_prism">प्रिज़्म</string>
+    <string name="chat_wallpaper_preset_orbit">कक्षा</string>
+    <string name="chat_wallpaper_preset_brush">ब्रश के रंग</string>
+    <string name="chat_wallpaper_preset_watercolor">जलरंग</string>
+    <string name="chat_wallpaper_preset_sketch">रेखाचित्र</string>
+    <string name="chat_wallpaper_preset_canvas">कैनवास</string>
 </resources>

@@ -1,6 +1,8 @@
 package com.moments.android.views.messaging.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedVisibility
@@ -8,6 +10,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.Canvas
@@ -33,6 +37,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items as rowItems
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -41,7 +53,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -108,6 +119,7 @@ import com.moments.android.views.creator.emojiSupportsSkinTone
 import com.moments.android.views.creator.emojiWithoutSkinTone
 import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.messaging.core.ChatMessagePolicy
+import com.moments.android.views.messaging.screens.chat.rememberRootKeyboardMetrics
 import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageStatus
 import com.moments.android.views.messaging.core.MessageType
@@ -197,11 +209,12 @@ data class ChatMessageMenuCallbacks(
     val onOpenMessage: (EnhancedMessage, List<EnhancedMessage>?) -> Unit = { _, _ -> },
 )
 
-private data class ChatMessageMenuLayout(
+internal data class ChatMessageMenuLayout(
     val messageOffsetY: Float,
     val reactionsCenter: Offset,
     val menuCenter: Offset,
     val reactionsAreAbove: Boolean,
+    val actionsMaxHeight: Float,
 )
 
 private fun liftedMessageHitRect(
@@ -301,7 +314,9 @@ fun ChatMessageBubbleChrome(
                 )
             },
     ) {
-        content()
+        CompositionLocalProvider(LocalChatMenuBadgesHidden provides isMenuSelected) {
+            content()
+        }
         if (isFlashing) {
             Box(
                 Modifier
@@ -342,13 +357,16 @@ fun ChatMessageContextMenuOverlay(
     val isStarred = item.message.id in starredMessageIds || item.message.isStarred(currentUserId)
     val rowCount = visibleMenuRowsCount(item.message, isCurrentUser, currentUserId, forwardingPreferences)
     val systemBars = WindowInsets.systemBars
+    val keyboardMetrics = rememberRootKeyboardMetrics()
+    val rootView = LocalView.current.rootView
     var overlayOriginInWindow by remember { mutableStateOf(Offset.Zero) }
-    var reactionsSizePx by remember { mutableStateOf(Offset(300f, 54f)) }
+    var reactionsSizePx by remember { mutableStateOf(with(density) { Offset(minOf(400.dp.toPx(), rootView.width.toFloat() - 32.dp.toPx()), 64.dp.toPx()) }) }
     var menuSizePx by remember(item.rowId, showsMessageInfo, showsGroupReaders) {
         val infoHeight = extraHeaderHeightDp.value
         mutableStateOf(Offset(240f, (rowCount * 36f + 16f + infoHeight).coerceAtLeast(36f)))
     }
     var presented by remember(item.rowId) { mutableStateOf(false) }
+    var dismissing by remember(item.rowId) { mutableStateOf(false) }
     var reactionsExpanded by remember(item.rowId) { mutableStateOf(false) }
     val presentationProgress by animateFloatAsState(
         targetValue = if (presented) 1f else 0f,
@@ -360,15 +378,27 @@ fun ChatMessageContextMenuOverlay(
         label = "messageContextPresentation",
     )
 
+    val railProgress by animateFloatAsState(
+        targetValue = if (presented) 1f else 0f,
+        animationSpec = tween(if (MotionPolicy.reduceMotion) 0 else if (presented) 420 else 300, easing = LinearEasing),
+        label = "reactionRailFormation",
+    )
+
     LaunchedEffect(item.rowId) { presented = true }
 
     fun dismissThen(action: () -> Unit = {}) {
+        if (dismissing) return
+        dismissing = true
         presented = false
         scope.launch {
-            if (!MotionPolicy.reduceMotion) delay(260L)
+            if (!MotionPolicy.reduceMotion) delay(320L)
             onDismiss()
             action()
         }
+    }
+
+    BackHandler {
+        if (reactionsExpanded) reactionsExpanded = false else dismissThen()
     }
 
     BoxWithConstraints(
@@ -401,7 +431,12 @@ fun ChatMessageContextMenuOverlay(
             systemBars.getTop(this).toFloat() + 12.dp.toPx()
         }
         val bottomMarginPx = with(density) {
-            systemBars.getBottom(this).toFloat() + 12.dp.toPx()
+            // Account for any resize already applied by the host, without double-counting IME.
+            val spaceBelowOverlay = (rootView.height - overlayOriginInWindow.y - containerH).coerceAtLeast(0f)
+            val imeOverlap = if (keyboardMetrics.visible) {
+                (keyboardMetrics.bottomInsetPx - spaceBelowOverlay).coerceAtLeast(0f)
+            } else WindowInsets.ime.getBottom(this).toFloat()
+            max(systemBars.getBottom(this).toFloat(), imeOverlap) + 12.dp.toPx()
         }
         // iOS usa puntos ≈ dp; clamp/offsets deben ir en px de densidad.
         val metrics = remember(density, showsMessageInfo, showsGroupReaders) {
@@ -412,8 +447,8 @@ fun ChatMessageContextMenuOverlay(
                         16.dp + extraHeaderHeightDp
                     ).toPx(),
                     stackGap = 10.dp.toPx(),
-                    reactionsBarHeight = 54.dp.toPx(),
-                    expandedReactionsHeight = 232.dp.toPx(),
+                    reactionsBarHeight = 64.dp.toPx(),
+                    expandedReactionsHeight = 250.dp.toPx(),
                     horizontalInset = 16.dp.toPx(),
                     reactionsBarEstimatedWidth = 300.dp.toPx(),
                     menuEstimatedWidth = 240.dp.toPx(),
@@ -477,15 +512,30 @@ fun ChatMessageContextMenuOverlay(
 
         val maxPanelWidth = (containerW - metrics.horizontalInset * 2f).coerceAtLeast(0f)
         ChatReactionRail(
-            message = item.message,
+            progress = railProgress,
             isOutgoing = item.isOutgoing,
             isAboveMessage = layout.reactionsAreAbove,
+            connectorAnchorX = reactionConnectorSourceX(
+                anchor = liftedMessageHitRect(
+                    anchor = localSelection.anchorFrame,
+                    offsetY = layout.messageOffsetY,
+                    scale = ChatBubbleAnchorMetrics.menuSelectionScale,
+                    isOutgoing = localSelection.isOutgoing,
+                ),
+                railLeft = (layout.reactionsCenter.x - reactionsSizePx.x / 2f).coerceIn(
+                    metrics.horizontalInset,
+                    (containerW - metrics.horizontalInset - reactionsSizePx.x).coerceAtLeast(metrics.horizontalInset),
+                ),
+                railWidth = reactionsSizePx.x,
+                inset = with(density) { 23.dp.toPx() },
+                isOutgoing = item.isOutgoing,
+            ),
             expanded = reactionsExpanded,
             onExpandedChange = { reactionsExpanded = it },
             emojiTracker = emojiTracker,
             onReaction = { emoji -> dismissThen { callbacks.onReaction(item.message, emoji) } },
             modifier = Modifier
-                .widthIn(max = with(density) { maxPanelWidth.toDp() })
+                .width(minOf(with(density) { maxPanelWidth.toDp() }, 400.dp))
                 .onGloballyPositioned { coords ->
                     reactionsSizePx = Offset(coords.size.width.toFloat(), coords.size.height.toFloat())
                 }
@@ -502,15 +552,34 @@ fun ChatMessageContextMenuOverlay(
                             .coerceIn(topMarginPx, maxY)
                             .roundToInt(),
                     )
-                }
-                .graphicsLayer {
-                    val scale = 0.82f + 0.18f * presentationProgress
-                    scaleX = scale
-                    scaleY = scale
-                    alpha = presentationProgress
-                    transformOrigin = TransformOrigin(0.5f, if (layout.reactionsAreAbove) 1f else 0f)
                 },
         )
+
+        // The connector protrudes beyond the rail; give it a root-level hit target.
+        if (!reactionsExpanded && railProgress > 0.95f) {
+            val railLeft = (layout.reactionsCenter.x - reactionsSizePx.x / 2f).coerceIn(
+                metrics.horizontalInset,
+                (containerW - metrics.horizontalInset - reactionsSizePx.x).coerceAtLeast(metrics.horizontalInset),
+            )
+            val railTop = (layout.reactionsCenter.y - reactionsSizePx.y / 2f).coerceIn(
+                topMarginPx,
+                (containerH - bottomMarginPx - reactionsSizePx.y).coerceAtLeast(topMarginPx),
+            )
+            val sourceX = reactionConnectorSourceX(
+                anchor = liftedMessageHitRect(localSelection.anchorFrame, layout.messageOffsetY, ChatBubbleAnchorMetrics.menuSelectionScale, localSelection.isOutgoing),
+                railLeft = railLeft, railWidth = reactionsSizePx.x,
+                inset = with(density) { 23.dp.toPx() }, isOutgoing = item.isOutgoing,
+            )
+            Box(Modifier.offset {
+                IntOffset(
+                    (railLeft + sourceX - 22.dp.toPx()).roundToInt(),
+                    (railTop + (if (layout.reactionsAreAbove) 74.dp.toPx() else -10.dp.toPx()) - 22.dp.toPx()).roundToInt(),
+                )
+            }.size(44.dp).zIndex(30f).clickable {
+                HapticManager.shared.lightImpact()
+                reactionsExpanded = true
+            })
+        }
 
         // Un solo popup a la vez: con el catálogo de reacciones abierto, las
         // acciones no reciben hits (no basta con alpha = 0).
@@ -518,6 +587,7 @@ fun ChatMessageContextMenuOverlay(
             Column(
                 Modifier
                     .width(minOf(240.dp, with(density) { maxPanelWidth.toDp() }))
+                    .heightIn(max = with(density) { layout.actionsMaxHeight.toDp() })
                     .onGloballyPositioned { coords ->
                         menuSizePx = Offset(coords.size.width.toFloat(), coords.size.height.toFloat())
                     }
@@ -543,6 +613,7 @@ fun ChatMessageContextMenuOverlay(
                         scaleX = 0.92f + 0.08f * presentationProgress
                         scaleY = 0.92f + 0.08f * presentationProgress
                     }
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 8.dp, vertical = 8.dp)
                     .clipToBounds(),
             ) {
@@ -600,9 +671,10 @@ private data class InlineSkinToneSelection(val baseEmoji: String, val anchorKey:
 
 @Composable
 private fun ChatReactionRail(
-    message: EnhancedMessage,
+    progress: Float,
     isOutgoing: Boolean,
     isAboveMessage: Boolean,
+    connectorAnchorX: Float,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     emojiTracker: EmojiUsageTracker,
@@ -613,14 +685,30 @@ private fun ChatReactionRail(
     val density = LocalDensity.current
     val primaryText = com.moments.android.extensions.MomentsChromeGlass.contentColor(dark)
     val revision by emojiTracker.revision.collectAsState()
-    val quick = remember(revision) { emojiTracker.orderedEmojis(EmojiReactionDefaults.chat) }
+    val quick = remember(revision) {
+        val candidates = (EmojiReactionDefaults.chat + emojiTracker.recentlyUsed(20) + emojiPickerCatalog().take(32)).distinct()
+        emojiTracker.orderedEmojis(candidates, limit = 20)
+    }
     val allEmojis = remember(revision) {
         (emojiTracker.recentlyUsed(12) + EmojiReactionDefaults.chat + emojiPickerCatalog()).distinct()
     }
     val frames = remember { mutableStateMapOf<String, Rect>() }
     var railOriginInWindow by remember { mutableStateOf(Offset.Zero) }
     var toneSelection by remember { mutableStateOf<InlineSkinToneSelection?>(null) }
-    val panelShape = RoundedCornerShape(23.dp)
+    val surface = com.moments.android.extensions.MomentsChromeGlass.canvasTint(dark)
+    val visible = reactionPhase(progress, 0.30f, 0.82f)
+    val formationShape = remember(progress, connectorAnchorX, expanded) {
+        object : Shape {
+            override fun createOutline(size: androidx.compose.ui.geometry.Size, layoutDirection: androidx.compose.ui.unit.LayoutDirection, density: androidx.compose.ui.unit.Density): Outline {
+                val spread = reactionPhase(progress, 0.20f, 0.78f)
+                val diameter = with(density) { 40.dp.toPx() } * reactionPhase(progress, 0f, 0.26f)
+                val width = diameter + (size.width - diameter) * spread
+                val height = diameter + (size.height - diameter) * spread
+                val x = connectorAnchorX + (size.width / 2f - connectorAnchorX) * spread
+                return Outline.Rounded(RoundRect(x - width / 2f, (size.height - height) / 2f, x + width / 2f, (size.height + height) / 2f, CornerRadius(if (expanded) minOf(height / 2f, with(density) { 23.dp.toPx() }) else height / 2f)))
+            }
+        }
+    }
 
     fun select(emoji: String) {
         HapticManager.shared.mediumImpact()
@@ -632,25 +720,16 @@ private fun ChatReactionRail(
     BoxWithConstraints(
         modifier.onGloballyPositioned { railOriginInWindow = it.positionInWindow() },
     ) {
-        val panelWidth = if (expanded) minOf(maxWidth, 350.dp) else androidx.compose.ui.unit.Dp.Unspecified
-        Column(
-            Modifier
-                .then(if (expanded) Modifier.width(panelWidth) else Modifier)
-                .shadow(
-                    24.dp,
-                    panelShape,
-                    ambientColor = Color.Black.copy(if (dark) 0.24f else 0.12f),
-                    spotColor = Color.Black.copy(if (dark) 0.24f else 0.12f),
-                )
-                .clip(panelShape)
-                .momentsChromeGlass(panelShape, interactive = true),
-        ) {
-            Row(
-                Modifier.height(46.dp).padding(horizontal = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+        Box(Modifier.fillMaxWidth().height(if (expanded) 250.dp else 64.dp)) {
+            Box(Modifier.fillMaxSize().clip(formationShape).background(surface))
+            Column(Modifier.fillMaxSize().graphicsLayer { shape = formationShape; clip = true; alpha = visible }) {
+            LazyRow(
+                Modifier.fillMaxWidth().height(64.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                quick.forEach { emoji ->
+                rowItems(quick, key = { it }) { emoji ->
+                    Box(Modifier.size(48.dp, 64.dp), contentAlignment = Alignment.Center) {
                     InlineReactionEmoji(
                         emoji = emoji,
                         anchorKey = "quick:$emoji",
@@ -668,26 +747,7 @@ private fun ChatReactionRail(
                             }
                         },
                     )
-                }
-                Box(
-                    Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .momentsChromeGlass(CircleShape, interactive = true)
-                        .border(1.dp, primaryText.copy(if (dark) 0.12f else 0.08f), CircleShape)
-                        .clickable {
-                            HapticManager.shared.lightImpact()
-                            toneSelection = null
-                            onExpandedChange(!expanded)
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Default.ExpandMore,
-                        stringResource(R.string.chat_action_more_reactions),
-                        tint = primaryText,
-                        modifier = Modifier.size(20.dp).rotate(if (expanded) 180f else 0f),
-                    )
+                    }
                 }
             }
 
@@ -723,21 +783,33 @@ private fun ChatReactionRail(
             }
         }
 
-        ChatReactionRailTail(
-            isOutgoing = isOutgoing,
-            pointsDown = isAboveMessage,
-            modifier = Modifier.align(
-                when {
-                    isAboveMessage && isOutgoing -> Alignment.BottomEnd
-                    isAboveMessage -> Alignment.BottomStart
-                    isOutgoing -> Alignment.TopEnd
-                    else -> Alignment.TopStart
-                },
-            ).offset(
-                x = if (isOutgoing) (-23).dp else 23.dp,
-                y = if (isAboveMessage) 20.dp else (-20).dp,
-            ),
-        )
+        }
+        if (!expanded) {
+            val tail = reactionPhase(progress, 0.50f, 0.89f)
+            val medium = reactionPhase(progress, 0.58f, 0.94f)
+            val small = reactionPhase(progress, 0.65f, 0.98f)
+            val face = reactionPhase(progress, 0.60f, 1f)
+            val direction = if (isAboveMessage) 1f else -1f
+            val edge = if (isAboveMessage) 64f else 0f
+            val faceY = edge + direction * (-8f + 18f * tail)
+            val mediumY = faceY + direction * (12f + 8f * medium)
+            val smallY = mediumY + direction * (6f + 5f * small)
+            val bend = if (isOutgoing) -1f else 1f
+            Canvas(Modifier.fillMaxWidth().height(64.dp)) {
+                drawCircle(surface, 20.dp.toPx() * tail, Offset(connectorAnchorX, faceY.dp.toPx()))
+                drawCircle(surface, 6.dp.toPx() * medium, Offset(connectorAnchorX + bend * 14.dp.toPx() * medium, mediumY.dp.toPx()))
+                drawCircle(surface, 4.dp.toPx() * small, Offset(connectorAnchorX + bend * (14f * medium + 5f * small).dp.toPx(), smallY.dp.toPx()))
+            }
+            Box(
+                Modifier.offset { IntOffset((connectorAnchorX - 20.dp.toPx()).roundToInt(), (faceY.dp.toPx() - 20.dp.toPx()).roundToInt()) }
+                    .size(40.dp).clip(CircleShape)
+                    ,
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(painterResource(R.drawable.chat_reaction_smile_icon), stringResource(R.string.chat_action_more_reactions),
+                    tint = primaryText, modifier = Modifier.size(22.dp).alpha(face))
+            }
+        }
 
         val selectedTone = toneSelection
         val windowAnchor = selectedTone?.let { frames[it.anchorKey] }
@@ -820,23 +892,16 @@ private fun InlineReactionEmoji(
     )
 }
 
-@Composable
-private fun ChatReactionRailTail(
+/** Aim at the message edge facing the rail, clamped away from its rounded ends. */
+internal fun reactionConnectorSourceX(
+    anchor: Rect,
+    railLeft: Float,
+    railWidth: Float,
+    inset: Float,
     isOutgoing: Boolean,
-    pointsDown: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val dark = isSystemInDarkTheme()
-    Canvas(modifier.size(24.dp, 28.dp)) {
-        val largeRadius = 8.dp.toPx()
-        val smallRadius = 4.dp.toPx()
-        val largeCenter = Offset(12.dp.toPx(), if (pointsDown) 8.dp.toPx() else 20.dp.toPx())
-        val bendsRight = !isOutgoing
-        val smallCenter = Offset(if (bendsRight) 21.dp.toPx() else 3.dp.toPx(), if (pointsDown) 22.dp.toPx() else 6.dp.toPx())
-        val color = if (dark) Color(0xE643464D) else Color(0xEDF4F4F4)
-        drawCircle(color, largeRadius, largeCenter)
-        drawCircle(color, smallRadius, smallCenter)
-    }
+): Float {
+    val source = if (isOutgoing) anchor.left - inset else anchor.right + inset
+    return (source - railLeft).coerceIn(inset, max(inset, railWidth - inset))
 }
 
 @Composable
@@ -1083,7 +1148,7 @@ private fun visibleMenuRowsCount(
     return count
 }
 
-private data class MenuLayoutMetrics(
+internal data class MenuLayoutMetrics(
     val menuRowHeight: Float,
     val menuVerticalPadding: Float,
     val stackGap: Float,
@@ -1095,7 +1160,7 @@ private data class MenuLayoutMetrics(
     val extraMessageLift: Float,
 )
 
-private fun menuLayout(
+internal fun menuLayout(
     selection: ChatMessageMenuSelection,
     rowCount: Int,
     containerWidth: Float,
@@ -1116,19 +1181,21 @@ private fun menuLayout(
             bottom = containerHeight / 2f + 80f,
         )
     } else {
-        val wDiff = anchor.width * (scale - 1f)
-        val hDiff = anchor.height * (scale - 1f)
-        Rect(
-            left = anchor.left - wDiff / 2f,
-            top = anchor.top - hDiff / 2f,
-            right = anchor.right + wDiff / 2f,
-            bottom = anchor.bottom + hDiff / 2f,
-        )
+        liftedMessageHitRect(anchor, 0f, scale, selection.isOutgoing)
     }
 
-    val menuHeight = rowCount * metrics.menuRowHeight + metrics.menuVerticalPadding
+    val naturalMenuHeight = rowCount * metrics.menuRowHeight + metrics.menuVerticalPadding
+
     val stackGap = metrics.stackGap
+    val reactionMessageGap = stackGap * 0.6f
     val reactionsBarHeight = if (reactionsExpanded) metrics.expandedReactionsHeight else metrics.reactionsBarHeight
+    val availableHeight = (containerHeight - topMarginPx - bottomMarginPx).coerceAtLeast(1f)
+    // Tall media can overlap the popup, but actions stay reachable above the IME.
+    val actionsMaxHeight = min(naturalMenuHeight, max(
+        metrics.menuRowHeight + metrics.menuVerticalPadding,
+        availableHeight - scaled.height - reactionsBarHeight - stackGap - reactionMessageGap,
+    )).coerceIn(1f, availableHeight)
+    val menuHeight = if (reactionsExpanded) 0f else actionsMaxHeight
     val horizontalInset = metrics.horizontalInset
     val reactionsBarEstimatedWidth = if (reactionsExpanded) {
         min(containerWidth - metrics.horizontalInset * 2f, metrics.reactionsBarEstimatedWidth + 50f)
@@ -1156,7 +1223,7 @@ private fun menuLayout(
     val centerX = clampCenterX(scaled.center.x, max(reactionsBarEstimatedWidth, menuEstimatedWidth))
     // Encaja reacciones + mensaje + acciones en el viewport desplazando la fila
     // viva (no una copia de la burbuja).
-    val minimumMessageTop = topMarginPx + reactionsBarHeight + stackGap
+    val minimumMessageTop = topMarginPx + reactionsBarHeight + reactionMessageGap
     val maximumMessageTop = containerHeight - bottomMarginPx - menuHeight - stackGap - scaled.height
     val targetMessageTop = if (maximumMessageTop >= minimumMessageTop) {
         (scaled.top - metrics.extraMessageLift).coerceIn(minimumMessageTop, maximumMessageTop)
@@ -1166,7 +1233,7 @@ private fun menuLayout(
     val messageOffsetY = targetMessageTop - scaled.top
     val shiftedTop = scaled.top + messageOffsetY
     val shiftedBottom = scaled.bottom + messageOffsetY
-    val reactionsCenterY = shiftedTop - stackGap - reactionsBarHeight / 2f
+    val reactionsCenterY = shiftedTop - reactionMessageGap - reactionsBarHeight / 2f
     val menuCenterY = shiftedBottom + stackGap + menuHeight / 2f
 
     return ChatMessageMenuLayout(
@@ -1180,5 +1247,11 @@ private fun menuLayout(
             clampCenterY(menuCenterY, menuHeight),
         ),
         reactionsAreAbove = true,
+        actionsMaxHeight = actionsMaxHeight,
     )
+}
+
+private fun reactionPhase(progress: Float, start: Float, end: Float): Float {
+    val t = ((progress - start) / (end - start)).coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
 }

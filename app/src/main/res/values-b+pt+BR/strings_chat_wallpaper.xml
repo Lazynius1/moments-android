@@ -44,4 +44,14 @@
 
     <string name="chat_wallpaper_preset_citrus">Cítricos</string>
     <string name="chat_wallpaper_current">Estilo atual</string>
+    <string name="chat_wallpaper_preset_pearl">Neon</string>
+    <string name="chat_wallpaper_preset_paper">Papel</string>
+    <string name="chat_wallpaper_preset_ink">Tinta</string>
+    <string name="chat_wallpaper_preset_ripple">Ondas</string>
+    <string name="chat_wallpaper_preset_prism">Prisma</string>
+    <string name="chat_wallpaper_preset_orbit">Órbita</string>
+    <string name="chat_wallpaper_preset_brush">Pinceladas</string>
+    <string name="chat_wallpaper_preset_watercolor">Aquarela</string>
+    <string name="chat_wallpaper_preset_sketch">Traço</string>
+    <string name="chat_wallpaper_preset_canvas">Tela</string>
 </resources>

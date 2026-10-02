@@ -1231,6 +1231,8 @@ open class EnhancedChatViewModel(
         _isLoadingMore.value = true
         _isLoadingOlderHistory.value = true
         _historyLoadNotice.value = HistoryLoadNotice.HIDDEN
+        // Let the UI observe progress even when the local page is ready immediately.
+        kotlinx.coroutines.yield()
 
         val cutoff = effectiveDeletedAtCutoff()
         val pageSize = historyPageSize

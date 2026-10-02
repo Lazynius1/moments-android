@@ -81,6 +81,8 @@ data class ChatFailedMessageRetryAction(
     val retry: (EnhancedMessage) -> Unit,
 )
 
+internal val LocalChatMenuBadgesHidden = staticCompositionLocalOf { false }
+
 val LocalChatFailedMessageRetryAction = staticCompositionLocalOf<ChatFailedMessageRetryAction?> { null }
 
 /** ≡ iOS `ChatComposerReplyHeader.fieldCornerRadius` / cápsula unificada del compositor. */
@@ -664,6 +666,7 @@ fun MessageReactionOverlayBox(
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
+    val badgesHidden = LocalChatMenuBadgesHidden.current
     val hasReactions = !reactions.isNullOrEmpty()
     val hang = MessageReactionMetrics.hangOffset(compact)
     val rowSpacing = MessageReactionMetrics.reactionRowSpacing(compact)
@@ -686,7 +689,7 @@ fun MessageReactionOverlayBox(
                     val gapPx = with(density) { gap.toPx() }
                     val hangPx = with(density) { hang.toPx() }
                     val horizontalPx = with(density) { horizontal.toPx() }
-                    if (hasReactions && visibleCount > 0) {
+                    if (!badgesHidden && hasReactions && visibleCount > 0) {
                         val diameterPx = with(density) {
                             MessageReactionMetrics.badgeDiameter(compact).toPx()
                         }
@@ -712,7 +715,7 @@ fun MessageReactionOverlayBox(
                             blendMode = BlendMode.Clear,
                         )
                     }
-                    if (isStarred) {
+                    if (!badgesHidden && isStarred) {
                         val starD = with(density) {
                             MessageReactionMetrics.starBadgeDiameter(compact).toPx()
                         }
@@ -736,7 +739,7 @@ fun MessageReactionOverlayBox(
         ) {
             content()
         }
-        reactions?.takeIf { it.isNotEmpty() }?.let { nonEmpty ->
+        reactions?.takeIf { !badgesHidden && it.isNotEmpty() }?.let { nonEmpty ->
             MessageReactionChip(
                 reactions = nonEmpty,
                 onTap = onTap,
@@ -750,7 +753,7 @@ fun MessageReactionOverlayBox(
                     .zIndex(5f),
             )
         }
-        if (isStarred) {
+        if (!badgesHidden && isStarred) {
             MessageStarBadge(
                 compact = compact,
                 modifier = Modifier

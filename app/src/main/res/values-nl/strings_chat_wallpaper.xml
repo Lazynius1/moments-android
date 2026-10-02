@@ -44,4 +44,14 @@
 
     <string name="chat_wallpaper_preset_citrus">Citrus</string>
     <string name="chat_wallpaper_current">Huidige stijl</string>
+    <string name="chat_wallpaper_preset_pearl">Neon</string>
+    <string name="chat_wallpaper_preset_paper">Papier</string>
+    <string name="chat_wallpaper_preset_ink">Inkt</string>
+    <string name="chat_wallpaper_preset_ripple">Golven</string>
+    <string name="chat_wallpaper_preset_prism">Prisma</string>
+    <string name="chat_wallpaper_preset_orbit">Baan</string>
+    <string name="chat_wallpaper_preset_brush">Penseelstreken</string>
+    <string name="chat_wallpaper_preset_watercolor">Aquarel</string>
+    <string name="chat_wallpaper_preset_sketch">Schets</string>
+    <string name="chat_wallpaper_preset_canvas">Doek</string>
 </resources>

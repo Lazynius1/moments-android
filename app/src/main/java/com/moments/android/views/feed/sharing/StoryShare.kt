@@ -498,7 +498,8 @@ private fun SharedStoryUnavailablePreview(
     Box(
         modifier
             .size(StoryShareCardMetrics.size())
-            .clip(shape),
+            .clip(shape)
+            .background(Color(0xFF30363D)),
     ) {
         if (!previewImageURL.isNullOrBlank()) {
             AsyncImage(

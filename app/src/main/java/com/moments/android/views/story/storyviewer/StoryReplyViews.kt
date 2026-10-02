@@ -383,6 +383,7 @@ fun StoryReplyUnavailableThumbnail(
         modifier
             .size(StoryReplyPreviewMetrics.width, StoryReplyPreviewMetrics.height)
             .clip(RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius))
+            .background(Color(0xFF30363D))
             .border(0.5.dp, storyReplyChassisStroke, RoundedCornerShape(StoryReplyPreviewMetrics.cornerRadius)),
     ) {
         if (!preview.isNullOrBlank()) {

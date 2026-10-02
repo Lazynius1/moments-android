@@ -44,4 +44,14 @@
 
     <string name="chat_wallpaper_preset_citrus">柑橘</string>
     <string name="chat_wallpaper_current">目前風格</string>
+    <string name="chat_wallpaper_preset_pearl">霓虹</string>
+    <string name="chat_wallpaper_preset_paper">紙藝</string>
+    <string name="chat_wallpaper_preset_ink">墨韻</string>
+    <string name="chat_wallpaper_preset_ripple">波紋</string>
+    <string name="chat_wallpaper_preset_prism">稜鏡</string>
+    <string name="chat_wallpaper_preset_orbit">軌道</string>
+    <string name="chat_wallpaper_preset_brush">筆觸</string>
+    <string name="chat_wallpaper_preset_watercolor">水彩</string>
+    <string name="chat_wallpaper_preset_sketch">線稿</string>
+    <string name="chat_wallpaper_preset_canvas">畫布</string>
 </resources>

@@ -44,4 +44,14 @@
 
     <string name="chat_wallpaper_preset_citrus">시트러스</string>
     <string name="chat_wallpaper_current">현재 스타일</string>
+    <string name="chat_wallpaper_preset_pearl">네온</string>
+    <string name="chat_wallpaper_preset_paper">종이</string>
+    <string name="chat_wallpaper_preset_ink">잉크</string>
+    <string name="chat_wallpaper_preset_ripple">물결</string>
+    <string name="chat_wallpaper_preset_prism">프리즘</string>
+    <string name="chat_wallpaper_preset_orbit">궤도</string>
+    <string name="chat_wallpaper_preset_brush">붓터치</string>
+    <string name="chat_wallpaper_preset_watercolor">수채화</string>
+    <string name="chat_wallpaper_preset_sketch">스케치</string>
+    <string name="chat_wallpaper_preset_canvas">캔버스</string>
 </resources>
