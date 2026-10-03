@@ -120,7 +120,6 @@ import com.moments.android.services.social.BestFriendsService
 import com.moments.android.services.social.StoryChainLimits
 import com.moments.android.utilities.EmojiReactionDefaults
 import com.moments.android.utilities.EmojiUsageTracker
-import com.moments.android.utilities.MomentsAudioSession
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.creator.EmojiPickerView
 import com.moments.android.views.creator.components.resolvedTextOverlays
@@ -919,7 +918,6 @@ fun StoryViewerScreen(
         onDispose {
             playbackCoordinator.stopStory()
             playbackCoordinator.close()
-            MomentsAudioSession.deactivate()
             story.id?.let { storyViewModel?.stopObservingReactions(it) }
         }
     }

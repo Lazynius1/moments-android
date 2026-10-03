@@ -102,6 +102,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.moments.android.utilities.MomentsAudioSession
 import android.media.MediaPlayer
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
@@ -1097,16 +1098,21 @@ fun VoiceRecordingDraftPreview(
     var progress by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
     val player = remember { MediaPlayer() }
+    val audioSession = remember { MomentsAudioSession.lease { player.pause(); isPlaying = false } }
     val onTrimChangedState = rememberUpdatedState(onTrimChanged)
 
     DisposableEffect(Unit) {
+        player.setOnCompletionListener { audioSession.release(); isPlaying = false }
         onDispose {
+            audioSession.release()
             runCatching { player.stop() }
             runCatching { player.release() }
         }
     }
 
     LaunchedEffect(draft?.recording?.data) {
+        audioSession.release()
+        isPlaying = false
         val data = draft?.recording?.data ?: return@LaunchedEffect
         runCatching {
             val file = File.createTempFile("voice_draft_", ".m4a")
@@ -1127,6 +1133,7 @@ fun VoiceRecordingDraftPreview(
             val durationMs = player.duration.coerceAtLeast(1)
             if (current >= endMs) {
                 player.pause()
+                audioSession.release()
                 player.seekTo(startMs)
                 isPlaying = false
                 // ≡ iOS: progress = currentTime / duration (absoluto)
@@ -1162,8 +1169,10 @@ fun VoiceRecordingDraftPreview(
                 .clickable(enabled = !isPreparing && draft?.recording != null) {
                     if (isPlaying) {
                         player.pause()
+                        audioSession.release()
                         isPlaying = false
                     } else {
+                        if (!audioSession.activate(contentType = android.media.AudioAttributes.CONTENT_TYPE_SPEECH)) return@clickable
                         player.seekTo((workingTrim.start * 1000).toInt())
                         player.start()
                         isPlaying = true

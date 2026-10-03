@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
+import com.moments.android.utilities.withMomentsAudioFocus
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -46,23 +47,11 @@ import com.moments.android.R
 import com.moments.android.models.MediaItem
 import com.moments.android.models.Story
 import com.moments.android.services.cache.VideoPreloader
-import com.moments.android.utilities.MomentsAudioSession
 import com.moments.android.views.creator.StoryMediaLayoutRules
 import com.moments.android.views.creator.StoryMediaPresentationMode
 import com.moments.android.views.creator.creatoruikit.storyViewerCanvasCornerRadius
 import com.moments.android.views.feed.video.VideoPosterOverlay
 import kotlinx.coroutines.delay
-
-/** Equivalente de `StoryAudioSession` en `StoryViewerMedia.swift`. */
-private object StoryAudioSession {
-    fun initialize(context: android.content.Context) = MomentsAudioSession.initialize(context)
-
-    suspend fun activate() {
-        MomentsAudioSession.activate()
-    }
-
-    fun deactivate() = MomentsAudioSession.deactivate()
-}
 
 /**
  * Port de `GlassmorphicStoryVideoPlayer` (StoryViewerMedia.swift / contentView).
@@ -87,7 +76,7 @@ fun GlassmorphicStoryVideoPlayer(
     val capturedSeekMs = remember(url) { initialSeekMs }
     // ≡ VideoPreloader.shared.getPlayerItem(for:)
     val player = remember(url, shouldLoop) {
-        ExoPlayer.Builder(context).build().apply {
+        ExoPlayer.Builder(context).build().withMomentsAudioFocus(context).apply {
             setMediaItem(VideoPreloader.getPlayerItem(url))
             repeatMode = if (shouldLoop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
             playWhenReady = false
@@ -96,7 +85,6 @@ fun GlassmorphicStoryVideoPlayer(
     }
 
     DisposableEffect(player) {
-        StoryAudioSession.initialize(context)
         // ≡ setupObservers: reset progreso
         onProgressUpdate(0f)
         onReadyToPlayChanged(false)
@@ -121,8 +109,6 @@ fun GlassmorphicStoryVideoPlayer(
             player.pause()
             player.volume = 0f
             player.release()
-            // ≡ StoryAudioSession.deactivate() en deinit
-            StoryAudioSession.deactivate()
         }
     }
 
@@ -130,7 +116,6 @@ fun GlassmorphicStoryVideoPlayer(
         // ≡ isMutedExternally || !isPlaying; silenciar al pausar
         player.volume = if (isMutedExternally || !isPlaying) 0f else 1f
         if (isPlaying) {
-            StoryAudioSession.activate()
             player.play()
         } else {
             player.pause()

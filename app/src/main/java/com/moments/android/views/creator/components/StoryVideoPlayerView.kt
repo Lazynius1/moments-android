@@ -40,6 +40,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import com.moments.android.utilities.withMomentsAudioFocus
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -81,10 +82,11 @@ fun StoryVideoPlayerView(
     val latestProgress by rememberUpdatedState(onPlayProgress)
     val latestTrimStart by rememberUpdatedState(trimStart)
     val player = remember(videoUri) {
-        ExoPlayer.Builder(context.applicationContext).build().apply {
+        ExoPlayer.Builder(context.applicationContext).build().withMomentsAudioFocus(context).apply {
             setMediaItem(MediaItem.fromUri(videoUri))
             repeatMode = Player.REPEAT_MODE_OFF
-            playWhenReady = true
+            this.volume = volume ?: if (isMuted) 0f else 1f
+            playWhenReady = isPlaying ?: true
             prepare()
         }
     }

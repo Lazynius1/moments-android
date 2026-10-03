@@ -1,5 +1,6 @@
 package com.moments.android.views.creator.creatoruikit
 
+import com.moments.android.utilities.MomentsAudioSession
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -101,6 +102,7 @@ fun CameraPreviewView(
     var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     var boundCamera by remember { mutableStateOf<Camera?>(null) }
     var activeRecording by remember { mutableStateOf<Recording?>(null) }
+    val audioSession = remember { MomentsAudioSession.lease { activeRecording?.stop() } }
     var appliedZoom by remember { mutableFloatStateOf(1f) }
 
     // ≡ publishCenterStageAvailability(false) — stub honesto
@@ -117,6 +119,7 @@ fun CameraPreviewView(
     DisposableEffect(Unit) {
         onDispose {
             activeRecording?.stop()
+            audioSession.release()
             provider?.unbindAll()
             executor.shutdown()
         }
@@ -215,14 +218,20 @@ fun CameraPreviewView(
     LaunchedEffect(isRecording, captureAudio) {
         if (isRecording) {
             if (activeRecording != null) return@LaunchedEffect
+            if (captureAudio && !audioSession.activate(contentType = android.media.AudioAttributes.CONTENT_TYPE_SPEECH)) {
+                onRecordingStateChange(false)
+                onCaptureError()
+                return@LaunchedEffect
+            }
             val output = File(captureDirectory(context), "story_video_${System.currentTimeMillis()}.mp4")
-            val pending = videoCapture.output
+            val pending = try { videoCapture.output
                 .prepareRecording(context, FileOutputOptions.Builder(output).build())
                 .let { if (captureAudio) it.withAudioEnabled() else it }
                 .start(ContextCompat.getMainExecutor(context)) { event ->
                     when (event) {
                         is VideoRecordEvent.Start -> onRecordingStateChange(true)
                         is VideoRecordEvent.Finalize -> {
+                            audioSession.release()
                             activeRecording = null
                             onRecordingStateChange(false)
                             if (event.hasError()) onCaptureError()
@@ -230,6 +239,12 @@ fun CameraPreviewView(
                         }
                     }
                 }
+            } catch (_: Exception) {
+                audioSession.release()
+                onRecordingStateChange(false)
+                onCaptureError()
+                return@LaunchedEffect
+            }
             activeRecording = pending
         } else {
             // Skill camerax: no stop sin sesión; callbacks llegan async en Start/Finalize.

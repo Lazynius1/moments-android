@@ -39,6 +39,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import com.moments.android.utilities.withMomentsAudioFocus
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -49,7 +50,6 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import com.moments.android.extensions.fromHex
 import com.moments.android.services.performance.MotionPolicy
-import com.moments.android.utilities.MomentsAudioSession
 import com.moments.android.views.components.MomentsTapCycleForeground
 import com.moments.android.views.components.TapCycleForegroundText
 import com.moments.android.views.components.momentsTapCycleStickerBackground
@@ -250,7 +250,7 @@ fun StickerVideoPlayer(
     }
     val durationCallback by rememberUpdatedState(onDurationMs)
     val player = remember(url) {
-        ExoPlayer.Builder(context.applicationContext).build().apply {
+        ExoPlayer.Builder(context.applicationContext).build().withMomentsAudioFocus(context).apply {
             setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -267,14 +267,8 @@ fun StickerVideoPlayer(
     }
     LaunchedEffect(player, isMuted) {
         player.volume = if (isMuted) 0f else 1f
-        if (!isMuted) {
-            MomentsAudioSession.initialize(context)
-            MomentsAudioSession.activate(
-                usage = android.media.AudioAttributes.USAGE_MEDIA,
-                contentType = android.media.AudioAttributes.CONTENT_TYPE_MOVIE,
-            )
-        }
     }
+
     DisposableEffect(player) {
         var reported = false
         val handler = Handler(Looper.getMainLooper())

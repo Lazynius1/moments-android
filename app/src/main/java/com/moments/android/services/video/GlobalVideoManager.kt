@@ -13,13 +13,9 @@ import com.moments.android.services.content.FeedMediaItem
 import com.moments.android.services.content.FeedMoment
 import com.moments.android.utilities.MomentsAudioSession
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 
 /**
  * Bridge hasta portar `VideoPlayerManager` (trozo 3 de VideoPlayer.swift).
@@ -41,7 +37,6 @@ interface RegisteredVideoPlayer {
  */
 object GlobalVideoManager {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val lock = Any()
 
     private val allPlayers = ConcurrentHashMap<String, RegisteredVideoPlayer>()
@@ -87,6 +82,7 @@ object GlobalVideoManager {
                     }
                 },
             )
+            MomentsAudioSession.addInterruptionListener { pauseAllVideos(); disableSoundForSession() }
             startVolumeObservation(context.applicationContext)
             initialized = true
         }
@@ -202,15 +198,8 @@ object GlobalVideoManager {
     /** El usuario activó sonido en Reels u otro reproductor fuera del registro de feed. */
     fun enableSoundForSession() {
         _userHasEnabledSoundInSession.value = true
-        scope.launch {
-            // ≡ iOS configurePlaybackAudioSession (.playback / .moviePlayback)
-            MomentsAudioSession.activate(
-                usage = android.media.AudioAttributes.USAGE_MEDIA,
-                contentType = android.media.AudioAttributes.CONTENT_TYPE_MOVIE,
-            )
-            allPlayers.values.forEach { it.setMuted(false, respectSilentMode = true) }
-            runCatching { SharedVideoPlayerPool.setAllVolumes(1f) }
-        }
+        allPlayers.values.forEach { it.setMuted(false, respectSilentMode = true) }
+        runCatching { SharedVideoPlayerPool.setAllVolumes(1f) }
     }
 
     /** Remute simétrico: limpia la preferencia de sesión y mutea todos los players registrados. */
@@ -416,7 +405,7 @@ object GlobalVideoManager {
                 lastMusicVolume = newVol
                 if (newVol > oldVol &&
                     _activeVideoId.value != null &&
-                    !_userHasEnabledSoundInSession.value
+                    !_userHasEnabledSoundInSession.value && !am.isMusicActive
                 ) {
                     enableSoundForSession()
                 }

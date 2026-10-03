@@ -1,101 +1,104 @@
 package com.moments.android.utilities
 
+import android.content.BroadcastReceiver
+import android.content.Intent
+import android.content.IntentFilter
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicLong
 
-/**
- * Centraliza gestión de audio fuera del hilo principal. Equivalente de AVAudioSession.
- *
- * AudioFocusRequest exige [OnAudioFocusChangeListener] si se usa delayed focus gain
- * o pause-on-duck — sin listener, `build()` lanza IllegalStateException
- * ("Can't use delayed focus or pause on duck without a listener").
- */
+/** One temporary focus request shared by all audible players and recordings. */
 object MomentsAudioSession {
-    private var appContext: Context? = null
     private var audioManager: AudioManager? = null
     private var focusRequest: AudioFocusRequest? = null
-    private var savedMode: Int? = null
-    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var focusGeneration = 0L
     private val mainHandler = Handler(Looper.getMainLooper())
-
-    /** Listener obligatorio para delayed focus; iOS no tiene equivalente de callbacks. */
-    private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { /* no-op */ }
+    private val interruptionListeners = mutableSetOf<() -> Unit>()
+    internal val coordinator = AudioFocusCoordinator { abandonNativeFocus() }
 
     fun initialize(context: Context) {
-        if (appContext == null) {
-            appContext = context.applicationContext
-            audioManager = appContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        synchronized(coordinator) {
+            if (audioManager == null) {
+                val app = context.applicationContext
+                audioManager = app.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                ContextCompat.registerReceiver(app, object : BroadcastReceiver() {
+                    override fun onReceive(context: Context?, intent: Intent?) {
+                        if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) interrupt()
+                    }
+                }, IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY), ContextCompat.RECEIVER_NOT_EXPORTED)
+                ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+                    override fun onStop(owner: LifecycleOwner) { interrupt() }
+                })
+            }
         }
     }
 
-    /** Desactiva la sesión sin bloquear al llamante. */
-    fun deactivate() {
-        val manager = audioManager ?: return
-        ioScope.launch {
-            abandonFocus(manager)
-        }
+    fun lease(onFocusLost: () -> Unit = {}): MomentsAudioSessionLease = MomentsAudioSessionLease(onFocusLost)
+
+    fun addInterruptionListener(listener: () -> Unit): () -> Unit {
+        synchronized(coordinator) { interruptionListeners += listener }
+        return { synchronized(coordinator) { interruptionListeners -= listener } }
     }
 
-    /** Restaura el modo que había antes y abandona el foco, fuera del main thread. */
-    fun restore(mode: Int? = null) {
-        val manager = audioManager ?: return
-        ioScope.launch {
-            mode?.let { manager.mode = it }
-            savedMode?.let { manager.mode = it }
-            abandonFocus(manager)
-        }
+    internal fun requestNativeFocus(usage: Int, contentType: Int): Boolean {
+        val manager = audioManager ?: return false
+        val generation = ++focusGeneration
+        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setAudioAttributes(AudioAttributes.Builder().setUsage(usage).setContentType(contentType).build())
+            .setWillPauseWhenDucked(true)
+            .setAcceptsDelayedFocusGain(false)
+            .setOnAudioFocusChangeListener({ change ->
+                if (change == AudioManager.AUDIOFOCUS_LOSS ||
+                    change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT ||
+                    change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
+                    val callbacks = synchronized(coordinator) {
+                        if (generation != focusGeneration) return@setOnAudioFocusChangeListener
+                        coordinator.interrupt() + interruptionListeners.toList()
+                    }
+                    callbacks.forEach { it() }
+                }
+            }, mainHandler)
+            .build()
+        val granted = manager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        if (granted) focusRequest = request else manager.abandonAudioFocusRequest(request)
+        return granted
     }
 
-    /**
-     * Solicita foco de audio. Hay que esperarla antes de reproducir/grabar.
-     */
-    suspend fun activate(
+    private fun interrupt() {
+        val callbacks = synchronized(coordinator) { coordinator.interrupt() + interruptionListeners.toList() }
+        callbacks.forEach { it() }
+    }
+
+    private fun abandonNativeFocus() {
+        ++focusGeneration
+        focusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
+        focusRequest = null
+    }
+}
+
+class MomentsAudioSessionLease internal constructor(private val onFocusLost: () -> Unit) {
+    private val generation = AtomicLong()
+    fun activate(
         usage: Int = AudioAttributes.USAGE_MEDIA,
         contentType: Int = AudioAttributes.CONTENT_TYPE_MUSIC,
-        legacyStreamType: Int = AudioManager.STREAM_MUSIC,
-    ): Boolean = withContext(Dispatchers.IO) {
-        val manager = audioManager ?: return@withContext false
-        savedMode = manager.mode
-
-        return@withContext if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            val attrs = AudioAttributes.Builder()
-                .setUsage(usage)
-                .setContentType(contentType)
-                .build()
-            // Listener + delayed focus: requerido por AudioFocusRequest.Builder.build()
-            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setAudioAttributes(attrs)
-                .setOnAudioFocusChangeListener(focusChangeListener, mainHandler)
-                .setAcceptsDelayedFocusGain(true)
-                .build()
-            focusRequest = request
-            manager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        } else {
-            @Suppress("DEPRECATION")
-            manager.requestAudioFocus(
-                focusChangeListener,
-                legacyStreamType,
-                AudioManager.AUDIOFOCUS_GAIN,
-            ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        }
+    ): Boolean {
+        val current = generation.incrementAndGet()
+        return MomentsAudioSession.coordinator.acquire(
+            owner = this, generation = current,
+            isCurrent = { generation.get() == current },
+            requestFocus = { MomentsAudioSession.requestNativeFocus(usage, contentType) },
+            onLoss = { if (generation.compareAndSet(current, current + 1)) onFocusLost() },
+        )
     }
-
-    private fun abandonFocus(manager: AudioManager) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            focusRequest?.let { manager.abandonAudioFocusRequest(it) }
-            focusRequest = null
-        } else {
-            @Suppress("DEPRECATION")
-            manager.abandonAudioFocus(focusChangeListener)
-        }
+    fun release() {
+        MomentsAudioSession.coordinator.release(this, generation.incrementAndGet())
     }
 }

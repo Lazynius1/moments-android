@@ -2,6 +2,7 @@ package com.moments.android.views.creator.components
 
 import android.Manifest
 import android.content.pm.PackageManager
+import com.moments.android.utilities.MomentsAudioSession
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.os.Build
@@ -208,6 +209,11 @@ fun AudioStickerRecordingView(
         mutableStateOf(List(30) { Random.nextFloat().coerceIn(0.2f, 0.8f) })
     }
 
+    val playbackSession = remember { MomentsAudioSession.lease { player?.pause(); isPlaying = false } }
+    val recordingSession = remember { MomentsAudioSession.lease {
+        recorder?.runCatching { stop() }; recorder?.release(); recorder = null; isRecording = false
+    } }
+
     val primary = if (isSystemInDarkTheme()) Color.White else Color.Black
     val secondary = primary.copy(alpha = 0.55f)
     val recordScale by animateFloatAsState(
@@ -217,6 +223,7 @@ fun AudioStickerRecordingView(
     )
 
     fun stopPlayback() {
+        playbackSession.release()
         player?.stop()
         player?.release()
         player = null
@@ -227,8 +234,10 @@ fun AudioStickerRecordingView(
     fun startPlayback() {
         val file = recordingFile ?: return
         stopPlayback()
+        if (!playbackSession.activate(contentType = android.media.AudioAttributes.CONTENT_TYPE_SPEECH)) return
+        var prepared: MediaPlayer? = null
         runCatching {
-            val next = MediaPlayer().apply {
+            val next = MediaPlayer().also { prepared = it }.apply {
                 setDataSource(file.absolutePath)
                 setOnCompletionListener { stopPlayback() }
                 prepare()
@@ -236,7 +245,7 @@ fun AudioStickerRecordingView(
             }
             player = next
             isPlaying = true
-        }
+        }.onFailure { prepared?.release(); playbackSession.release() }
     }
 
     fun stopRecording() {
@@ -245,6 +254,7 @@ fun AudioStickerRecordingView(
         runCatching { active.stop() }
         active.release()
         recorder = null
+        recordingSession.release()
         audioPower = 0.1f
         if (recordingFile != null) {
             startPlayback()
@@ -253,6 +263,7 @@ fun AudioStickerRecordingView(
 
     fun startRecording() {
         stopPlayback()
+        if (!recordingSession.activate(contentType = android.media.AudioAttributes.CONTENT_TYPE_SPEECH)) return
         recordingFile?.delete()
         recordingFile = null
         duration = 0f
@@ -260,13 +271,14 @@ fun AudioStickerRecordingView(
         waveformLevels = List(30) { Random.nextFloat().coerceIn(0.2f, 0.8f) }
 
         val target = File(context.cacheDir, "story_audio_${UUID.randomUUID()}.m4a")
+        var pending: MediaRecorder? = null
         val started = runCatching {
             val next = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 MediaRecorder(context)
             } else {
                 @Suppress("DEPRECATION")
                 MediaRecorder()
-            }.apply {
+            }.also { pending = it }.apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -281,6 +293,8 @@ fun AudioStickerRecordingView(
             isRecording = true
         }.isSuccess
         if (!started) {
+            pending?.release()
+            recordingSession.release()
             target.delete()
             recordingFile = null
             HapticManager.shared.warning()
@@ -340,6 +354,7 @@ fun AudioStickerRecordingView(
 
     DisposableEffect(Unit) {
         onDispose {
+            playbackSession.release(); recordingSession.release()
             if (isRecording) {
                 runCatching { recorder?.stop() }
                 recorder?.release()

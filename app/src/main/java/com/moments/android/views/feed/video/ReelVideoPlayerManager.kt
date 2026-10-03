@@ -22,7 +22,6 @@ import com.moments.android.services.video.VideoPlaybackSelector
 import com.moments.android.services.video.configure
 import com.moments.android.services.video.makeConfiguredPlayerItem
 import com.moments.android.services.video.videoPlaybackSource
-import com.moments.android.utilities.MomentsAudioSession
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -112,8 +111,7 @@ class ReelVideoPlayerManager {
             player = pooledPlayer
             isLoaded = pooledPlayer.playbackState == Player.STATE_READY
             applySessionMuteState()
-            configureAudioSession()
-            observePlayerItem()
+                observePlayerItem()
             setupLooping()
             observePlayback()
             if (isLoaded) {
@@ -140,7 +138,6 @@ class ReelVideoPlayerManager {
         player = pooledPlayer
         isLoaded = pooledPlayer.playbackState == Player.STATE_READY
         applySessionMuteState()
-        configureAudioSession()
         observePlayerItem()
         setupLooping()
         observePlayback()
@@ -195,12 +192,6 @@ class ReelVideoPlayerManager {
         } else {
             // Seek rápido durante scrub (tolerancia amplia en iOS)
             exo.seekTo(targetMs)
-        }
-    }
-
-    private fun configureAudioSession() {
-        managerScope.launch {
-            MomentsAudioSession.activate()
         }
     }
 

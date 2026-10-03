@@ -135,6 +135,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -2474,7 +2475,16 @@ fun InteractiveAudioStickerView(
     var progressJob by remember { mutableStateOf<Job?>(null) }
     var waveJob by remember { mutableStateOf<Job?>(null) }
     var animatedHeights by remember { mutableStateOf(listOf(10f, 14f, 10f)) }
-    var didConfigureAudioSession by remember { mutableStateOf(false) }
+    var loadJob by remember { mutableStateOf<Job?>(null) }
+    val audioSession = remember {
+        MomentsAudioSession.lease {
+            loadJob?.cancel()
+            player?.pause()
+            isPlaying = false
+            progressJob?.cancel()
+            waveJob?.cancel()
+        }
+    }
     val scope = rememberCoroutineScope()
     val foregroundColor = if (isSystemInDarkTheme()) {
         Color.White
@@ -2483,6 +2493,8 @@ fun InteractiveAudioStickerView(
     }
 
     fun stopPlayback() {
+        loadJob?.cancel(); loadJob = null
+        audioSession.release()
         progressJob?.cancel()
         progressJob = null
         waveJob?.cancel()
@@ -2493,10 +2505,6 @@ fun InteractiveAudioStickerView(
         isPlaying = false
         progress = 0f
         animatedHeights = listOf(10f, 14f, 10f)
-        if (didConfigureAudioSession) {
-            MomentsAudioSession.restore()
-            didConfigureAudioSession = false
-        }
     }
 
     fun startProgressUpdates(activePlayer: MediaPlayer) {
@@ -2536,39 +2544,51 @@ fun InteractiveAudioStickerView(
         }
     }
 
-    fun startPlayback() {
+    fun startPlayback(userInitiated: Boolean = false) {
         val parsed = runCatching { Uri.parse(audioURL) }.getOrNull() ?: return
-        if (!didConfigureAudioSession) {
-            didConfigureAudioSession = true
-        }
-        scope.launch {
-            MomentsAudioSession.activate()
-            val mediaPlayer = runCatching {
-                when {
-                    parsed.scheme == "file" -> MediaPlayer().apply {
-                        setDataSource(context, parsed)
+        val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
+        if (!userInitiated && audioManager?.isMusicActive == true) return
+        loadJob?.cancel()
+        loadJob = scope.launch {
+            var prepared: MediaPlayer? = null
+            var installed = false
+            var claimed = false
+            try {
+                val source = if (audioURL.startsWith("http://") || audioURL.startsWith("https://")) {
+                    PersistentAudioCache.localURL(URL(audioURL)).absolutePath
+                } else audioURL
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val next = MediaPlayer()
+                    prepared = next
+                    next.apply {
+                        if (parsed.scheme == "file") setDataSource(context, parsed) else setDataSource(source)
+                        prepare()
                     }
-                    audioURL.startsWith("http://") || audioURL.startsWith("https://") -> {
-                        val cached = PersistentAudioCache.localURL(URL(audioURL))
-                        MediaPlayer().apply { setDataSource(cached.absolutePath) }
-                    }
-                    else -> MediaPlayer().apply { setDataSource(audioURL) }
                 }
-            }.getOrNull()?.apply {
-                setOnCompletionListener { stopPlayback() }
-                prepare()
-            } ?: return@launch
-
-            player = mediaPlayer
-            mediaPlayer.start()
-            isPlaying = true
-            startProgressUpdates(mediaPlayer)
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                val active = prepared ?: return@launch
+                if (!audioSession.activate(contentType = android.media.AudioAttributes.CONTENT_TYPE_SPEECH)) return@launch
+                claimed = true
+                active.setOnCompletionListener { stopPlayback() }
+                player = active
+                active.start()
+                installed = true
+                isPlaying = true
+                startProgressUpdates(active)
+            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                throw cancel
+            } catch (_: Exception) {
+                // Keep failed or cancelled preparation silent.
+            } finally {
+                if (!installed) { prepared?.release(); if (claimed) audioSession.release() }
+            }
         }
     }
 
     fun togglePlayback() {
         if (isPlaying) {
             player?.pause()
+            audioSession.release()
             isPlaying = false
             progressJob?.cancel()
             progressJob = null
@@ -2578,11 +2598,12 @@ fun InteractiveAudioStickerView(
         } else {
             val active = player
             if (active != null) {
+                if (!audioSession.activate(contentType = android.media.AudioAttributes.CONTENT_TYPE_SPEECH)) return
                 active.start()
                 isPlaying = true
                 startProgressUpdates(active)
             } else {
-                startPlayback()
+                startPlayback(userInitiated = true)
             }
         }
     }

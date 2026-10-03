@@ -15,7 +15,6 @@ import androidx.compose.ui.graphics.Color
 import com.moments.android.coordinators.CoordinatorNavigationEvent
 import com.moments.android.coordinators.NavigationEventBus
 import com.moments.android.models.StickerData
-import com.moments.android.utilities.MomentsAudioSession
 import com.moments.android.views.creator.creatorscreens.CaptionAndDetailsView
 import com.moments.android.views.creator.creatorscreens.ContentTypeSelectionView
 import com.moments.android.views.creator.creatorscreens.MediaEditingView
@@ -95,7 +94,6 @@ fun CreatorView(
 
     fun cleanupVideoAndAudio() {
         selectedMediaItems = emptyList()
-        MomentsAudioSession.deactivate()
         NavigationEventBus.emit(CoordinatorNavigationEvent.CleanupVideoPlayer)
     }
 

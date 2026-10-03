@@ -11,6 +11,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import com.moments.android.utilities.withMomentsAudioFocus
 import androidx.media3.exoplayer.ExoPlayer
 import com.moments.android.models.StoryMusicSelection
 import kotlinx.coroutines.*
@@ -20,7 +21,7 @@ import java.nio.ByteOrder
 import kotlin.math.*
 
 class StoryMusicAudio(context: Context) {
-    private val player = ExoPlayer.Builder(context).build()
+    private val player = ExoPlayer.Builder(context).build().withMomentsAudioFocus(context)
     var playing by mutableStateOf(false); private set
     var elapsed by mutableDoubleStateOf(0.0); private set
     var failed by mutableStateOf(false); private set

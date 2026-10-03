@@ -9,6 +9,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.media.AudioManager
+import com.moments.android.utilities.MomentsAudioSession
 import android.media.MediaRecorder
 import android.media.MediaExtractor
 import android.media.MediaFormat
@@ -69,6 +70,8 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import com.moments.android.utilities.withMomentsAudioFocus
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.moments.android.services.cache.PersistentAudioCache
 import com.moments.android.utilities.HapticManager
@@ -208,6 +211,7 @@ class AudioRecordingManager private constructor() {
     private val _audioPower = MutableStateFlow(0f)
     val audioPower: StateFlow<Float> = _audioPower.asStateFlow()
 
+    private val audioSession = MomentsAudioSession.lease { cancelRecording() }
     private var recorder: MediaRecorder? = null
     private var outputFile: File? = null
     private var levels = mutableListOf<Float>()
@@ -220,16 +224,21 @@ class AudioRecordingManager private constructor() {
             completion(false)
             return
         }
-        completion(beginRecording(activity.cacheDir))
+        MomentsAudioSession.initialize(activity)
+        if (!audioSession.activate(contentType = android.media.AudioAttributes.CONTENT_TYPE_SPEECH)) { completion(false); return }
+        val started = beginRecording(activity.cacheDir)
+        if (!started) audioSession.release()
+        completion(started)
     }
 
     fun stopRecording(completion: (RecordedVoiceNote?) -> Unit) {
         meterJob?.cancel(); meterJob = null; _audioPower.value = 0f
-        val activeRecorder = recorder ?: run { completion(null); return }
+        val activeRecorder = recorder ?: run { audioSession.release(); completion(null); return }
         recorder = null
         val file = outputFile; outputFile = null
         runCatching { activeRecorder.stop() }
         activeRecorder.reset(); activeRecorder.release()
+        audioSession.release()
         val data = file?.takeIf { it.exists() && it.length() > 512L }?.readBytes()
         completion(data?.let { RecordedVoiceNote(it, ChatVoiceWaveformSamples.resampled(levels, ChatVoiceWaveformSamples.storedSampleCount)) })
         levels.clear(); file?.delete()
@@ -237,29 +246,34 @@ class AudioRecordingManager private constructor() {
 
     fun cancelRecording() = stopRecording { }
 
-    private fun beginRecording(cacheDir: File): Boolean = runCatching {
-        val file = File.createTempFile("chat_voice_", ".m4a", cacheDir)
-        val next = MediaRecorder().apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setAudioSamplingRate(44_100)
-            setAudioEncodingBitRate(64_000)
-            setOutputFile(file.absolutePath)
-            prepare(); start()
-        }
-        recorder = next; outputFile = file; levels.clear()
-        meterJob?.cancel()
-        meterJob = scope.launch {
-            while (recorder === next) {
-                val level = normalizedPower(next.maxAmplitude)
-                levels += level
-                _audioPower.value = level
-                delay(50)
+    private fun beginRecording(cacheDir: File): Boolean {
+        var pending: MediaRecorder? = null
+        var pendingFile: File? = null
+        return runCatching {
+            val file = File.createTempFile("chat_voice_", ".m4a", cacheDir)
+            pendingFile = file
+            val next = MediaRecorder().also { pending = it }.apply {
+                setAudioSource(MediaRecorder.AudioSource.MIC)
+                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setAudioSamplingRate(44_100)
+                setAudioEncodingBitRate(64_000)
+                setOutputFile(file.absolutePath)
+                prepare(); start()
             }
-        }
-        true
-    }.getOrElse { false }
+            recorder = next; outputFile = file; levels.clear()
+            meterJob?.cancel()
+            meterJob = scope.launch {
+                while (recorder === next) {
+                    val level = normalizedPower(next.maxAmplitude)
+                    levels += level
+                    _audioPower.value = level
+                    delay(50)
+                }
+            }
+            true
+        }.getOrElse { pending?.release(); pendingFile?.delete(); false }
+    }
 
     private fun normalizedPower(amplitude: Int): Float = (amplitude / 32_767f).coerceIn(0f, 1f)
 
@@ -431,7 +445,7 @@ private fun applyVoicePlaybackRoute(context: Context, player: ExoPlayer, toEarpi
                 .setUsage(C.USAGE_VOICE_COMMUNICATION)
                 .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
                 .build(),
-            /* handleAudioFocus = */ true,
+            /* handleAudioFocus = */ false,
         )
     } else {
         am.mode = AudioManager.MODE_NORMAL
@@ -440,14 +454,16 @@ private fun applyVoicePlaybackRoute(context: Context, player: ExoPlayer, toEarpi
         player.setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
-                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
                 .build(),
-            /* handleAudioFocus = */ true,
+            /* handleAudioFocus = */ false,
         )
     }
 }
 
-private fun restoreVoicePlaybackAudio(context: Context) {
+private fun restoreVoicePlaybackAudio(context: Context, messageId: String) {
+    val active = ChatAudioPlaybackCenter.shared.activeMessageId
+    if (active != null && active != messageId) return
     val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
     am.mode = AudioManager.MODE_NORMAL
     @Suppress("DEPRECATION")
@@ -496,7 +512,7 @@ fun GlassmorphicAudioMessage(
         joinedRadius = 6.dp,
     )
 
-    val player = remember { ExoPlayer.Builder(context).build() }
+    val player = remember { ExoPlayer.Builder(context).build().withMomentsAudioFocus(context) }
     val proximityManager = remember { SimpleProximityManager(context) }
     var isPlaying by remember { mutableStateOf(false) }
     var currentTime by remember { mutableFloatStateOf(0f) }
@@ -562,7 +578,7 @@ fun GlassmorphicAudioMessage(
                 ChatAudioPlaybackCenter.shared.deactivate(messageId)
             }
             proximityManager.stopMonitoring()
-            restoreVoicePlaybackAudio(context)
+            restoreVoicePlaybackAudio(context, messageId)
             player.release()
         }
     }
@@ -580,11 +596,11 @@ fun GlassmorphicAudioMessage(
         while (isPlaying) {
             currentTime = (player.currentPosition / 1000.0).toFloat()
             delay(50)
-            if (!player.isPlaying) {
+            if (!player.playWhenReady || player.playbackState == Player.STATE_ENDED) {
                 isPlaying = false
                 currentTime = 0f
                 proximityManager.stopMonitoring()
-                restoreVoicePlaybackAudio(context)
+                restoreVoicePlaybackAudio(context, messageId)
                 ChatAudioPlaybackCenter.shared.deactivate(messageId)
             }
         }
@@ -604,7 +620,7 @@ fun GlassmorphicAudioMessage(
         player.pause()
         isPlaying = false
         proximityManager.stopMonitoring()
-        restoreVoicePlaybackAudio(context)
+        restoreVoicePlaybackAudio(context, messageId)
         if (notifyCenter) ChatAudioPlaybackCenter.shared.deactivate(messageId)
     }
 

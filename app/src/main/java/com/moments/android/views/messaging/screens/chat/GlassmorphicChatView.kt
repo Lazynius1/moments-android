@@ -712,6 +712,13 @@ fun GlassmorphicChatView(
         }
     }
 
+    DisposableEffect(voice) {
+        val removeListener = com.moments.android.utilities.MomentsAudioSession.addInterruptionListener {
+            if (voice.isRecording) voice.resetVoiceRecordingInteraction()
+        }
+        onDispose { removeListener() }
+    }
+
     val headerDensity = androidx.compose.ui.platform.LocalDensity.current
     var headerHeight by remember { mutableStateOf(0.dp) }
     val effectivePendingContext = composer.pendingChatContext ?: pendingChatContext

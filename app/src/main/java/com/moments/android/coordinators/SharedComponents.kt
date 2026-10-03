@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem as ExoMediaItem
+import com.moments.android.utilities.withMomentsAudioFocus
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -161,7 +162,7 @@ fun CustomVideoPlayer(
 ) {
     val context = LocalContext.current
     val exoPlayer = remember(url) {
-        ExoPlayer.Builder(context).build().apply {
+        ExoPlayer.Builder(context).build().withMomentsAudioFocus(context).apply {
             setMediaItem(ExoMediaItem.fromUri(Uri.parse(url)))
             prepare()
             playWhenReady = true

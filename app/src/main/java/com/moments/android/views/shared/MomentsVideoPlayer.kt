@@ -28,7 +28,6 @@ import com.moments.android.services.video.GlobalVideoManager
 import com.moments.android.services.video.VideoPlaybackSelector
 import com.moments.android.services.video.buildAdaptiveExoPlayer
 import com.moments.android.services.video.configure
-import com.moments.android.utilities.MomentsAudioSession
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.max
@@ -107,13 +106,6 @@ fun MomentsVideoPlayer(
             onSharedPlayerChanged?.invoke(null)
             player.release()
         }
-    }
-
-    LaunchedEffect(Unit) {
-        MomentsAudioSession.activate(
-            usage = android.media.AudioAttributes.USAGE_MEDIA,
-            contentType = android.media.AudioAttributes.CONTENT_TYPE_MOVIE,
-        )
     }
 
     LaunchedEffect(isMuted) {

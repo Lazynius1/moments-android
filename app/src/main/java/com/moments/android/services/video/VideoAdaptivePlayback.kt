@@ -3,6 +3,7 @@ package com.moments.android.services.video
 import android.content.Context
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.DefaultLoadControl
+import com.moments.android.utilities.withMomentsAudioFocus
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import com.moments.android.models.MediaItem as MomentMediaItem
@@ -33,7 +34,7 @@ fun buildAdaptiveExoPlayer(
     ExoPlayer.Builder(context.applicationContext)
         .setTrackSelector(DefaultTrackSelector(context.applicationContext))
         .setLoadControl(loadControl)
-        .build()
+        .build().withMomentsAudioFocus(context)
 
 fun VideoPlaybackSelector.tierBelow(tier: VideoPlaybackTier): VideoPlaybackTier? = when (tier) {
     VideoPlaybackTier.HIGH -> VideoPlaybackTier.MEDIUM

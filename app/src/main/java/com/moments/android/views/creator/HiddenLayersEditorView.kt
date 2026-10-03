@@ -7,6 +7,7 @@ import android.graphics.ImageDecoder
 import android.graphics.Paint as AndroidPaint
 import android.graphics.Typeface
 import android.media.ExifInterface
+import com.moments.android.utilities.MomentsAudioSession
 import android.media.MediaPlayer
 import android.media.MediaRecorder
 import android.net.Uri
@@ -273,6 +274,9 @@ fun HiddenLayersEditorView(
     val micGate = remember { PermissionPrimerGate(PermissionPrimerGate.Kind.MICROPHONE) }
     var isPreviewPlaying by remember { mutableStateOf(false) }
     var audioPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    val previewAudioSession = remember { MomentsAudioSession.lease {
+        audioPlayer?.pause(); isPreviewPlaying = false
+    } }
     var previewingLayerId by remember { mutableStateOf<String?>(null) }
     var recordingLayerId by remember { mutableStateOf<String?>(null) }
 
@@ -409,6 +413,7 @@ fun HiddenLayersEditorView(
     }
 
     fun stopAudioPreview() {
+        previewAudioSession.release()
         audioPlayer?.runCatching { stop() }
         audioPlayer?.release()
         audioPlayer = null
@@ -418,10 +423,13 @@ fun HiddenLayersEditorView(
 
     fun startAudioPreview(uri: Uri, layerId: String) {
         stopAudioPreview()
+        if (!previewAudioSession.activate(contentType = android.media.AudioAttributes.CONTENT_TYPE_SPEECH)) return
+        var prepared: MediaPlayer? = null
         runCatching {
-            val player = MediaPlayer().apply {
+            val player = MediaPlayer().also { prepared = it }.apply {
                 setDataSource(context, uri)
                 setOnCompletionListener {
+                    previewAudioSession.release()
                     runCatching { stop() }
                     release()
                     if (audioPlayer === this) {
@@ -436,7 +444,7 @@ fun HiddenLayersEditorView(
             audioPlayer = player
             isPreviewPlaying = true
             previewingLayerId = layerId
-        }.onFailure { stopAudioPreview() }
+        }.onFailure { prepared?.release(); stopAudioPreview() }
     }
 
     fun startAudioPreview(index: Int) {
@@ -514,6 +522,7 @@ fun HiddenLayersEditorView(
             audioRecorder.release()
             audioPlayer?.runCatching { stop() }
             audioPlayer?.release()
+            previewAudioSession.release()
             audioPlayer = null
         }
     }
@@ -2159,6 +2168,7 @@ private class HiddenLayerAudioRecorder(private val context: Context) {
     var elapsedTime by mutableDoubleStateOf(0.0)
         private set
 
+    private val audioSession = MomentsAudioSession.lease { stopRecording() }
     private var recorder: MediaRecorder? = null
     private var outputFile: File? = null
     private var startedAtElapsed = 0L
@@ -2176,14 +2186,16 @@ private class HiddenLayerAudioRecorder(private val context: Context) {
 
     fun startRecording() {
         if (isRecording) return
+        if (!audioSession.activate(contentType = android.media.AudioAttributes.CONTENT_TYPE_SPEECH)) return
         val target = File(context.cacheDir, "hidden_layer_audio_${UUID.randomUUID()}.m4a")
+        var pending: MediaRecorder? = null
         val started = runCatching {
             val next = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 MediaRecorder(context)
             } else {
                 @Suppress("DEPRECATION")
                 MediaRecorder()
-            }.apply {
+            }.also { pending = it }.apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -2202,6 +2214,8 @@ private class HiddenLayerAudioRecorder(private val context: Context) {
             handler.post(tickRunnable)
         }.isSuccess
         if (!started) {
+            pending?.release()
+            audioSession.release()
             target.delete()
             outputFile = null
             recorder = null
@@ -2211,11 +2225,12 @@ private class HiddenLayerAudioRecorder(private val context: Context) {
     }
 
     fun stopRecording(): HiddenLayerAudioRecording? {
-        val active = recorder ?: return null
+        val active = recorder ?: run { audioSession.release(); return null }
         val file = outputFile
         handler.removeCallbacks(tickRunnable)
         val stopped = runCatching { active.stop() }.isSuccess
         active.release()
+        audioSession.release()
         recorder = null
         isRecording = false
         val duration = min(
@@ -2232,6 +2247,7 @@ private class HiddenLayerAudioRecorder(private val context: Context) {
     }
 
     fun release() {
+        audioSession.release()
         handler.removeCallbacks(tickRunnable)
         recorder?.runCatching { stop() }
         recorder?.release()

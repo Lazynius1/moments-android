@@ -1,5 +1,8 @@
 package com.moments.android.views.feed.moments
 
+import com.moments.android.utilities.MomentsAudioSession
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import android.media.MediaPlayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
@@ -732,11 +735,19 @@ private fun HiddenLayerAudioTagView(
     var isPreparing by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
     var didAppear by remember { mutableStateOf(!isAnimated) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     var waveHeights by remember { mutableStateOf(listOf(10f, 14f, 10f)) }
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
     val scope = rememberCoroutineScope()
 
+    var loadJob by remember { mutableStateOf<Job?>(null) }
+    val audioSession = remember { MomentsAudioSession.lease {
+        loadJob?.cancel(); player?.pause(); isPlaying = false; isPreparing = false
+    } }
+
     fun stopPlayback() {
+        loadJob?.cancel(); loadJob = null
+        audioSession.release()
         runCatching {
             player?.stop()
             player?.release()
@@ -776,43 +787,57 @@ private fun HiddenLayerAudioTagView(
         }
     }
 
-    fun startPlayback() {
+    fun startPlayback(userInitiated: Boolean = false) {
         if (isPreparing) return
+        val manager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
+        if (!userInitiated && manager?.isMusicActive == true) return
         isPreparing = true
-        scope.launch {
-            val mp = withContext(Dispatchers.IO) {
-                runCatching {
-                    MediaPlayer().apply {
-                        setDataSource(audioURL)
-                        prepare()
-                    }
-                }.getOrNull()
-            }
-            if (mp == null) {
+        loadJob?.cancel()
+        loadJob = scope.launch {
+            var prepared: MediaPlayer? = null
+            var installed = false
+            var claimed = false
+            try {
+                withContext(Dispatchers.IO) {
+                    val next = MediaPlayer()
+                    prepared = next
+                    next.apply { setDataSource(audioURL); prepare() }
+                }
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                val active = prepared ?: return@launch
+                if (!audioSession.activate(contentType = android.media.AudioAttributes.CONTENT_TYPE_SPEECH)) return@launch
+                claimed = true
+                player = active
+                active.setOnCompletionListener { stopPlayback() }
+                active.start()
+                installed = true
+                isPlaying = true
                 isPreparing = false
-                return@launch
+                startProgressLoop()
+                startWave()
+            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                throw cancel
+            } catch (_: Exception) {
+                // Keep failed or cancelled preparation silent.
+            } finally {
+                if (!installed) { prepared?.release(); if (claimed) audioSession.release(); isPreparing = false }
             }
-            player = mp
-            mp.setOnCompletionListener { stopPlayback() }
-            mp.start()
-            isPlaying = true
-            isPreparing = false
-            startProgressLoop()
-            startWave()
         }
     }
 
     fun togglePlayback() {
         if (isPlaying) {
             player?.pause()
+            audioSession.release()
             isPlaying = false
         } else if (player != null) {
+            if (!audioSession.activate(contentType = android.media.AudioAttributes.CONTENT_TYPE_SPEECH)) return
             player?.start()
             isPlaying = true
             startProgressLoop()
             startWave()
         } else {
-            startPlayback()
+            startPlayback(userInitiated = true)
         }
     }
 

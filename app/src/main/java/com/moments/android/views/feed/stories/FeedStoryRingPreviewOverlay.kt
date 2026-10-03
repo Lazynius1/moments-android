@@ -1,7 +1,6 @@
 package com.moments.android.views.feed.stories
 
 import android.os.SystemClock
-import android.media.AudioAttributes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -74,7 +73,6 @@ import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.services.video.GlobalVideoManager
-import com.moments.android.utilities.MomentsAudioSession
 import com.moments.android.views.components.LiveUsernameContent
 import com.moments.android.views.components.MomentRowButton
 import com.moments.android.views.components.MomentRowButtonFeedback
@@ -276,17 +274,6 @@ fun FeedStoryRingPreviewOverlay(
         }
     }
 
-    fun preparePreviewAudioIfNeeded() {
-        if (!soundEnabledInSession) return
-        MomentsAudioSession.initialize(context)
-        scope.launch {
-            MomentsAudioSession.activate(
-                usage = AudioAttributes.USAGE_MEDIA,
-                contentType = AudioAttributes.CONTENT_TYPE_MOVIE,
-            )
-        }
-    }
-
     LaunchedEffect(selection?.userId) {
         val userId = selection?.userId
         if (userId == null) {
@@ -304,7 +291,6 @@ fun FeedStoryRingPreviewOverlay(
         successMessage = null
         resetPreviewPlayback()
         loadPreview(userId)
-        preparePreviewAudioIfNeeded()
         isPresented = true
     }
 
@@ -333,12 +319,6 @@ fun FeedStoryRingPreviewOverlay(
             pausePreviewSegmentClock()
         } else if (selection != null && isPresented && previewElapsedBeforePauseMs > 0L) {
             resumePreviewSegmentClock()
-        }
-    }
-
-    LaunchedEffect(soundEnabledInSession, previewStory?.mediaItem?.type) {
-        if (soundEnabledInSession && previewStory?.mediaItem?.type == MediaItem.MediaType.VIDEO) {
-            preparePreviewAudioIfNeeded()
         }
     }
 
@@ -398,7 +378,7 @@ fun FeedStoryRingPreviewOverlay(
                     val elapsed = currentPreviewElapsedSeconds()
                     dismissOverlay { onOpenStory(selection.userId, storyId, elapsed) }
                 },
-                onVideoAppear = { preparePreviewAudioIfNeeded() },
+                onVideoAppear = {},
                 isPreviewVideoReady = isPreviewVideoReady,
                 onVideoDurationMs = {
                     isPreviewVideoReady = true
