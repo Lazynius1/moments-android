@@ -23,8 +23,7 @@ import kotlinx.coroutines.launch
 /**
  * Observa el IME (`WindowInsets.ime`) para sincronizar scroll del chat.
  *
- * En Telegram Android: `SizeNotifierFrameLayout` + `AdjustPanLayoutHelper`.
- * Aquí el inset Compose alimenta el mismo ciclo (altura / transitioning / duración).
+ * El inset de Compose alimenta el ciclo de altura, transición y duración.
  */
 @Stable
 class ChatKeyboardScrollCoordinator {

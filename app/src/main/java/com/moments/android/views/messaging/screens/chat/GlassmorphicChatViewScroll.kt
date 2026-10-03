@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 /**
  * Scroll del chat: pin/bottom, history, search jump, vanish pull.
  *
- * Teclado (Android/TG): no force-scroll a mitad del IME. El padding de la lista
+ * Teclado: no force-scroll a mitad del IME. El padding de la lista
  * sigue la altura medida del composer (incluye inset); al acabar la transición
  * se hace un settle. Durante IME se silencian snaps de composer.
  */

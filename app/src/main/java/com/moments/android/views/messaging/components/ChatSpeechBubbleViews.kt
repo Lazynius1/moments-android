@@ -97,8 +97,13 @@ object ChatBubbleLayoutWidth {
     }
 
     @Composable
-    fun maxTextBubbleWidth(chatListWidth: Dp = LocalChatListContainerWidth.current): Dp =
-        containerWidth(chatListWidth) * ChatTextBubbleMetrics.maxWidthScreenFraction
+    fun maxTextBubbleWidth(
+        chatListWidth: Dp = LocalChatListContainerWidth.current,
+        isOutgoing: Boolean = true,
+    ): Dp {
+        val maximum = containerWidth(chatListWidth) * ChatTextBubbleMetrics.maxWidthScreenFraction
+        return if (isOutgoing) maximum else maxOf(120.dp, maximum - ChatIncomingMessageLayout.gutterInset)
+    }
 
     @Composable
     fun capped(
@@ -209,7 +214,7 @@ fun ChatTextBubbleView(
     val linkUrl = remember(text) { ChatLinkOpener.firstUrl(text) }
     val hasLink = linkUrl != null
 
-    val maxBubbleWidth = ChatBubbleLayoutWidth.maxTextBubbleWidth()
+    val maxBubbleWidth = ChatBubbleLayoutWidth.maxTextBubbleWidth(isOutgoing = isOutgoing)
     val shape = chatBubbleShape(
         side = if (isOutgoing) ChatBubbleSide.TRAILING else ChatBubbleSide.LEADING,
         position = groupPosition,

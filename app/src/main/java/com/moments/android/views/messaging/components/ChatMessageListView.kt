@@ -632,7 +632,7 @@ fun ChatMessageListView(
         if (!isVanishGestureEnabled) vanishPull.reset()
     }
 
-    // TG ChatListViewPaddingsAnimator / AdjustPan: al cambiar el padding inferior
+    // Al cambiar el padding inferior
     // (composer+IME), si estás al fondo reafirma index 0 sin animar. Sin pan
     // de ventana completo, no compensamos mid-lista (evita scrollBy con signo dudoso).
     val density = LocalDensity.current

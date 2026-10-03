@@ -543,8 +543,8 @@ fun GlassmorphicInputBar(
                                 BasicTextField(
                                     value = text,
                                     // Mantener el input connection vivo durante la grabacion.
-                                    // Telegram oculta el editor bajo su record panel, pero no lo
-                                    // vuelve read-only: hacerlo cerraba el IME y bajaba el composer.
+                                    // Ocultar el editor sin volverlo read-only: hacerlo cerraba
+                                    // el IME y bajaba el compositor.
                                     onValueChange = { updated ->
                                         if (!isRecordingVoice) onTextChange(updated)
                                     },
@@ -817,8 +817,7 @@ fun VoiceRecordingFloatingControl(
         VoiceRecordingFloatingControlMode.PREPARING -> stringResource(R.string.common_loading)
         VoiceRecordingFloatingControlMode.RESUME -> stringResource(R.string.chat_voice_record_resume)
     }
-    // Lenguaje Android propio: surface tonal opaca y elevada. La geometría sigue
-    // el control dibujado de Telegram, pero sin copiar el glass/aurora de iOS.
+    // Superficie tonal opaca y elevada para el control de grabación.
     val baseSurface = MomentsChromeGlass.canvasTint(isDark)
     val targetFill = when (mode) {
         VoiceRecordingFloatingControlMode.LOCKING ->

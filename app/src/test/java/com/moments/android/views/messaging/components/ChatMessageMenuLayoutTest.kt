@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatMessageMenuLayoutTest {
-    private val metrics = MenuLayoutMetrics(36f, 16f, 10f, 64f, 250f, 16f, 300f, 240f, 18f)
+    private val metrics = MenuLayoutMetrics(36f, 16f, 10f, 64f, 250f, 16f, 300f, 240f)
 
     private fun layout(bottomInset: Float, height: Float = 60f, expanded: Boolean = false): ChatMessageMenuLayout = menuLayout(
         ChatMessageMenuSelection(
@@ -23,6 +23,28 @@ class ChatMessageMenuLayoutTest {
         metrics = metrics,
         reactionsExpanded = expanded,
     )
+
+
+    @Test fun messageStaysInPlaceWhenTheWholeMenuFits() {
+        for (outgoing in listOf(true, false)) {
+            val result = menuLayout(
+                ChatMessageMenuSelection(
+                    rowId = "row:test",
+                    message = EnhancedMessage("test", "conversation", "me"),
+                    anchorFrame = Rect(100f, 250f, 350f, 310f),
+                    isOutgoing = outgoing,
+                ),
+                rowCount = 7,
+                containerWidth = 400f,
+                containerHeight = 800f,
+                topMarginPx = 36f,
+                bottomMarginPx = 36f,
+                metrics = metrics,
+                reactionsExpanded = false,
+            )
+            assertTrue(result.messageOffsetY == 0f)
+        }
+    }
 
     @Test fun actionsAndReactionsStayAboveOpenKeyboard() {
         val result = layout(340f)
@@ -50,15 +72,21 @@ class ChatMessageMenuLayoutTest {
         assertTrue(result.reactionsCenter.y + 125f <= 460f)
     }
     @Test fun connectorFollowsMessageWidthInsteadOfFixedRailEnd() {
-        val shortMessage = reactionConnectorSourceX(Rect(260f, 0f, 380f, 40f), 40f, 340f, 23f, true)
-        val longMessage = reactionConnectorSourceX(Rect(100f, 0f, 380f, 40f), 40f, 340f, 23f, true)
+        val shortMessage = reactionConnectorSourceX(Rect(260f, 0f, 380f, 40f), 40f, 340f, 23f, true, 400f)
+        val longMessage = reactionConnectorSourceX(Rect(100f, 0f, 380f, 40f), 40f, 340f, 23f, true, 400f)
         assertTrue(shortMessage == 197f)
         assertTrue(longMessage == 37f)
     }
 
-    @Test fun connectorStaysAwayFromCapsuleCorners() {
-        assertTrue(reactionConnectorSourceX(Rect(0f, 0f, 390f, 40f), 40f, 340f, 23f, true) == 23f)
-        assertTrue(reactionConnectorSourceX(Rect(0f, 0f, 390f, 40f), 40f, 340f, 23f, false) == 317f)
+    @Test fun wideMessageConnectorCanReachRailEdgesWithoutBeingPushedOverMessage() {
+        assertTrue(reactionConnectorSourceX(Rect(0f, 0f, 390f, 40f), 40f, 340f, 23f, true, 400f) == 0f)
+        assertTrue(reactionConnectorSourceX(Rect(0f, 0f, 390f, 40f), 40f, 340f, 23f, false, 400f) == 337f)
+    }
+
+    @Test fun wideReceivedConnectorKeepsItsWholeOutlineInsideViewport() {
+        val railLeft = 76f
+        val source = reactionConnectorSourceX(Rect(48f, 0f, 390f, 40f), railLeft, 320f, 32f, false, 400f)
+        assertTrue(railLeft + source + 28f <= 396f)
     }
 
 }

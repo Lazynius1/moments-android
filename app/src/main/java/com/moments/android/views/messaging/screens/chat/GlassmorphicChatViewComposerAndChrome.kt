@@ -419,12 +419,12 @@ internal fun ChatComposerChrome(
     }
     val usePinnedKeyboardPadding = voiceGestureState.preserveKeyboardElevation &&
         voiceGestureState.pinnedKeyboardBottomPx > 0
-    // Gap fijo (TG: mismo término en la fórmula con/sin teclado). imePadding()
+    // Separación fija con y sin teclado. imePadding()
     // a veces queda corto en el host legacy → medimos IME y sumamos panelInset.
     val panelGap = ChatComposerChromeMetrics.panelBottomGap(keyboardVisible)
     val composerPanelBackground = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()).chatInputBackground
     // Una única superficie opaca cubre compositor + zona de nav/gesture.
-    // Como SizeNotifierFrameLayout en Telegram: durante todo el gesto de voz se usa
+    // Durante todo el gesto de voz se usa
     // la altura capturada al tocar el mic, incluso si el IME empieza a animarse.
     val safeModifier = modifier
         .fillMaxWidth()
