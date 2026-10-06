@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.outlined.Photo
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -132,6 +134,7 @@ fun NotificationStoryThumbnailView(
     loadFailed: Boolean,
     story: Story? = null,
     modifier: Modifier = Modifier,
+    isChain: Boolean = false,
 ) {
     val corner = RoundedCornerShape(NotificationRowMetrics.STORY_THUMB_CORNER_RADIUS_DP.dp)
     val stroke = if (isDark) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.1f)
@@ -142,8 +145,26 @@ fun NotificationStoryThumbnailView(
                     NotificationRowMetrics.STORY_THUMB_WIDTH_DP.dp,
                     NotificationRowMetrics.STORY_THUMB_HEIGHT_DP.dp,
                 )
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    if (isChain) {
+                        drawCircle(
+                            color = Color.Black,
+                            radius = 11.dp.toPx(),
+                            center = Offset(size.width - 7.dp.toPx(), size.height - 7.dp.toPx()),
+                            blendMode = BlendMode.Clear,
+                        )
+                    }
+                }
                 .clip(corner)
-                .border(0.5.dp, stroke, corner),
+                .then(
+                    if (isChain) Modifier.border(
+                        2.dp,
+                        Brush.linearGradient(listOf(Color.Blue.copy(alpha = 0.85f), Color(0xFF9C27B0).copy(alpha = 0.85f))),
+                        corner,
+                    ) else Modifier.border(0.5.dp, stroke, corner)
+                ),
             contentAlignment = Alignment.Center,
         ) {
             val showImage = !imagePath.isNullOrBlank() && !loadFailed
@@ -158,6 +179,22 @@ fun NotificationStoryThumbnailView(
                 )
             } else {
                 StoryThumbPlaceholder(isDark = isDark, corner = corner)
+            }
+        }
+        if (isChain) {
+            Box(
+                modifier = Modifier
+                    .offset(x = 4.dp, y = 4.dp)
+                    .size(18.dp)
+                    .background(if (isDark) Color.White else Color.Black, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Link,
+                    contentDescription = null,
+                    tint = if (isDark) Color.Black else Color.White,
+                    modifier = Modifier.size(13.dp),
+                )
             }
         }
         if (!reaction.isNullOrBlank()) {

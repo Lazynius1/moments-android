@@ -68,8 +68,6 @@ fun PrivacySection(
     showFollowers: Boolean,
     viewModel: SettingsViewModel,
     onRoute: (SettingsRoute) -> Unit,
-    showReadReceipts: Boolean,
-    onShowReadReceiptsChange: (Boolean) -> Unit,
     blockedAccountsCount: Int,
 ) {
     Column {
@@ -107,7 +105,24 @@ fun PrivacySection(
             subtitle = stringResource(R.string.settings_sections_mute_subtitle),
             onClick = { onRoute(SettingsRoute.MUTE) },
         )
-        MessageRequestPolicyRow(viewModel = viewModel)
+
+    }
+}
+
+@Composable
+fun MessagingPrivacySection(
+    viewModel: SettingsViewModel,
+    onRoute: (SettingsRoute) -> Unit,
+    showReadReceipts: Boolean,
+    onShowReadReceiptsChange: (Boolean) -> Unit,
+) {
+    Column {
+        SettingsRow(
+            icon = Icons.Filled.Email,
+            title = stringResource(R.string.message_requests_title),
+            subtitle = stringResource(R.string.settings_privacy_message_requests_desc),
+            onClick = { onRoute(SettingsRoute.MESSAGE_REQUEST_SETTINGS) },
+        )
         GroupInvitePolicyRow(viewModel = viewModel)
         SettingsToggleRow(
             title = stringResource(R.string.settings_privacy_read_receipts_title),

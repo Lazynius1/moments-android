@@ -1677,7 +1677,7 @@
     <string name="settings_sections_login_activity">Activitat d\'inici de sessió</string>
     <string name="settings_sections_login_activity_subtitle">Revisa la teva activitat recent</string>
     <string name="settings_sections_mute">Silenciar</string>
-    <string name="settings_sections_mute_subtitle">Comptes, paraules i frases</string>
+    <string name="settings_sections_mute_subtitle">Silencia comptes i filtra contingut</string>
     <string name="settings_sections_password">Contrasenya</string>
     <string name="settings_sections_password_subtitle">Canviar contrasenya</string>
     <string name="settings_sections_personal_info">Informació personal</string>

@@ -2332,7 +2332,7 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="settings_appeals">Bezwaar en beoordelingsstatus</string>
     <string name="settings_privacy_policy">Privacybeleid en voorwaarden</string>
     <string name="settings_section_advanced">GEAVANCEERDE INSTELLINGEN</string>
-    <string name="settings_account_management">Geavanceerd accountbeheer</string>
+    <string name="settings_account_management">Accountbeheer</string>
     <string name="settings_account_management_desc">Account deactiveren of verwijderen</string>
     <string name="settings_group_account">JOUW ACCOUNT</string>
     <string name="settings_group_security">BEVEILIGING</string>
@@ -2374,7 +2374,8 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="blocked_users_error_fetch_users">Geblokkeerde gebruikers ophalen mislukt</string>
     <string name="blocked_users_error_unblock">Deblokkeren van gebruiker mislukt</string>
     <string name="settings_sections_mute">Dempen</string>
-    <string name="settings_sections_mute_subtitle">Accounts, woorden en zinnen</string>
+
+    <string name="settings_sections_mute_subtitle">Accounts dempen en inhoud filteren</string>
     <string name="settings_sections_password">Wachtwoord</string>
     <string name="settings_sections_password_subtitle">Wachtwoord wijzigen</string>
     <string name="settings_sections_saved">Opgeslagen</string>
@@ -2923,7 +2924,8 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="message_requests_move_to_hidden">Naar verborgen verplaatsen</string>
     <string name="message_requests_report">Melden</string>
     <string name="message_requests_hidden_words_title">Verborgen woorden</string>
-    <string name="message_requests_hidden_words_description">Filter verzoeken nadat ze op dit apparaat zijn ontsleuteld.</string>
+
+    <string name="message_requests_hidden_words_description">Filter berichtverzoeken op dit apparaat nadat ze zijn ontsleuteld.</string>
     <string name="message_requests_hidden_words_automatic">Automatisch filter</string>
     <string name="message_requests_hidden_words_automatic_description">Verbergt verzoeken op basis van veiligheidssignalen, zonder de inhoud op de server te analyseren.</string>
     <string name="message_requests_hidden_words_custom">Woorden en zinnen</string>
@@ -3015,4 +3017,6 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="maps_chrome_nearby">Bij jou in de buurt</string>
     <string name="maps_chrome_choose_city">Kies een stad</string>
     <string name="maps_chrome_recenter">Mijn locatie</string>
+    <string name="settings_group_profile_content">Profiel en inhoud</string>
+    <string name="settings_group_messaging_privacy">Berichten en interacties</string>
 </resources>

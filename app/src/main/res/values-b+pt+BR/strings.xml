@@ -2314,7 +2314,8 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="message_requests_move_to_hidden">Mover para Ocultas</string>
     <string name="message_requests_report">Denunciar</string>
     <string name="message_requests_hidden_words_title">Palavras ocultas</string>
-    <string name="message_requests_hidden_words_description">Filtra solicitações após a descriptografia neste dispositivo.</string>
+
+    <string name="message_requests_hidden_words_description">Filtre solicitações de mensagens neste dispositivo após descriptografá-las.</string>
     <string name="message_requests_hidden_words_automatic">Filtro automático</string>
     <string name="message_requests_hidden_words_automatic_description">Usa sinais de segurança sem analisar o conteúdo no servidor.</string>
     <string name="message_requests_hidden_words_custom">Palavras e frases</string>
@@ -2403,4 +2404,6 @@ Para dúvidas ou solicitações sobre privacidade, entre em contato pelo e-mail 
     <string name="maps_chrome_nearby">Perto de você</string>
     <string name="maps_chrome_choose_city">Escolha uma cidade</string>
     <string name="maps_chrome_recenter">Minha localização</string>
+    <string name="settings_group_profile_content">Perfil e conteúdo</string>
+    <string name="settings_group_messaging_privacy">Mensagens e interações</string>
 </resources>

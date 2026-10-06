@@ -164,83 +164,14 @@ object EnhancedNotificationRowTrailing {
             loadFailed = storyModel == null && path == null
         }
 
-        val path = imagePath
-        if (!path.isNullOrBlank() && !loadFailed) {
-            Box(
-                modifier = Modifier.size(44.dp),
-                contentAlignment = Alignment.BottomEnd,
-            ) {
-                val corner = RoundedCornerShape(8.dp)
-                if (storyModel != null) {
-                    StoryStaticPreviewSurface(
-                        story = storyModel!!,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(corner),
-                    )
-                } else {
-                    AsyncImage(
-                        model = path,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clip(corner),
-                        contentScale = ContentScale.Crop,
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(corner)
-                        .border(
-                            2.dp,
-                            Brush.linearGradient(
-                                listOf(
-                                    Color.Blue.copy(alpha = 0.85f),
-                                    Color(0xFF9C27B0).copy(alpha = 0.85f),
-                                ),
-                            ),
-                            corner,
-                        ),
-                )
-                Icon(
-                    imageVector = Icons.Filled.Link,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier
-                        .offset(x = 4.dp, y = 4.dp)
-                        .background(Color.Black.copy(alpha = 0.45f), CircleShape)
-                        .padding(2.dp)
-                        .size(14.dp),
-                )
-            }
-        } else {
-            val corner = RoundedCornerShape(8.dp)
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(corner)
-                    .background(if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.06f))
-                    .border(
-                        1.5.dp,
-                        Brush.linearGradient(
-                            listOf(
-                                Color.Blue.copy(alpha = 0.35f),
-                                Color(0xFF9C27B0).copy(alpha = 0.35f),
-                            ),
-                        ),
-                        corner,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Link,
-                    contentDescription = null,
-                    tint = if (isDark) Color.White.copy(alpha = 0.72f) else Color.Black.copy(alpha = 0.62f),
-                    modifier = Modifier.size(17.dp),
-                )
-            }
-        }
+        com.moments.android.notifications.components.NotificationStoryThumbnailView(
+            imagePath = imagePath,
+            reaction = null,
+            isDark = isDark,
+            loadFailed = loadFailed,
+            story = storyModel,
+            isChain = true,
+        )
     }
 
     /** ≡ Button View grouped followers */

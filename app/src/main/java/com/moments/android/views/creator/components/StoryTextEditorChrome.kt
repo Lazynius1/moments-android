@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -522,14 +523,14 @@ fun StoryMomentsTextToolbar(
     Row(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = 20.dp)
             .height(StoryTextEditorChrome.toolbarHeight)
             .clip(RoundedCornerShape(14.dp))
             .background(StoryTextEditorChrome.toolbarFill),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         StoryTextToolbarItem(
-            label = if (forcesAllCaps || styleUsesCaps) "AA" else "Aa",
+            iconRes = if (forcesAllCaps || styleUsesCaps) R.drawable.editor_text_caps else R.drawable.editor_text_type,
             active = activeContext == StoryTextEditorContext.FONTS,
             onTap = { selectContext(StoryTextEditorContext.FONTS) },
             onLongPress = {
@@ -542,22 +543,16 @@ fun StoryMomentsTextToolbar(
             active = activeContext == StoryTextEditorContext.COLORS,
             onTap = { selectContext(StoryTextEditorContext.COLORS) },
         ) {
-            Box(
-                Modifier
-                    .size(22.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.sweepGradient(
-                            listOf(Color.Red, Color.Yellow, Color.Green, Color.Blue, Color.Magenta, Color.Red),
-                        ),
-                    )
-                    .border(1.2.dp, Color.White.copy(alpha = .9f), CircleShape),
+            Icon(
+                painterResource(R.drawable.editor_text_color),
+                contentDescription = null,
+                tint = Color.Unspecified,
+                modifier = Modifier.size(24.dp),
             )
         }
         StoryTextToolbarDivider()
         StoryTextToolbarIconItem(
-            // SF Symbol `text.line.first.and.arrowtriangle.forward` ≈ play/motion cue.
-            icon = Icons.Filled.PlayArrow,
+            iconRes = R.drawable.editor_text_motion,
             active = activeContext == StoryTextEditorContext.MOTION,
             onTap = { selectContext(StoryTextEditorContext.MOTION) },
         )
@@ -568,11 +563,11 @@ fun StoryMomentsTextToolbar(
         )
         StoryTextToolbarDivider()
         val alignIcon = when (textAlignmentRaw.lowercase()) {
-            "leading", "left" -> Icons.AutoMirrored.Filled.FormatAlignLeft
-            "trailing", "right" -> Icons.AutoMirrored.Filled.FormatAlignRight
-            else -> Icons.Filled.FormatAlignCenter
+            "leading", "left" -> R.drawable.editor_text_align_left
+            "trailing", "right" -> R.drawable.editor_text_align_right
+            else -> R.drawable.editor_text_align_center
         }
-        StoryTextToolbarIconItem(icon = alignIcon, active = true, onTap = onCycleAlignment)
+        StoryTextToolbarIconItem(iconRes = alignIcon, active = true, onTap = onCycleAlignment)
         StoryTextToolbarDivider()
         StoryTextBackgroundToolbarItem(textBackgroundFillRaw, selectedColor, onCycleBackground)
     }
@@ -580,7 +575,7 @@ fun StoryMomentsTextToolbar(
 
 @Composable
 private fun RowScope.StoryTextToolbarItem(
-    label: String,
+    iconRes: Int,
     active: Boolean,
     onTap: () -> Unit,
     onLongPress: (() -> Unit)? = null,
@@ -597,19 +592,18 @@ private fun RowScope.StoryTextToolbarItem(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            label,
-            color = if (active) Color.White else Color.White.copy(alpha = .55f),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
+        Icon(
+            painterResource(iconRes),
+            contentDescription = null,
+            tint = if (active) Color.White else Color.White.copy(alpha = .55f),
+            modifier = Modifier.size(24.dp),
         )
     }
 }
 
 @Composable
 private fun RowScope.StoryTextToolbarIconItem(
-    icon: ImageVector,
+    iconRes: Int,
     active: Boolean,
     onTap: () -> Unit,
 ) {
@@ -621,10 +615,10 @@ private fun RowScope.StoryTextToolbarIconItem(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            icon,
+            painterResource(iconRes),
             contentDescription = null,
             tint = if (active) Color.White else Color.White.copy(alpha = .55f),
-            modifier = Modifier.size(17.dp),
+            modifier = Modifier.size(24.dp),
         )
     }
 }
@@ -659,23 +653,12 @@ private fun RowScope.StoryTextToolbarVisualItem(
             .clickable(onClick = onTap),
         contentAlignment = Alignment.Center,
     ) {
-        Box {
-            Text(
-                "A",
-                color = if (active) Color.White else Color.White.copy(alpha = .55f),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                "✦",
-                color = if (active) Color(0xFFFFD60A) else Color.White.copy(alpha = .7f),
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 4.dp, y = (-2).dp),
-            )
-        }
+        Icon(
+            painterResource(R.drawable.editor_text_effects),
+            contentDescription = null,
+            tint = if (active) Color.White else Color.White.copy(alpha = .55f),
+            modifier = Modifier.size(24.dp),
+        )
     }
 }
 
@@ -717,22 +700,12 @@ private fun RowScope.StoryTextBackgroundToolbarItem(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            Modifier
-                .size(width = 22.dp, height = 18.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(previewFill)
-                .then(
-                    if (normalized == "none") {
-                        Modifier.border(1.dp, Color.White.copy(alpha = .55f), RoundedCornerShape(5.dp))
-                    } else {
-                        Modifier
-                    },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("A", color = textForeground, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        }
+        Icon(
+            painterResource(R.drawable.editor_text_background),
+            contentDescription = null,
+            tint = if (normalized == "none") Color.White else previewFill,
+            modifier = Modifier.size(24.dp),
+        )
     }
 }
 

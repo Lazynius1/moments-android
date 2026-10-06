@@ -202,7 +202,7 @@ fun HelpSection(onRoute: (SettingsRoute) -> Unit) {
 fun AdvancedAccountSection(onShowAdvancedAccountManagement: () -> Unit) {
     SettingsRow(
         icon = Icons.Filled.Settings,
-        title = stringResource(R.string.settings_advanced_title),
+        title = stringResource(R.string.settings_account_management),
         onClick = onShowAdvancedAccountManagement,
     )
 }

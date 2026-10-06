@@ -348,15 +348,18 @@ fun VisualWaveformView(
     activeColor: Color,
     progress: Float,
     modifier: Modifier = Modifier,
+    centerInWidth: Boolean = false,
 ) {
     Canvas(modifier.height(VoiceMessageLayout.waveformHeight.dp)) {
         if (levels.isEmpty()) return@Canvas
         val barW = VoiceMessageLayout.barWidth.dp.toPx()
         val gap = VoiceMessageLayout.barSpacing.dp.toPx()
         val step = barW + gap
+        val waveformWidth = levels.size * step - gap
+        val startX = if (centerInWidth) ((size.width - waveformWidth) / 2f).coerceAtLeast(0f) else 0f
         levels.forEachIndexed { index, level ->
             val height = max(6f, level.coerceIn(0f, 1f) * size.height)
-            val x = index * step + barW / 2f
+            val x = startX + index * step + barW / 2f
             drawLine(
                 color = if (index.toFloat() / levels.size <= progress) activeColor else color,
                 start = androidx.compose.ui.geometry.Offset(x, (size.height - height) / 2f),

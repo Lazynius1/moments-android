@@ -181,10 +181,6 @@ class LoginActivityViewModel {
             }
         }
 
-        if (resolvedCurrent == null) {
-            remaining.firstOrNull()?.let { resolvedCurrent = it }
-        }
-
         resolvedCurrent?.let { currentResolved ->
             remaining.removeAll { isSameSession(it, currentResolved) }
         }

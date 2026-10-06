@@ -2320,7 +2320,8 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="message_requests_move_to_hidden">Sposta in Nascoste</string>
     <string name="message_requests_report">Segnala</string>
     <string name="message_requests_hidden_words_title">Parole nascoste</string>
-    <string name="message_requests_hidden_words_description">Filtra le richieste dopo la decifratura sul dispositivo.</string>
+
+    <string name="message_requests_hidden_words_description">Filtra le richieste di messaggi su questo dispositivo dopo averle decifrate.</string>
     <string name="message_requests_hidden_words_automatic">Filtro automatico</string>
     <string name="message_requests_hidden_words_automatic_description">Usa segnali di sicurezza senza analizzare il contenuto sul server.</string>
     <string name="message_requests_hidden_words_custom">Parole e frasi</string>
@@ -2408,4 +2409,6 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="maps_chrome_nearby">Vicino a te</string>
     <string name="maps_chrome_choose_city">Scegli una città</string>
     <string name="maps_chrome_recenter">La mia posizione</string>
+    <string name="settings_group_profile_content">Profilo e contenuti</string>
+    <string name="settings_group_messaging_privacy">Messaggi e interazioni</string>
 </resources>

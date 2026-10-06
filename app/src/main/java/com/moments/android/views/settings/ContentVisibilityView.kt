@@ -99,14 +99,13 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
     var showingStoryInteractions by remember { mutableStateOf(false) }
     var showingCustomLists by remember { mutableStateOf(false) }
     var showingHiddenFrom by remember { mutableStateOf(false) }
-    var showingHiddenWords by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadSettings { isLoading = false }
     }
 
     SettingsSubsectionWrapper(
-        title = stringResource(R.string.content_visibility_title),
+        title = stringResource(R.string.settings_sections_content_visibility),
         onNavigateBack = onNavigateBack,
     ) {
         Box(Modifier.fillMaxSize()) {
@@ -183,44 +182,7 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
-                            HorizontalDivider(
-                                Modifier.padding(start = SettingsDividerStart),
-                                color = primary.copy(alpha = 0.2f),
-                            )
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable { showingHiddenWords = true }
-                                    .padding(horizontal = 16.dp, vertical = 11.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                            ) {
-                                Icon(
-                                    Icons.Filled.TextFields,
-                                    null,
-                                    tint = primary,
-                                    modifier = Modifier.width(28.dp),
-                                )
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(
-                                        stringResource(R.string.message_requests_hidden_words_title),
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = primary,
-                                    )
-                                    Text(
-                                        stringResource(R.string.message_requests_hidden_words_description),
-                                        fontSize = 13.sp,
-                                        color = Color.Gray,
-                                    )
-                                }
-                                Icon(
-                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                    null,
-                                    tint = Color.Gray,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
+
                         }
                     }
 
@@ -376,14 +338,7 @@ fun ContentVisibilityView(onNavigateBack: () -> Unit = {}) {
         }
     }
 
-    if (showingHiddenWords) {
-        MomentsModalSheet(
-            onDismissRequest = { showingHiddenWords = false },
-            largeOnly = false,
-        ) { dismiss ->
-            HiddenWordsSettingsView(onDismiss = dismiss)
-        }
-    }
+
 }
 
 @Composable
@@ -713,6 +668,34 @@ private fun InteractionToggleRow(
 }
 
 // MARK: - Hidden words
+
+@Composable
+fun MessageRequestSettingsView(viewModel: SettingsViewModel, onNavigateBack: () -> Unit) {
+    var showingHiddenWords by remember { mutableStateOf(false) }
+    SettingsSubsectionWrapper(
+        title = stringResource(R.string.message_requests_title),
+        onNavigateBack = onNavigateBack,
+    ) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        ) {
+            SettingsSubsectionGroup {
+                com.moments.android.views.settings.sections.MessageRequestPolicyRow(viewModel)
+                com.moments.android.views.settings.sections.SettingsRow(
+                    icon = Icons.Filled.TextFields,
+                    title = stringResource(R.string.message_requests_hidden_words_title),
+                    subtitle = stringResource(R.string.message_requests_hidden_words_description),
+                    onClick = { showingHiddenWords = true },
+                )
+            }
+        }
+    }
+    if (showingHiddenWords) {
+        MomentsModalSheet(onDismissRequest = { showingHiddenWords = false }, largeOnly = false) { dismiss ->
+            HiddenWordsSettingsView(onDismiss = dismiss)
+        }
+    }
+}
 
 @Composable
 private fun HiddenWordsSettingsView(onDismiss: () -> Unit) {

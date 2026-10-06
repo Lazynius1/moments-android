@@ -66,6 +66,7 @@ data class StoryStickerDraft(
     val revealEffectColor: String? = null,
     val audioURL: String? = null,
     val audioDuration: Double? = null,
+    val originalAudioId: String? = null,
     val music: com.moments.android.models.StoryMusicSelection? = null,
     /** ≡ StickerInteractionData.momentId / mediaCount (shareMoment). */
     val momentId: String? = null,
@@ -127,6 +128,7 @@ fun StoryStickerDraft.toStickerData(zIndex: Int = this.zIndex): com.moments.andr
         contentOffsetY = contentOffsetY,
         audioURL = audioURL,
         audioDuration = audioDuration,
+        originalAudioId = originalAudioId,
         music = music,
         isAnimated = isAnimated,
         gifURL = gifURL,

@@ -1,6 +1,7 @@
 package com.moments.android.services.social
 
 import android.location.Location
+import java.security.MessageDigest
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -179,17 +180,40 @@ object EchoService {
             moments = momentRefs,
         )
         try {
-            val docRef = db.collection("echoes").add(newEcho.toMap()).await()
-            sendEchoSuggestions(docRef.id, participants, hostId)
+            val echoId = proposalId(momentRefs)
+            val docRef = db.collection("echoes").document(echoId)
+            val payload = newEcho.toMap()
+            val created = db.runTransaction { transaction ->
+                if (transaction.get(docRef).exists()) {
+                    false
+                } else {
+                    transaction.set(docRef, payload)
+                    true
+                }
+            }.await()
+            if (created) {
+                sendEchoSuggestions(echoId, participants, hostId)
+            } else {
+                mergeWithExistingEcho(echoId, hostMoment)
+            }
         } catch (_: Exception) {
             // mirror iOS: log only
         }
     }
 
+    internal fun proposalId(moments: List<EchoMomentRef>): String {
+        val canonical = moments.map { "${it.authorId}/${it.momentId}" }
+            .distinct().sorted().joinToString("\n")
+        val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray(Charsets.UTF_8))
+        return "echo_v1_" + digest.joinToString("") { "%02x".format(it) }
+    }
+
     private suspend fun findExistingEcho(near: Moment.LocationCoordinate): Echo? {
         val searchWindow = Date(System.currentTimeMillis() - 86_400_000L)
         return try {
+            val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return null
             val snapshot = db.collection("echoes")
+                .whereArrayContains("participantIds", userId)
                 .whereGreaterThan("createdAt", Timestamp(searchWindow))
                 .get()
                 .await()

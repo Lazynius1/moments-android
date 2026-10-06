@@ -55,6 +55,7 @@ data class CachedStickerInteractionData(
     val contentOffsetY: Double? = null,
     val audioURL: String? = null,
     val audioDuration: Double? = null,
+    val originalAudioId: String? = null,
     val music: StoryMusicSelection? = null,
 )
 
@@ -141,6 +142,7 @@ data class StoryUploadPayload(
     val continuationCustomViewers: List<String>? = null,
     val continuationCustomListId: String? = null,
     val continuationCustomListName: String? = null,
+    val interactionSettings: Map<String, Boolean>? = null,
     val expirationHours: Int? = null,
     val drawingFileName: String? = null,
     val stickers: List<CachedSticker>? = null,
@@ -266,6 +268,9 @@ object UploadPayloadDecoder {
             continuationCustomViewers = json.optStringList("continuationCustomViewers"),
             continuationCustomListId = json.optString("continuationCustomListId").takeIf { json.has("continuationCustomListId") && !json.isNull("continuationCustomListId") },
             continuationCustomListName = json.optString("continuationCustomListName").takeIf { json.has("continuationCustomListName") && !json.isNull("continuationCustomListName") },
+            interactionSettings = json.optJSONObject("interactionSettings")?.let { settings ->
+                settings.keys().asSequence().mapNotNull { key -> (settings.opt(key) as? Boolean)?.let { key to it } }.toMap()
+            },
             expirationHours = json.optInt("expirationHours").takeIf { json.has("expirationHours") },
             drawingFileName = json.optString("drawingFileName").takeIf { json.has("drawingFileName") && !json.isNull("drawingFileName") },
             stickers = stickers,
@@ -414,6 +419,7 @@ object UploadPayloadDecoder {
         payload.continuationCustomViewers?.let { json.put("continuationCustomViewers", JSONArray(it)) }
         payload.continuationCustomListId?.let { json.put("continuationCustomListId", it) }
         payload.continuationCustomListName?.let { json.put("continuationCustomListName", it) }
+        payload.interactionSettings?.let { json.put("interactionSettings", JSONObject(it)) }
         payload.expirationHours?.let { json.put("expirationHours", it) }
         payload.drawingFileName?.let { json.put("drawingFileName", it) }
         fun encodeOverlay(meta: StoryTextOverlayMetadata): JSONObject = JSONObject().apply {
@@ -513,6 +519,7 @@ object UploadPayloadDecoder {
                                             data.contentOffsetY?.let { put("contentOffsetY", it) }
                                             data.audioURL?.let { put("audioURL", it) }
                                             data.audioDuration?.let { put("audioDuration", it) }
+                                            data.originalAudioId?.let { put("originalAudioId", it) }
                                             data.music?.let { put("music", org.json.JSONObject(it.toMap())) }
                                         },
                                     )
@@ -596,6 +603,7 @@ object UploadPayloadDecoder {
                 audioURL = data.optString("audioURL").takeIf { data.has("audioURL") && !data.isNull("audioURL") },
                 music = data.optJSONObject("music")?.let { StoryMusicSelection.from(storyMusicJsonMap(it)) },
                 audioDuration = data.optDouble("audioDuration").takeIf { data.has("audioDuration") && !data.isNull("audioDuration") },
+                originalAudioId = data.optString("originalAudioId").takeIf { it.isNotBlank() && it != "null" },
             )
         }
         CachedSticker(

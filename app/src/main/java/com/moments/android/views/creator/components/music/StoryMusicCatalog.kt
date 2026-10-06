@@ -33,7 +33,7 @@ object StoryMusicCatalog {
     suspend fun save(id: String, saved: Boolean) { request("setStoryMusicSaved", JSONObject().put("trackId", id).put("saved", saved)) }
     suspend fun resolve(id: String, storyId: String? = null): StoryMusicTrack = StoryMusicTrack.from(jsonMap(
         request("getStoryMusicTrack", JSONObject().put("trackId", id).apply { storyId?.let { put("storyId", it) } })))
-    private suspend fun request(endpoint: String, body: JSONObject): JSONObject {
+    internal suspend fun request(endpoint: String, body: JSONObject): JSONObject {
         val token = checkNotNull(FirebaseAuth.getInstance().currentUser).getIdToken(false).await().token
         val project = checkNotNull(FirebaseApp.getInstance().options.projectId)
         return withContext(Dispatchers.IO) {
@@ -54,5 +54,5 @@ object StoryMusicCatalog {
         is org.json.JSONArray -> (0 until value.length()).map { jsonValue(value.opt(it)) }
         else -> value
     }
-    private fun jsonMap(json: JSONObject) = json.keys().asSequence().associateWith { jsonValue(json.opt(it)) }
+    internal fun jsonMap(json: JSONObject) = json.keys().asSequence().associateWith { jsonValue(json.opt(it)) }
 }

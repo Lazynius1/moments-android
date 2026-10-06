@@ -75,12 +75,13 @@ suspend fun FirestoreService.createStoryWithVisibility(
     expirationHours: Int? = 24,
     duration: Double? = null,
     storyId: String? = null,
+    interactionSettings: Map<String, Boolean>? = null,
 ): String = createStoryDocument(
     userId, mediaItem, audienceSetting.raw, null, customViewers, text, textPosition, textStyle,
     textOverlay, textOverlays, stickers, drawingData, aspectRatio, backgroundFrameURL,
     backgroundBlurredFrameURL, chainId, chainPosition, chainTitle, expirationHours,
     allowOthersToContinue, continuationAudience, continuationCustomViewers,
-    continuationCustomListId, continuationCustomListName, duration, storyId,
+    continuationCustomListId, continuationCustomListName, duration, storyId, interactionSettings,
 )
 
 suspend fun FirestoreService.createStoryWithCustomList(
@@ -108,12 +109,13 @@ suspend fun FirestoreService.createStoryWithCustomList(
     expirationHours: Int? = 24,
     duration: Double? = null,
     storyId: String? = null,
+    interactionSettings: Map<String, Boolean>? = null,
 ): String = createStoryDocument(
     userId, mediaItem, ContentAudience.CUSTOM_LIST.raw, customListId, null, text, textPosition,
     textStyle, textOverlay, textOverlays, stickers, drawingData, aspectRatio, backgroundFrameURL,
     backgroundBlurredFrameURL, chainId, chainPosition, chainTitle, expirationHours,
     allowOthersToContinue, continuationAudience, continuationCustomViewers,
-    continuationCustomListId, continuationCustomListName, duration, storyId,
+    continuationCustomListId, continuationCustomListName, duration, storyId, interactionSettings,
 )
 
 private suspend fun FirestoreService.createStoryDocument(
@@ -143,12 +145,18 @@ private suspend fun FirestoreService.createStoryDocument(
     continuationCustomListName: String?,
     duration: Double?,
     storyId: String?,
+    interactionSettings: Map<String, Boolean>? = null,
 ): String {
     val user = fetchUser(userId)
     val isChain = chainId != null
     val resolvedExpirationHours = if (isChain) 48 else if (expirationHours == 48) 48 else 24
     val expirationDate = calculateStoryExpirationDate(isChain, chainId, resolvedExpirationHours)
-    val resolvedDuration = duration ?: if (mediaItem.type == MediaItem.MediaType.VIDEO) 60.0 else (stickers?.firstOrNull { it.music != null }?.music?.duration?.coerceIn(15.0, 60.0) ?: 15.0)
+    val photoAudioDuration = listOfNotNull(
+        stickers?.firstOrNull { it.music != null }?.music?.duration,
+        stickers?.filter { it.type == "audio" }?.mapNotNull { it.audioDuration }
+            ?.filter { it.isFinite() }?.maxOrNull(),
+    ).filter { it.isFinite() }.maxOrNull()?.coerceIn(15.0, 60.0) ?: 15.0
+    val resolvedDuration = duration ?: if (mediaItem.type == MediaItem.MediaType.VIDEO) 60.0 else photoAudioDuration
     val resolvedStoryId = storyId ?: UUID.randomUUID().toString()
     val resolvedTextOverlays = textOverlays?.takeIf { it.isNotEmpty() }
         ?: textOverlay?.let { listOf(it) }
@@ -164,6 +172,7 @@ private suspend fun FirestoreService.createStoryDocument(
         expirationHours = resolvedExpirationHours,
         expirationDate = expirationDate,
         profileImagePath = user.profileImagePath,
+        interactionSettings = interactionSettings,
         audience = audience,
         customListId = customListId,
         text = primaryTextOverlay?.text ?: text,

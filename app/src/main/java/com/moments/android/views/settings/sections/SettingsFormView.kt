@@ -142,7 +142,7 @@ fun SettingsFormView(
                 }
             }
             AnimatedSettingsBlock(visible = animateSections, delayMs = 150) {
-                SettingsGroup(title = stringResource(R.string.settings_group_privacy)) {
+                SettingsGroup(title = stringResource(R.string.settings_group_profile_content)) {
                     PrivacySection(
                         isPrivate = isPrivate,
                         onIsPrivateChange = onIsPrivateChange,
@@ -150,9 +150,17 @@ fun SettingsFormView(
                         showFollowers = showFollowers,
                         viewModel = viewModel,
                         onRoute = onRoute,
+                        blockedAccountsCount = blockedAccountsCount,
+                    )
+                }
+            }
+            AnimatedSettingsBlock(visible = animateSections, delayMs = 175) {
+                SettingsGroup(title = stringResource(R.string.settings_group_messaging_privacy)) {
+                    MessagingPrivacySection(
+                        viewModel = viewModel,
+                        onRoute = onRoute,
                         showReadReceipts = showReadReceipts,
                         onShowReadReceiptsChange = onShowReadReceiptsChange,
-                        blockedAccountsCount = blockedAccountsCount,
                     )
                 }
             }
@@ -177,18 +185,13 @@ fun SettingsFormView(
                     OnlineStatusSection()
                 }
             }
-            AnimatedSettingsBlock(visible = animateSections, delayMs = 300) {
-                SettingsGroup(title = stringResource(R.string.settings_group_data)) {
-                    DataSection(onRoute = onRoute)
-                }
-            }
             AnimatedSettingsBlock(visible = animateSections, delayMs = 350) {
                 SettingsGroup(title = stringResource(R.string.settings_group_support)) {
                     HelpSection(onRoute = onRoute)
                 }
             }
             AnimatedSettingsBlock(visible = animateSections, delayMs = 400) {
-                SettingsGroup(title = stringResource(R.string.settings_group_advanced)) {
+                SettingsGroup(title = stringResource(R.string.settings_account_management)) {
                     AdvancedAccountSection(onShowAdvancedAccountManagement = onShowAdvancedAccountManagement)
                     LogoutSection(onNavigateBack = onNavigateBack)
                 }

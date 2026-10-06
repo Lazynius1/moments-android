@@ -2332,7 +2332,7 @@
     <string name="settings_appeals">異議申し立てと審査状況</string>
     <string name="settings_privacy_policy">プライバシーポリシーと利用規約</string>
     <string name="settings_section_advanced">詳細設定</string>
-    <string name="settings_account_management">アカウントの詳細管理</string>
+    <string name="settings_account_management">アカウント管理</string>
     <string name="settings_account_management_desc">アカウントを停止または削除します</string>
     <string name="settings_group_account">あなたのアカウント</string>
     <string name="settings_group_security">セキュリティ</string>
@@ -2374,7 +2374,8 @@
     <string name="blocked_users_error_fetch_users">ブロックしたユーザーを取得できませんでした</string>
     <string name="blocked_users_error_unblock">ユーザーのブロックを解除できませんでした</string>
     <string name="settings_sections_mute">ミュート</string>
-    <string name="settings_sections_mute_subtitle">アカウント、単語、フレーズ</string>
+
+    <string name="settings_sections_mute_subtitle">アカウントをミュートし、コンテンツをフィルタリング</string>
     <string name="settings_sections_password">パスワード</string>
     <string name="settings_sections_password_subtitle">パスワードを変更</string>
     <string name="settings_sections_saved">保存済み</string>
@@ -2923,7 +2924,8 @@
     <string name="message_requests_move_to_hidden">非表示に移動</string>
     <string name="message_requests_report">報告</string>
     <string name="message_requests_hidden_words_title">非表示ワード</string>
-    <string name="message_requests_hidden_words_description">このデバイスで復号した後のリクエストをフィルタリングします。</string>
+
+    <string name="message_requests_hidden_words_description">メッセージリクエストを復号した後、このデバイスでフィルタリングします。</string>
     <string name="message_requests_hidden_words_automatic">自動フィルター</string>
     <string name="message_requests_hidden_words_automatic_description">サーバー側で内容を分析せず、安全性に関するシグナルを使ってリクエストを非表示にします。</string>
     <string name="message_requests_hidden_words_custom">単語とフレーズ</string>
@@ -3015,4 +3017,6 @@
     <string name="maps_chrome_nearby">近くの投稿</string>
     <string name="maps_chrome_choose_city">都市を選択</string>
     <string name="maps_chrome_recenter">現在地</string>
+    <string name="settings_group_profile_content">プロフィールとコンテンツ</string>
+    <string name="settings_group_messaging_privacy">メッセージと交流</string>
 </resources>

@@ -2378,7 +2378,8 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="message_requests_move_to_hidden">Déplacer vers Masquées</string>
     <string name="message_requests_report">Signaler</string>
     <string name="message_requests_hidden_words_title">Mots masqués</string>
-    <string name="message_requests_hidden_words_description">Filtre les demandes après leur déchiffrement sur cet appareil.</string>
+
+    <string name="message_requests_hidden_words_description">Filtre les demandes de messages sur cet appareil après leur déchiffrement.</string>
     <string name="message_requests_hidden_words_automatic">Filtre automatique</string>
     <string name="message_requests_hidden_words_automatic_description">Utilise des signaux de sécurité sans analyser le contenu sur le serveur.</string>
     <string name="message_requests_hidden_words_custom">Mots et expressions</string>
@@ -2466,4 +2467,6 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="maps_chrome_nearby">À proximité</string>
     <string name="maps_chrome_choose_city">Choisis une ville</string>
     <string name="maps_chrome_recenter">Ma position</string>
+    <string name="settings_group_profile_content">Profil et contenu</string>
+    <string name="settings_group_messaging_privacy">Messages et interactions</string>
 </resources>

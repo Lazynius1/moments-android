@@ -75,6 +75,7 @@ internal object StoryStickerRebuild {
             contentOffsetY = interaction?.contentOffsetY,
             audioURL = interaction?.audioURL,
             audioDuration = interaction?.audioDuration,
+        originalAudioId = interaction?.originalAudioId,
             music = interaction?.music,
             isAnimated = cached.isAnimated,
             gifURL = cached.gifURL,

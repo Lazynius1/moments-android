@@ -853,6 +853,7 @@ data class StickerData(
     val moderationCategory: String? = null,
     val audioURL: String? = null,
     val audioDuration: Double? = null,
+    val originalAudioId: String? = null,
     val music: StoryMusicSelection? = null,
     val isAnimated: Boolean = false,
     val gifURL: String? = null,
@@ -930,6 +931,7 @@ data class StickerData(
                 music = StoryMusicSelection.from(data["music"]),
                 audioURL = data["audioURL"] as? String,
                 audioDuration = (data["audioDuration"] as? Number)?.toDouble(),
+                originalAudioId = data["originalAudioId"] as? String,
                 isAnimated = isAnimated,
                 gifURL = gifURL,
                 videoURL = videoURL,
@@ -986,6 +988,7 @@ data class StickerData(
                 moderationCategory = null,
                 audioURL = interaction?.audioURL,
                 audioDuration = interaction?.audioDuration,
+                originalAudioId = interaction?.originalAudioId,
                 music = interaction?.music,
                 isAnimated = stickerItem.isAnimated,
                 gifURL = stickerItem.gifURL,
@@ -1146,6 +1149,7 @@ data class Story(
     val profileImagePath: String? = null,
     val timestamp: Date,
     val username: String,
+    val interactionSettings: Map<String, Boolean>? = null,
     val audience: String? = null,
     val customListId: String? = null,
     val text: String? = null,
@@ -1190,6 +1194,7 @@ data class Story(
             profileImagePath == other.profileImagePath &&
             timestamp == other.timestamp &&
             username == other.username &&
+            interactionSettings == other.interactionSettings &&
             audience == other.audience &&
             customListId == other.customListId &&
             text == other.text &&
@@ -1228,6 +1233,7 @@ data class Story(
         result = 31 * result + (profileImagePath?.hashCode() ?: 0)
         result = 31 * result + timestamp.hashCode()
         result = 31 * result + username.hashCode()
+        result = 31 * result + (interactionSettings?.hashCode() ?: 0)
         result = 31 * result + (audience?.hashCode() ?: 0)
         result = 31 * result + (customListId?.hashCode() ?: 0)
         result = 31 * result + (text?.hashCode() ?: 0)
@@ -1282,6 +1288,8 @@ data class Story(
                 profileImagePath = data["profileImagePath"] as? String,
                 timestamp = MediaItem.anyToDate(data["timestamp"]) ?: Date(),
                 username = data["username"] as? String ?: "",
+                interactionSettings = (data["interactionSettings"] as? Map<*, *>)?.entries
+                    ?.mapNotNull { (key, value) -> if (key is String && value is Boolean) key to value else null }?.toMap(),
                 audience = data["audience"] as? String,
                 customListId = data["customListId"] as? String,
                 text = data["text"] as? String,
@@ -1719,6 +1727,7 @@ fun StickerData.toMap(): Map<String, Any> = buildMap {
     moderationState?.let { put("moderationState", it) }; moderationReason?.let { put("moderationReason", it) }
     moderationCategory?.let { put("moderationCategory", it) }
     audioURL?.let { put("audioURL", it) }; audioDuration?.let { put("audioDuration", it) }
+    originalAudioId?.let { put("originalAudioId", it) }
     put("isAnimated", isAnimated)
     gifURL?.let { put("gifURL", it) }; videoURL?.let { put("videoURL", it) }
 }
@@ -1730,6 +1739,7 @@ fun Story.toMap(): Map<String, Any> = buildMap {
     expirationHours?.let { put("expirationHours", it) }
     put("timestamp", Timestamp(timestamp)); put("expirationDate", Timestamp(expirationDate))
     profileImagePath?.let { put("profileImagePath", it) }
+    interactionSettings?.let { put("interactionSettings", it) }
     audience?.let { put("audience", it) }
     customListId?.let { put("customListId", it) }
     text?.let { put("text", it) }

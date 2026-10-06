@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
@@ -93,7 +94,7 @@ import kotlinx.coroutines.launch
  * Verificación social: Apple → Google.
  */
 
-private enum class AdvancedFlowDestination { MAIN, DELETE_ACCOUNT, LOGIN_ACTIVITY }
+private enum class AdvancedFlowDestination { MAIN, LOGIN_ACTIVITY, DATA_EXPORT, DELETE_ACCOUNT }
 
 enum class AccountDeletionVerificationMethod {
     PASSWORD,
@@ -247,9 +248,16 @@ fun AdvancedAccountManagementView(
             when (dest) {
                 AdvancedFlowDestination.MAIN -> AdvancedMainContent(
                     onDismiss = onNavigateBack,
-                    onLoginActivity = { navigate(AdvancedFlowDestination.LOGIN_ACTIVITY) },
                     onDeactivate = { showDeactivateConfirmation = true },
                     onDelete = { navigate(AdvancedFlowDestination.DELETE_ACCOUNT) },
+                    onLoginActivity = { navigate(AdvancedFlowDestination.LOGIN_ACTIVITY) },
+                    onDataExport = { navigate(AdvancedFlowDestination.DATA_EXPORT) },
+                )
+                AdvancedFlowDestination.LOGIN_ACTIVITY -> LoginActivityView(
+                    onNavigateBack = { navigate(AdvancedFlowDestination.MAIN, forward = false) },
+                )
+                AdvancedFlowDestination.DATA_EXPORT -> DataExportView(
+                    onNavigateBack = { navigate(AdvancedFlowDestination.MAIN, forward = false) },
                 )
                 AdvancedFlowDestination.DELETE_ACCOUNT -> DeleteAccountVerificationView(
                     isProcessing = isProcessing,
@@ -258,9 +266,6 @@ fun AdvancedAccountManagementView(
                     onConfirm = ::runDelete,
                     onCancel = { navigate(AdvancedFlowDestination.MAIN, forward = false) },
                     onProcessingChange = { isProcessing = it },
-                )
-                AdvancedFlowDestination.LOGIN_ACTIVITY -> LoginActivityView(
-                    onNavigateBack = { navigate(AdvancedFlowDestination.MAIN, forward = false) },
                 )
             }
         }
@@ -320,17 +325,18 @@ fun AdvancedAccountManagementView(
 @Composable
 private fun AdvancedMainContent(
     onDismiss: () -> Unit,
-    onLoginActivity: () -> Unit,
     onDeactivate: () -> Unit,
     onDelete: () -> Unit,
+    onLoginActivity: () -> Unit,
+    onDataExport: () -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
     val primary = SettingsProfileColors.accent(isDark)
     val secondary = primary.copy(alpha = 0.58f)
     Column(Modifier.fillMaxSize()) {
         AdvancedSheetHeader(
-            title = stringResource(R.string.settings_advanced_title),
-            subtitle = stringResource(R.string.settings_danger_zone_warning),
+            title = stringResource(R.string.settings_account_management),
+            subtitle = null,
         )
         Column(
             Modifier
@@ -347,6 +353,14 @@ private fun AdvancedMainContent(
                     subtitle = stringResource(R.string.settings_sections_login_activity_subtitle),
                     onClick = onLoginActivity,
                 )
+                AdvancedAccountActionRow(
+                    icon = Icons.Filled.Download,
+                    title = stringResource(R.string.settings_sections_download_data),
+                    subtitle = stringResource(R.string.settings_sections_download_data_subtitle),
+                    onClick = onDataExport,
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 AdvancedAccountActionRow(
                     icon = Icons.Filled.Pause,
                     title = stringResource(R.string.account_management_deactivate_title),

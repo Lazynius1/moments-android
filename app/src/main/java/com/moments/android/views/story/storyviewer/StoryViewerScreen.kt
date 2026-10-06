@@ -233,6 +233,7 @@ fun StoryViewerScreen(
 
     // MARK: - State (espejo @State iOS)
     var messageText by remember { mutableStateOf("") }
+    var originalAudioSheet by remember { mutableStateOf<com.moments.android.views.creator.components.music.StoryOriginalAudioSource?>(null) }
     var musicTrackSheet by remember { mutableStateOf<com.moments.android.models.StoryMusicTrack?>(null) }
     var showReactions by remember { mutableStateOf(false) }
     var showQuickActions by remember { mutableStateOf(false) }
@@ -331,7 +332,7 @@ fun StoryViewerScreen(
 
     val isStoryInteractionBlocked =
         isMenuInteractionActive ||
-            musicTrackSheet != null || showQuickActions ||
+            musicTrackSheet != null || originalAudioSheet != null || showQuickActions ||
             showActivity ||
             showChain ||
             showReactions ||
@@ -883,8 +884,8 @@ fun StoryViewerScreen(
             storyStickers = resolvedStoryStickers(story)
         }
     }
-    LaunchedEffect(story.authorId) {
-        val settings = runCatching {
+    LaunchedEffect(story.id, story.authorId, story.interactionSettings) {
+        val settings = story.interactionSettings ?: runCatching {
             @Suppress("UNCHECKED_CAST")
             firestore.db.collection("users").document(story.authorId).get().await().data
                 ?.get("contentVisibilitySettings") as? Map<String, Any?>
@@ -1278,7 +1279,13 @@ fun StoryViewerScreen(
                         initialSeekMs = ((if (didApplyInitialElapsed) 0.0 else initialElapsed) * 1000.0).toLong(),
                         modifier = Modifier.fillMaxSize(),
                     )
-                    androidx.compose.runtime.CompositionLocalProvider(com.moments.android.views.creator.components.music.LocalStoryMusicPlaying provides musicPlaying) {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        com.moments.android.views.creator.components.music.LocalStoryMusicPlaying provides musicPlaying,
+                        com.moments.android.views.components.LocalStoryAudioPlaybackClock provides com.moments.android.views.components.StoryAudioPlaybackClock(
+                            elapsed = playbackCoordinator.progress * story.duration,
+                            active = isDeckPageActive && !playbackCoordinator.isPaused,
+                        ),
+                    ) {
                     StoryMediaOverlayRendererView(
                         // ≡ iOS: resolvedTextOverlays; drawingData nil (dibujo ya bakeado en media)
                         textOverlays = story.resolvedTextOverlays,
@@ -1444,8 +1451,15 @@ fun StoryViewerScreen(
                         Box(Modifier.onSizeChanged { headerH = it.height }) {
                             StoryViewerHeaderChrome(
                                 username = story.username,
-                                onMusicTap = { story.stickers?.firstOrNull { it.music != null }?.music?.track?.let { pauseStoryPlayback(); musicTrackSheet = it } },
-                                musicTitle = story.stickers?.firstOrNull { it.music != null }?.music?.let { it.track.title + " · " + it.track.artist },
+                                onMusicTap = {
+                                    val music = story.stickers?.firstOrNull { it.music != null }?.music?.track
+                                    if (music != null) { pauseStoryPlayback(); musicTrackSheet = music }
+                                    else story.stickers?.firstOrNull { it.type == "audio" && it.audioURL != null }?.stickerId?.let { clip ->
+                                        story.id?.let { storyId -> pauseStoryPlayback(); originalAudioSheet = com.moments.android.views.creator.components.music.StoryOriginalAudioSource(story.authorId, storyId, clip) }
+                                    }
+                                },
+                                musicTitle = story.stickers?.firstOrNull { it.music != null }?.music?.let { it.track.title + " · " + it.track.artist }
+                                    ?: if (story.stickers?.any { it.type == "audio" && it.audioURL != null } == true) stringResource(R.string.story_audio_original) + (if (story.stickers?.firstOrNull { it.type == "audio" }?.originalAudioId == null) " · " + story.username else "") else null,
                                 authorId = story.authorId,
                                 isOwnStory = isOwnStory,
                                 profileImagePath = story.profileImagePath,
@@ -2055,6 +2069,16 @@ fun StoryViewerScreen(
 
         // MARK: profileRoute via UserProfileZoomNavigationHost (shared-element, no Dialog)
 
+        originalAudioSheet?.let { source ->
+            val clip = story.stickers?.firstOrNull { it.stickerId == source.stickerId }
+            com.moments.android.views.creator.components.music.StoryMusicTrackSheet(
+                com.moments.android.models.StoryMusicTrack(source.stickerId, stringResource(R.string.story_audio_original), if (clip?.originalAudioId == null) story.username else "", clip?.audioDuration ?: 15.0), originalAudio = source,
+                onCreatorTap = { creatorId ->
+                    profileRoute = FeedProfileSheetRoute(creatorId)
+                    originalAudioSheet = null
+                },
+            ) { originalAudioSheet = null; resumeStoryPlayback() }
+        }
         musicTrackSheet?.let { track ->
             com.moments.android.views.creator.components.music.StoryMusicTrackSheet(track) {
                 musicTrackSheet = null

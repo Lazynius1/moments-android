@@ -122,7 +122,7 @@ object LoginActivityService : LocationListener {
         val sessions = fetchActiveSessions(userId)
         if (sessions.isEmpty()) return null
         val currentFingerprint = currentDeviceFingerprint()
-        return sessions.firstOrNull { it.deviceIdentifier == currentFingerprint } ?: sessions.first()
+        return sessions.firstOrNull { it.deviceIdentifier == currentFingerprint }
     }
 
     suspend fun fetchActiveSessions(userId: String): List<LoginSession> =
@@ -171,6 +171,17 @@ object LoginActivityService : LocationListener {
                 com.google.firebase.firestore.SetOptions.merge(),
             ).await()
         if (signOutIfCurrentDevice) FirebaseAuth.getInstance().signOut()
+    }
+
+    fun markCurrentSessionSignedOut(userId: String) {
+        db.collection("users").document(userId).collection("loginActivity")
+            .document(hash(currentDeviceFingerprint()))
+            .update(mapOf(
+                "isActive" to false,
+                "sessionRevokedAt" to Timestamp(Date()),
+                "sessionRevokedReason" to "user_requested_logout",
+                "updatedAt" to Timestamp(Date()),
+            ))
     }
 
     suspend fun invalidateAllSessions(userId: String) {
@@ -251,7 +262,7 @@ object LoginActivityService : LocationListener {
                 location = location,
                 ipAddress = ipAddress,
                 timestamp = timestamp,
-                isActive = data["isActive"] as? Boolean ?: true,
+                isActive = data["isActive"] as? Boolean ?: false,
                 deviceIdentifier = deviceIdentifier.ifEmpty { null },
                 isSuspicious = data["isSuspicious"] as? Boolean ?: false,
                 isNewDevice = data["isNewDevice"] as? Boolean ?: false,

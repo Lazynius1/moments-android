@@ -849,7 +849,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="settings_appeals">Einspruchs- &amp; Überprüfungsstatus</string>
     <string name="settings_privacy_policy">Datenschutzrichtlinie und Bedingungen</string>
     <string name="settings_section_advanced">ERWEITERTE EINSTELLUNGEN</string>
-    <string name="settings_account_management">Erweiterte Kontoverwaltung</string>
+    <string name="settings_account_management">Kontoverwaltung</string>
     <string name="settings_account_management_desc">Konto deaktivieren oder löschen</string>
     <string name="maps_error_retry">Erneut versuchen</string>
     <string name="story_chains_loading">Kette wird geladen…</string>
@@ -2338,7 +2338,8 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="message_requests_move_to_hidden">Ausblenden</string>
     <string name="message_requests_report">Melden</string>
     <string name="message_requests_hidden_words_title">Ausgeblendete Wörter</string>
-    <string name="message_requests_hidden_words_description">Filtert Anfragen nach der Entschlüsselung auf diesem Gerät.</string>
+
+    <string name="message_requests_hidden_words_description">Nachrichtenanfragen nach der Entschlüsselung auf diesem Gerät filtern.</string>
     <string name="message_requests_hidden_words_automatic">Automatischer Filter</string>
     <string name="message_requests_hidden_words_automatic_description">Nutzt Sicherheitssignale ohne serverseitige Inhaltsanalyse.</string>
     <string name="message_requests_hidden_words_custom">Wörter und Ausdrücke</string>
@@ -2425,4 +2426,6 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="maps_chrome_nearby">In deiner Nähe</string>
     <string name="maps_chrome_choose_city">Wähle eine Stadt</string>
     <string name="maps_chrome_recenter">Mein Standort</string>
+    <string name="settings_group_profile_content">Profil und Inhalte</string>
+    <string name="settings_group_messaging_privacy">Nachrichten und Interaktionen</string>
 </resources>

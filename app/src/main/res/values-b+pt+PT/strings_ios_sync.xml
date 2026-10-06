@@ -1680,7 +1680,7 @@
     <string name="settings_sections_login_activity">Atividade de início de sessão</string>
     <string name="settings_sections_login_activity_subtitle">Revê a tua atividade recente</string>
     <string name="settings_sections_mute">Silenciar</string>
-    <string name="settings_sections_mute_subtitle">Contas, palavras e frases</string>
+    <string name="settings_sections_mute_subtitle">Silencia contas e filtra conteúdo</string>
     <string name="settings_sections_password">Palavra-passe</string>
     <string name="settings_sections_password_subtitle">Alterar palavra-passe</string>
     <string name="settings_sections_personal_info">Informações pessoais</string>

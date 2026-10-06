@@ -2332,7 +2332,7 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="settings_appeals">Odwołania i status weryfikacji</string>
     <string name="settings_privacy_policy">Polityka prywatności i warunki korzystania</string>
     <string name="settings_section_advanced">USTAWIENIA ZAAWANSOWANE</string>
-    <string name="settings_account_management">Zaawansowane zarządzanie kontem</string>
+    <string name="settings_account_management">Zarządzanie kontem</string>
     <string name="settings_account_management_desc">Dezaktywuj lub usuń konto</string>
     <string name="settings_group_account">TWOJE KONTO</string>
     <string name="settings_group_security">BEZPIECZEŃSTWO</string>
@@ -2374,7 +2374,8 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="blocked_users_error_fetch_users">Nie udało się pobrać zablokowanych użytkowników</string>
     <string name="blocked_users_error_unblock">Nie udało się odblokować użytkownika</string>
     <string name="settings_sections_mute">Wyciszanie</string>
-    <string name="settings_sections_mute_subtitle">Konta, słowa i frazy</string>
+
+    <string name="settings_sections_mute_subtitle">Wyciszaj konta i filtruj treści</string>
     <string name="settings_sections_password">Hasło</string>
     <string name="settings_sections_password_subtitle">Zmień hasło</string>
     <string name="settings_sections_saved">Zapisane</string>
@@ -2923,7 +2924,8 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="message_requests_move_to_hidden">Przenieś do ukrytych</string>
     <string name="message_requests_report">Zgłoś</string>
     <string name="message_requests_hidden_words_title">Ukryte słowa</string>
-    <string name="message_requests_hidden_words_description">Filtruj prośby po ich odszyfrowaniu na tym urządzeniu.</string>
+
+    <string name="message_requests_hidden_words_description">Filtruj prośby o wiadomości na tym urządzeniu po ich odszyfrowaniu.</string>
     <string name="message_requests_hidden_words_automatic">Filtr automatyczny</string>
     <string name="message_requests_hidden_words_automatic_description">Ukrywa prośby na podstawie sygnałów bezpieczeństwa, bez analizy treści po stronie serwera.</string>
     <string name="message_requests_hidden_words_custom">Słowa i wyrażenia</string>
@@ -3015,4 +3017,6 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="maps_chrome_nearby">W pobliżu</string>
     <string name="maps_chrome_choose_city">Wybierz miasto</string>
     <string name="maps_chrome_recenter">Moja lokalizacja</string>
+    <string name="settings_group_profile_content">Profil i treści</string>
+    <string name="settings_group_messaging_privacy">Wiadomości i interakcje</string>
 </resources>

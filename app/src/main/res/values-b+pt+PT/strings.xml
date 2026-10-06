@@ -2311,7 +2311,8 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="message_requests_move_to_hidden">Mover para Ocultos</string>
     <string name="message_requests_report">Denunciar</string>
     <string name="message_requests_hidden_words_title">Palavras ocultas</string>
-    <string name="message_requests_hidden_words_description">Filtra pedidos depois de serem decifrados neste dispositivo.</string>
+
+    <string name="message_requests_hidden_words_description">Filtra pedidos de mensagens neste dispositivo depois de os desencriptar.</string>
     <string name="message_requests_hidden_words_automatic">Filtro automático</string>
     <string name="message_requests_hidden_words_automatic_description">Usa sinais de segurança sem analisar o conteúdo no servidor.</string>
     <string name="message_requests_hidden_words_custom">Palavras e frases</string>
@@ -2400,4 +2401,6 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="maps_chrome_nearby">Perto de ti</string>
     <string name="maps_chrome_choose_city">Escolhe uma cidade</string>
     <string name="maps_chrome_recenter">A minha localização</string>
+    <string name="settings_group_profile_content">Perfil e conteúdo</string>
+    <string name="settings_group_messaging_privacy">Mensagens e interações</string>
 </resources>

@@ -712,7 +712,14 @@ fun StickerPickerView(
                                         StickerEmojiSliderPillGlyph(Modifier.size(width = 122.dp, height = 28.dp))
                                     } else {
                                         val attachment = cat.attachmentIcon
-                                        if (attachment != null) {
+                                        if (cat == StickerCatalogCategory.FRAME) {
+                                            Icon(
+                                                androidx.compose.ui.res.painterResource(R.drawable.sticker_polaroid_icon),
+                                                null,
+                                                tint = cat.accentColor,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                        } else if (attachment != null) {
                                             AttachmentIconView(
                                                 icon = attachment,
                                                 preset = AttachmentIconPreset.STICKER_CATALOG_PILL,
@@ -1036,10 +1043,13 @@ fun StickerPickerView(
                     }
                 }
 
-                StickerPickerMode.AUDIO -> AudioStickerRecordingView(
-                    onAdd = { file, duration ->
+                StickerPickerMode.AUDIO -> com.moments.android.views.creator.components.music.StoryAudioPicker(
+                    onRecord = { file, duration ->
                         HapticManager.shared.mediumImpact()
                         emit(StoryStickerDraft(type = "audio", audioURL = file.absolutePath, audioDuration = duration))
+                    },
+                    onUse = { file, duration, id ->
+                        emit(StoryStickerDraft(type = "audio", audioURL = file.absolutePath, audioDuration = duration, originalAudioId = id))
                     },
                 )
 

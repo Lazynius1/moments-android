@@ -1576,6 +1576,7 @@ object AuthService {
     // MARK: - Public helpers
 
     fun logout() {
+        auth.currentUser?.uid?.let(LoginActivityService::markCurrentSessionSignedOut)
         scope.launch {
             stopSuspensionListener()
             runCatching { LiveLocationSharingService.endActiveSessionForSignOut() }

@@ -2387,7 +2387,7 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="settings_appeals">Appeals &amp; review status</string>
     <string name="settings_privacy_policy">Privacy policy and terms</string>
     <string name="settings_section_advanced">ADVANCED SETTINGS</string>
-    <string name="settings_account_management">Advanced account management</string>
+    <string name="settings_account_management">Account Management</string>
     <string name="settings_account_management_desc">Deactivate or delete account</string>
     <string name="settings_group_account">YOUR ACCOUNT</string>
     <string name="settings_group_security">SECURITY</string>
@@ -2429,7 +2429,8 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="blocked_users_error_fetch_users">Error fetching blocked users</string>
     <string name="blocked_users_error_unblock">Error unblocking user</string>
     <string name="settings_sections_mute">Mute</string>
-    <string name="settings_sections_mute_subtitle">Accounts, words and phrases</string>
+
+    <string name="settings_sections_mute_subtitle">Mute accounts and filter content</string>
     <string name="settings_sections_password">Password</string>
     <string name="settings_sections_password_subtitle">Change password</string>
     <string name="settings_sections_saved">Saved</string>
@@ -2984,7 +2985,8 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="message_requests_move_to_hidden">Move to Hidden</string>
     <string name="message_requests_report">Report</string>
     <string name="message_requests_hidden_words_title">Hidden words</string>
-    <string name="message_requests_hidden_words_description">Filter requests after they are decrypted on this device.</string>
+
+    <string name="message_requests_hidden_words_description">Filter message requests on this device after decrypting them.</string>
     <string name="message_requests_hidden_words_automatic">Automatic filter</string>
     <string name="message_requests_hidden_words_automatic_description">Hides requests using safety signals without server-side content analysis.</string>
     <string name="message_requests_hidden_words_custom">Words and phrases</string>
@@ -3059,4 +3061,37 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="maps_chrome_nearby">Nearby</string>
     <string name="maps_chrome_choose_city">Choose a city</string>
     <string name="maps_chrome_recenter">My location</string>
+
+    <!-- Per-story sharing options -->
+    <string name="story_share_title">Share story</string>
+    <string name="story_share_close">Close</string>
+    <string name="story_share_back">Back</string>
+    <string name="story_share_your_story">Your story</string>
+    <string name="story_share_review">Choose who can see and interact.</string>
+    <string name="story_share_expiration">Available for</string>
+    <string name="story_share_chain_settings">Chain settings</string>
+    <string name="story_share_interactions">Interactions</string>
+    <string name="story_share_only_this_story">These options apply only to this story. Your defaults in Settings stay the same.</string>
+    <string name="story_share_chain_audience">Chains are visible to everyone and last 48 hours. Interactions apply only to your part.</string>
+    <string name="story_share_customize">Customize</string>
+    <string name="story_share_disabled">Disabled</string>
+    <string name="story_share_audience">Audience</string>
+
+    <!-- Original story audio -->
+    <string name="story_audio_title">Audio</string>
+    <string name="story_audio_record">Record</string>
+    <string name="story_audio_saved">Saved</string>
+    <string name="story_audio_original">Original audio</string>
+    <string name="story_audio_empty">The audios you save from stories will appear here.</string>
+    <string name="story_audio_use">Use audio</string>
+    <string name="story_audio_retry">Try again</string>
+    <string name="story_audio_unavailable">This audio is unavailable.</string>
+    <string name="story_audio_allow_reuse">Allow saving and reusing audio</string>
+    <string name="story_audio_allow_reuse_detail">People can save this audio and reuse it after this story expires.</string>
+    <string name="story_audio_restricted_audience">Only audio from public stories and public accounts can be saved.</string>
+    <string name="story_audio_restricted_creator">The creator has not allowed saving this audio.</string>
+    <string name="story_audio_saved_confirmation">Audio saved to favorites</string>
+    <string name="story_audio_unsaved_confirmation">Audio removed from favorites</string>
+    <string name="settings_group_profile_content">Profile and content</string>
+    <string name="settings_group_messaging_privacy">Messages and interactions</string>
 </resources>

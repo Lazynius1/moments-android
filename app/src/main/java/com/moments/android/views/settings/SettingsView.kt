@@ -97,6 +97,7 @@ object SettingsProfileColors {
  */
 enum class SettingsRoute {
     CONTENT_VISIBILITY,
+    MESSAGE_REQUEST_SETTINGS,
     CONNECTIONS,
     BEST_FRIENDS,
     BLOCKED_ACCOUNTS,
@@ -391,6 +392,7 @@ private fun SettingsDestinationHost(
     MomentsTabBarHidden()
     when (route) {
         SettingsRoute.CONTENT_VISIBILITY -> ContentVisibilityView(onNavigateBack = onDismiss)
+        SettingsRoute.MESSAGE_REQUEST_SETTINGS -> MessageRequestSettingsView(viewModel, onNavigateBack = onDismiss)
         SettingsRoute.CONNECTIONS -> ConnectionVisibilityView(
             showFollowing = showFollowing,
             onShowFollowingChange = onShowFollowingChange,

@@ -849,7 +849,7 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="settings_appeals">Estat d’al·legacions i revisions</string>
     <string name="settings_privacy_policy">Política de Privadesa i Termes</string>
     <string name="settings_section_advanced">CONFIGURACIÓ AVANÇADA</string>
-    <string name="settings_account_management">Gestió avançada de compte</string>
+    <string name="settings_account_management">Gestió del compte</string>
     <string name="settings_account_management_desc">Desactivar o eliminar compte</string>
     <string name="maps_error_retry">Reintentar</string>
     <string name="story_chains_loading">Carregant cadena…</string>
@@ -2318,7 +2318,8 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="message_requests_move_to_hidden">Mou a Ocultes</string>
     <string name="message_requests_report">Denuncia</string>
     <string name="message_requests_hidden_words_title">Paraules ocultes</string>
-    <string name="message_requests_hidden_words_description">Filtra sol·licituds després de desxifrar-les al dispositiu.</string>
+
+    <string name="message_requests_hidden_words_description">Filtra sol·licituds de missatges en aquest dispositiu, després de desxifrar-les.</string>
     <string name="message_requests_hidden_words_automatic">Filtre automàtic</string>
     <string name="message_requests_hidden_words_automatic_description">Oculta sol·licituds amb senyals de seguretat sense analitzar el contingut al servidor.</string>
     <string name="message_requests_hidden_words_custom">Paraules i frases</string>
@@ -2407,4 +2408,37 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="maps_chrome_nearby">A prop teu</string>
     <string name="maps_chrome_choose_city">Tria una ciutat</string>
     <string name="maps_chrome_recenter">La meva ubicació</string>
+
+    <!-- Per-story sharing options -->
+    <string name="story_share_title">Compartir història</string>
+    <string name="story_share_close">Tancar</string>
+    <string name="story_share_back">Tornar</string>
+    <string name="story_share_your_story">La teva història</string>
+    <string name="story_share_review">Tria qui pot veure-la i interactuar.</string>
+    <string name="story_share_expiration">Disponible durant</string>
+    <string name="story_share_chain_settings">Configuració de la cadena</string>
+    <string name="story_share_interactions">Interaccions</string>
+    <string name="story_share_only_this_story">Aquestes opcions només s’apliquen a aquesta història. Les preferències de Configuració no canvien.</string>
+    <string name="story_share_chain_audience">Les cadenes són visibles per a tothom i duren 48 hores. Les interaccions només s’apliquen a la teva part.</string>
+    <string name="story_share_customize">Personalitzar</string>
+    <string name="story_share_disabled">Desactivades</string>
+    <string name="story_share_audience">Audiència</string>
+
+    <!-- Original story audio -->
+    <string name="story_audio_title">Àudio</string>
+    <string name="story_audio_record">Gravar</string>
+    <string name="story_audio_saved">Desats</string>
+    <string name="story_audio_original">Àudio original</string>
+    <string name="story_audio_empty">Aquí apareixeran els àudios que desis de les històries.</string>
+    <string name="story_audio_use">Utilitzar àudio</string>
+    <string name="story_audio_retry">Tornar-ho a provar</string>
+    <string name="story_audio_unavailable">Aquest àudio no està disponible.</string>
+    <string name="story_audio_allow_reuse">Permetre desar i reutilitzar l’àudio</string>
+    <string name="story_audio_allow_reuse_detail">Altres podran desar aquest àudio i reutilitzar-lo quan caduqui la història.</string>
+    <string name="story_audio_restricted_audience">Només es poden desar àudios d’històries públiques i comptes públics.</string>
+    <string name="story_audio_restricted_creator">El creador no permet desar aquest àudio.</string>
+    <string name="story_audio_saved_confirmation">Àudio desat als preferits</string>
+    <string name="story_audio_unsaved_confirmation">Àudio eliminat dels preferits</string>
+    <string name="settings_group_profile_content">Perfil i contingut</string>
+    <string name="settings_group_messaging_privacy">Missatges i interaccions</string>
 </resources>

@@ -1656,7 +1656,7 @@ Le contenu privé ou restreint utilise Blackout : Moments essaie de le masquer d
     <string name="settings_sections_login_activity">Activité de connexion</string>
     <string name="settings_sections_login_activity_subtitle">Vérifier votre activité récente</string>
     <string name="settings_sections_mute">Sourdine</string>
-    <string name="settings_sections_mute_subtitle">Comptes, mots et expressions</string>
+    <string name="settings_sections_mute_subtitle">Masquer des comptes et filtrer le contenu</string>
     <string name="settings_sections_password">Mot de passe</string>
     <string name="settings_sections_password_subtitle">Modifier le mot de passe</string>
     <string name="settings_sections_personal_info">Informations personnelles</string>

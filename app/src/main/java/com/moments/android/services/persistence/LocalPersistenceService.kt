@@ -1309,6 +1309,8 @@ private fun encodeCachedStory(story: CachedStory): JSONObject = JSONObject().app
     put("expirationDate", story.expirationDate.time)
     put("expirationHours", story.expirationHours)
     put("mediaItemData", Base64.getEncoder().encodeToString(story.mediaItemData))
+    story.interactionSettings?.let { put("interactionSettings", JSONObject(it)) }
+    story.storyDuration?.let { put("storyDuration", it) }
     put("audience", story.audience)
     put("customListId", story.customListId)
     put("text", story.text)
@@ -1337,6 +1339,10 @@ private fun decodeCachedStory(obj: JSONObject): CachedStory? = runCatching {
         expirationDate = Date(obj.getLong("expirationDate")),
         expirationHours = obj.optIntOrNull("expirationHours"),
         mediaItemData = Base64.getDecoder().decode(obj.getString("mediaItemData")),
+        interactionSettings = obj.optJSONObject("interactionSettings")?.let { settings ->
+            settings.keys().asSequence().mapNotNull { key -> (settings.opt(key) as? Boolean)?.let { key to it } }.toMap()
+        },
+        storyDuration = obj.optDouble("storyDuration").takeIf { obj.has("storyDuration") && it.isFinite() },
         audience = obj.stringOrNull("audience"),
         customListId = obj.stringOrNull("customListId"),
         text = obj.stringOrNull("text"),

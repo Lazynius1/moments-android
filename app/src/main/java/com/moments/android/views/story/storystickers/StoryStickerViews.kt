@@ -1023,6 +1023,8 @@ fun StoryStickerView(
                 InteractiveAudioStickerView(
                     audioURL = url,
                     duration = sticker.audioDuration ?: 15.0,
+                    onPauseStory = onPauseStory,
+                    onResumeStory = onResumeStory,
                     modifier = modifier,
                 )
             }

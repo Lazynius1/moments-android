@@ -224,10 +224,13 @@ fun AudioStickerRecordingView(
 
     fun stopPlayback() {
         playbackSession.release()
-        player?.stop()
-        player?.release()
+        val previous = player
         player = null
         isPlaying = false
+        previous?.setOnCompletionListener(null)
+        previous?.setOnErrorListener(null)
+        previous?.runCatching { stop() }
+        previous?.release()
         playbackProgress = 0f
     }
 
@@ -239,7 +242,13 @@ fun AudioStickerRecordingView(
         runCatching {
             val next = MediaPlayer().also { prepared = it }.apply {
                 setDataSource(file.absolutePath)
-                setOnCompletionListener { stopPlayback() }
+                setOnCompletionListener { completed ->
+                    if (player === completed) stopPlayback()
+                }
+                setOnErrorListener { failed, _, _ ->
+                    if (player === failed) stopPlayback()
+                    true
+                }
                 prepare()
                 start()
             }
@@ -321,17 +330,18 @@ fun AudioStickerRecordingView(
         if (isPlaying) stopPlayback() else startPlayback()
     }
 
-    // Timer 0.1s + auto-stop 15s (≡ Timer iOS)
+    // Timer 0.1s + auto-stop 60s (≡ Timer iOS)
     LaunchedEffect(isRecording) {
         if (!isRecording) return@LaunchedEffect
         while (isActive && isRecording) {
             delay(100)
+            if (!isActive || !isRecording) break
             duration += 0.1f
             recorder?.let { r ->
                 audioPower = (r.maxAmplitude / 32_767f).coerceIn(0f, 1f)
                 liveLevels = liveLevels.drop(1) + audioPower
             }
-            if (duration >= 15f) {
+            if (duration >= 60f) {
                 stopRecording()
                 break
             }
@@ -343,11 +353,17 @@ fun AudioStickerRecordingView(
         val active = player ?: return@LaunchedEffect
         while (isActive && isPlaying) {
             delay(50)
-            val total = active.duration.takeIf { it > 0 } ?: continue
-            playbackProgress = (active.currentPosition.toFloat() / total).coerceIn(0f, 1f)
-            if (!active.isPlaying) {
-                stopPlayback()
+            // Completion/disposal can release this player while the coroutine is suspended.
+            if (!isActive || !isPlaying || player !== active) break
+            val sample = runCatching {
+                Triple(active.duration, active.currentPosition, active.isPlaying)
+            }.getOrNull()
+            if (sample == null || !sample.third) {
+                if (player === active) stopPlayback()
                 break
+            }
+            if (sample.first > 0) {
+                playbackProgress = (sample.second.toFloat() / sample.first).coerceIn(0f, 1f)
             }
         }
     }
@@ -404,6 +420,7 @@ fun AudioStickerRecordingView(
                             color = audioAccent,
                             activeColor = audioAccent,
                             progress = 1f,
+                            centerInWidth = true,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(44.dp)
@@ -416,6 +433,7 @@ fun AudioStickerRecordingView(
                             color = Color.White.copy(alpha = 0.2f),
                             activeColor = audioAccent,
                             progress = playbackProgress,
+                            centerInWidth = true,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(44.dp)

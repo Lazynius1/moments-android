@@ -115,21 +115,18 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.EmojiEmotions
-import androidx.compose.material.icons.filled.PhotoFilter
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.graphics.PathEffect
@@ -293,6 +290,12 @@ fun StoryEditingView(
     var galleryFeedbackIsError by remember { mutableStateOf(false) }
     var galleryFeedbackIsProgress by remember { mutableStateOf(false) }
     var galleryFeedbackHideJob by remember { mutableStateOf<Job?>(null) }
+    var allowOriginalAudioReuse by remember { mutableStateOf(false) }
+    var isPrivateAccount by remember { mutableStateOf(false) }
+    var showingShareSheet by remember { mutableStateOf(false) }
+    var allowStoryMessages by remember { mutableStateOf(true) }
+    var allowStoryReactions by remember { mutableStateOf(true) }
+    var allowStoryEphemeralPhotos by remember { mutableStateOf(true) }
     var showingAudience by remember { mutableStateOf(false) }
     var pendingTool by remember { mutableStateOf<String?>(null) }
 
@@ -455,6 +458,7 @@ fun StoryEditingView(
         revealEffectColor = data.revealEffectColor,
         audioURL = data.audioURL,
         audioDuration = data.audioDuration,
+        originalAudioId = data.originalAudioId,
         music = data.music,
         momentId = data.momentId,
         mediaCount = data.mediaCount,
@@ -1074,7 +1078,11 @@ fun StoryEditingView(
         }
         runCatching {
             val snap = FirebaseFirestore.getInstance().collection("users").document(uid).get().await()
+            isPrivateAccount = snap.getBoolean("isPrivate") ?: false
             val visibility = snap.get("contentVisibilitySettings") as? Map<*, *> ?: return@runCatching
+            allowStoryMessages = visibility["allowStoryMessages"] as? Boolean ?: true
+            allowStoryReactions = visibility["allowStoryReactions"] as? Boolean ?: true
+            allowStoryEphemeralPhotos = visibility["allowStoryEphemeralPhotos"] as? Boolean ?: true
             val raw = visibility["storyAudience"] as? String ?: return@runCatching
             val content = ContentAudience.entries.firstOrNull { it.raw == raw } ?: return@runCatching
             when (content) {
@@ -1384,6 +1392,12 @@ fun StoryEditingView(
             catch (_: Exception) { isPublishing = false; return@launch }
 
             // Capturar estado en Main antes de dismiss (≡ iOS publishStoryAfterValidation)
+            val capturedInteractions = mapOf(
+                "allowStoryMessages" to allowStoryMessages,
+                "allowStoryReactions" to allowStoryReactions,
+                "allowStoryEphemeralPhotos" to allowStoryEphemeralPhotos,
+                "allowOriginalAudioReuse" to (allowOriginalAudioReuse && !isPrivateAccount && (isCreatingChain || isContinuingChain || audience == ContentAudience.EVERYONE)),
+            )
             val baseMedia = media
             val capturedFilter = selectedFilter
             val capturedFilterBmp = filteredImage?.let { src ->
@@ -1522,6 +1536,7 @@ fun StoryEditingView(
                             revealEffectColor = draft.revealEffectColor,
                             audioURL = draft.audioURL,
                             audioDuration = draft.audioDuration,
+        originalAudioId = draft.originalAudioId,
                             music = draft.music,
                             momentId = draft.momentId,
                             mediaCount = draft.mediaCount,
@@ -1643,6 +1658,7 @@ fun StoryEditingView(
                 customViewers = capturedCustomUsers.takeIf { it.isNotEmpty() && !chainActive },
                 customListId = capturedListId.takeUnless { chainActive },
                 selectedListName = capturedListName.takeUnless { chainActive },
+                interactionSettings = capturedInteractions,
                 expirationHours = resolvedExpiration,
                 chainId = publishChainId,
                 chainPosition = publishChainPosition,
@@ -2213,7 +2229,7 @@ fun StoryEditingView(
                             ) {
                                 // ≡ iOS chatTopToolbarView
                                 if (isChatSendMode && activeEditorMode == ActiveEditorMode.IDLE && editingRevealId == null) {
-                                    SideTool(Icons.Filled.TextFields, controlFg, controlStroke) {
+                                    SideTool(iconRes = R.drawable.moments_text_tool, tint = controlFg, stroke = controlStroke) {
                                         beginCreatingTextOverlay()
                                     }
                                     SideTool(
@@ -2223,10 +2239,10 @@ fun StoryEditingView(
                                     ) {
                                         showingStickerPicker = true
                                     }
-                                    SideTool(Icons.Filled.Brush, controlFg, controlStroke) {
+                                    SideTool(iconRes = R.drawable.moments_drawing_tool, tint = controlFg, stroke = controlStroke) {
                                         activeEditorMode = ActiveEditorMode.DRAWING
                                     }
-                                    SideTool(Icons.Filled.PhotoFilter, controlFg, controlStroke) {
+                                    SideTool(iconRes = R.drawable.moments_filters_tool, tint = controlFg, stroke = controlStroke) {
                                         activeEditorMode = ActiveEditorMode.FILTERS
                                         if (media != null && !media.isVideo) {
                                             showingIntensitySlider = selectedFilter != FilterService.FilterType.NORMAL
@@ -2298,7 +2314,7 @@ fun StoryEditingView(
                         .padding(top = 62.dp, end = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    SideTool(Icons.Filled.TextFields, controlFg, controlStroke) {
+                    SideTool(iconRes = R.drawable.moments_text_tool, tint = controlFg, stroke = controlStroke) {
                         beginCreatingTextOverlay()
                     }
                     SideTool(
@@ -2308,10 +2324,10 @@ fun StoryEditingView(
                     ) {
                         showingStickerPicker = true
                     }
-                    SideTool(Icons.Filled.Brush, controlFg, controlStroke) {
+                    SideTool(iconRes = R.drawable.moments_drawing_tool, tint = controlFg, stroke = controlStroke) {
                         activeEditorMode = ActiveEditorMode.DRAWING
                     }
-                    SideTool(Icons.Filled.PhotoFilter, controlFg, controlStroke) {
+                    SideTool(iconRes = R.drawable.moments_filters_tool, tint = controlFg, stroke = controlStroke) {
                         activeEditorMode = ActiveEditorMode.FILTERS
                         if (media != null && !media.isVideo) {
                             showingIntensitySlider = selectedFilter != FilterService.FilterType.NORMAL
@@ -2647,7 +2663,7 @@ fun StoryEditingView(
                                 Modifier
                                     .clip(RoundedCornerShape(50))
                                     .background(shareBg.copy(if (hasContent && !isPublishing && !isLoadingUserSettings) 1f else 0.55f))
-                                    .clickable(enabled = hasContent && !isPublishing && !isLoadingUserSettings) { publishStory() }
+                                    .clickable(enabled = hasContent && !isPublishing && !isLoadingUserSettings) { showingShareSheet = true }
                                     .padding(horizontal = 18.dp, vertical = 14.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
@@ -2664,11 +2680,11 @@ fun StoryEditingView(
                                     .size(width = 54.dp, height = 48.dp)
                                     .momentsChromeGlass(RoundedCornerShape(50), interactive = true)
                                     .clickable(enabled = hasContent && !isPublishing && !isLoadingUserSettings) {
-                                        showingChainConfiguration = true
+                                        showingShareSheet = true
                                     },
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(Icons.Filled.Settings, null, tint = controlFg, modifier = Modifier.size(18.dp))
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, null, tint = controlFg, modifier = Modifier.size(18.dp))
                             }
                         }
                         else -> {
@@ -2676,7 +2692,7 @@ fun StoryEditingView(
                                 Modifier
                                     .clip(RoundedCornerShape(50))
                                     .background(shareBg.copy(if (hasContent && !isPublishing && !isLoadingUserSettings) 1f else 0.55f))
-                                    .clickable(enabled = hasContent && !isPublishing && !isLoadingUserSettings) { publishStory() }
+                                    .clickable(enabled = hasContent && !isPublishing && !isLoadingUserSettings) { showingShareSheet = true }
                                     .padding(horizontal = 20.dp, vertical = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -2956,6 +2972,39 @@ fun StoryEditingView(
 
         PermissionPrimerGateHost(gate = photosSaveGate)
 
+        if (showingShareSheet && !isChatSendMode) {
+            MomentsModalSheet(
+                onDismissRequest = { showingShareSheet = false },
+                dismissEnabled = !isPublishing,
+                largeOnly = false,
+                containerColor = rememberAdaptiveColors().surfaceBackground,
+            ) {
+                com.moments.android.views.creator.components.StoryShareSheet(
+                    preview = filteredImage ?: sourceBitmap,
+                    audienceTitle = if (isCreatingChain || isContinuingChain) audienceLabel(ContentAudience.EVERYONE)
+                        else if (audience == ContentAudience.CUSTOM_LIST && !selectedListName.isNullOrBlank()) selectedListName!!
+                        else audienceLabel(audience),
+                    isChain = isCreatingChain || isContinuingChain,
+                    chainTitle = if (isContinuingChain) originalChainTitle else chainTitle,
+                    expirationHours = expirationHours,
+                    onExpirationChange = { expirationHours = it },
+                    allowMessages = allowStoryMessages, onMessagesChange = { allowStoryMessages = it },
+                    allowReactions = allowStoryReactions, onReactionsChange = { allowStoryReactions = it },
+                    allowEphemeralPhotos = allowStoryEphemeralPhotos, onEphemeralPhotosChange = { allowStoryEphemeralPhotos = it },
+                    isPublishing = isPublishing,
+                    hasAudio = stickers.any { it.type == "audio" },
+                    hasOriginalAudio = stickers.any { it.type == "audio" && it.originalAudioId == null },
+                    canShareOriginalAudio = !isPrivateAccount && (isCreatingChain || isContinuingChain || audience == ContentAudience.EVERYONE),
+                    allowOriginalAudioReuse = allowOriginalAudioReuse, onAudioReuseChange = { allowOriginalAudioReuse = it },
+                    onAudience = { showingAudience = true },
+                    onChainSettings = { showingChainConfiguration = true },
+                    onShare = { publishStory() },
+                    onDismiss = { showingShareSheet = false },
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                )
+            }
+        }
+
         // ≡ iOS `.sheet` AudienceSelectionView (detents medium/large)
         if (showingAudience) {
             MomentsModalSheet(
@@ -3000,7 +3049,7 @@ fun StoryEditingView(
                     onCustomSelectedUsersChange = { customSelectedUsers = it },
                     chainTitleSummary = if (isContinuingChain) originalChainTitle else chainTitle,
                     isContinuing = isContinuingChain,
-                    onConfirm = { publishStory() },
+                    onConfirm = { showingChainConfiguration = false; showingShareSheet = true },
                     onDismiss = { showingChainConfiguration = false },
                     modifier = Modifier
                         .fillMaxWidth()

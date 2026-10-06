@@ -135,7 +135,6 @@ fun HiddenLayersOverlayView(
     var layers by remember(momentId) { mutableStateOf<List<MomentHiddenLayer>>(emptyList()) }
     var isLoading by remember(momentId) { mutableStateOf(false) }
     var revealedIds by remember(momentId) { mutableStateOf(setOf<String>()) }
-    var autoplayIds by remember(momentId) { mutableStateOf(setOf<String>()) }
     var revealBurstIds by remember(momentId) { mutableStateOf(setOf<String>()) }
     var showIntroShimmer by remember(momentId) { mutableStateOf(false) }
     var hasPlayedIntro by remember(momentId) { mutableStateOf(false) }
@@ -320,9 +319,6 @@ fun HiddenLayersOverlayView(
         HapticManager.shared.lightImpact()
         revealBurstIds = revealBurstIds + layer.id
         revealedIds = revealedIds + layer.id
-        if (layer.type == MomentHiddenLayer.LayerType.AUDIO) {
-            autoplayIds = autoplayIds + layer.id
-        }
         markSeen(layer.id)
         if (!alreadySeen) {
             val uid = viewerId
@@ -368,7 +364,6 @@ fun HiddenLayersOverlayView(
             .filter { wasSeen(it.id) && it.isUnlocked(viewerNow) }
             .map { it.id }
             .toSet()
-        autoplayIds = emptySet()
         hasPlayedIntro = false
         isLoading = false
         scheduleIntroIfNeeded()
@@ -461,7 +456,7 @@ fun HiddenLayersOverlayView(
                         layer = layer,
                         frameWidthPx = frame.width,
                         frameHeightPx = frame.height,
-                        shouldAutoplay = layer.id in autoplayIds,
+                        shouldAutoplay = false,
                     )
                 } else if (showIntroShimmer || !wasSeen(layer.id)) {
                     HiddenLayerHintAppearanceView(

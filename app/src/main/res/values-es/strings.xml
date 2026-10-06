@@ -1397,7 +1397,7 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="settings_appeals">Estado de apelaciones y revisiones</string>
     <string name="settings_privacy_policy">Política de Privacidad y Términos</string>
     <string name="settings_section_advanced">AJUSTES AVANZADOS</string>
-    <string name="settings_account_management">Gestión avanzada de cuenta</string>
+    <string name="settings_account_management">Gestión de cuenta</string>
     <string name="settings_account_management_desc">Desactivar o eliminar cuenta</string>
     <string name="settings_group_account">TU CUENTA</string>
     <string name="settings_group_security">SEGURIDAD</string>
@@ -1439,7 +1439,8 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="blocked_users_error_fetch_users">Error al obtener usuarios bloqueados</string>
     <string name="blocked_users_error_unblock">Error al desbloquear usuario</string>
     <string name="settings_sections_mute">Silenciar</string>
-    <string name="settings_sections_mute_subtitle">Cuentas, palabras y frases</string>
+
+    <string name="settings_sections_mute_subtitle">Silencia cuentas y filtra contenido</string>
     <string name="settings_sections_password">Contraseña</string>
     <string name="settings_sections_password_subtitle">Cambiar contraseña</string>
     <string name="settings_sections_saved">Guardados</string>
@@ -2765,7 +2766,8 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="message_requests_move_to_hidden">Mover a Ocultas</string>
     <string name="message_requests_report">Denunciar</string>
     <string name="message_requests_hidden_words_title">Palabras ocultas</string>
-    <string name="message_requests_hidden_words_description">Filtra solicitudes después de descifrarlas en este dispositivo.</string>
+
+    <string name="message_requests_hidden_words_description">Filtra solicitudes de mensajes en este dispositivo, después de descifrarlas.</string>
     <string name="message_requests_hidden_words_automatic">Filtro automático</string>
     <string name="message_requests_hidden_words_automatic_description">Oculta solicitudes con señales de seguridad, sin analizar su contenido en el servidor.</string>
     <string name="message_requests_hidden_words_custom">Palabras y frases</string>
@@ -2859,4 +2861,37 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="maps_chrome_nearby">Cerca de ti</string>
     <string name="maps_chrome_choose_city">Elige una ciudad</string>
     <string name="maps_chrome_recenter">Mi ubicación</string>
+
+    <!-- Per-story sharing options -->
+    <string name="story_share_title">Compartir historia</string>
+    <string name="story_share_close">Cerrar</string>
+    <string name="story_share_back">Volver</string>
+    <string name="story_share_your_story">Tu historia</string>
+    <string name="story_share_review">Elige quién puede verla e interactuar.</string>
+    <string name="story_share_expiration">Disponible durante</string>
+    <string name="story_share_chain_settings">Ajustes de la cadena</string>
+    <string name="story_share_interactions">Interacciones</string>
+    <string name="story_share_only_this_story">Estas opciones solo se aplican a esta historia. Tus preferencias de Ajustes no cambian.</string>
+    <string name="story_share_chain_audience">Las cadenas son visibles para todos y duran 48 horas. Las interacciones solo se aplican a tu parte.</string>
+    <string name="story_share_customize">Personalizar</string>
+    <string name="story_share_disabled">Desactivadas</string>
+    <string name="story_share_audience">Audiencia</string>
+
+    <!-- Original story audio -->
+    <string name="story_audio_title">Audio</string>
+    <string name="story_audio_record">Grabar</string>
+    <string name="story_audio_saved">Guardados</string>
+    <string name="story_audio_original">Audio original</string>
+    <string name="story_audio_empty">Aquí aparecerán los audios que guardes de las historias.</string>
+    <string name="story_audio_use">Usar audio</string>
+    <string name="story_audio_retry">Reintentar</string>
+    <string name="story_audio_unavailable">Este audio no está disponible.</string>
+    <string name="story_audio_allow_reuse">Permitir guardar y reutilizar el audio</string>
+    <string name="story_audio_allow_reuse_detail">Otros podrán guardar este audio y reutilizarlo cuando caduque la historia.</string>
+    <string name="story_audio_restricted_audience">Solo se pueden guardar audios de historias públicas y cuentas públicas.</string>
+    <string name="story_audio_restricted_creator">El creador no permite guardar este audio.</string>
+    <string name="story_audio_saved_confirmation">Audio guardado en favoritos</string>
+    <string name="story_audio_unsaved_confirmation">Audio eliminado de favoritos</string>
+    <string name="settings_group_profile_content">Perfil y contenido</string>
+    <string name="settings_group_messaging_privacy">Mensajes e interacciones</string>
 </resources>

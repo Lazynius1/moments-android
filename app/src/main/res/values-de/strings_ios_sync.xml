@@ -1660,7 +1660,7 @@
     <string name="settings_sections_login_activity">Anmeldeaktivität</string>
     <string name="settings_sections_login_activity_subtitle">Deine letzte Aktivität prüfen</string>
     <string name="settings_sections_mute">Stummschalten</string>
-    <string name="settings_sections_mute_subtitle">Konten, Wörter und Phrasen</string>
+    <string name="settings_sections_mute_subtitle">Konten stummschalten und Inhalte filtern</string>
     <string name="settings_sections_password">Passwort</string>
     <string name="settings_sections_password_subtitle">Passwort ändern</string>
     <string name="settings_sections_personal_info">Persönliche Informationen</string>

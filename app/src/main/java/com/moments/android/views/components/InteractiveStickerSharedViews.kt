@@ -2458,17 +2458,25 @@ fun StickerDitherPattern(
 // MARK: - InteractiveAudioStickerView
 
 /** Port de `InteractiveAudioStickerView`. */
+data class StoryAudioPlaybackClock(val elapsed: Double, val active: Boolean)
+val LocalStoryAudioPlaybackClock = androidx.compose.runtime.staticCompositionLocalOf<StoryAudioPlaybackClock?> { null }
+
 @Composable
 fun InteractiveAudioStickerView(
     audioURL: String,
     duration: Double,
     modifier: Modifier = Modifier,
+    onPauseStory: () -> Unit = {},
+    onResumeStory: () -> Unit = {},
 ) {
     @Suppress("UNUSED_PARAMETER")
     val unusedDuration = duration
 
+    val storyClock = LocalStoryAudioPlaybackClock.current
+    val currentClock by androidx.compose.runtime.rememberUpdatedState(storyClock)
     val exportTime = LocalStoryExportTime.current
     val context = LocalContext.current
+    var interrupted by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
@@ -2478,6 +2486,7 @@ fun InteractiveAudioStickerView(
     var loadJob by remember { mutableStateOf<Job?>(null) }
     val audioSession = remember {
         MomentsAudioSession.lease {
+            interrupted = true
             loadJob?.cancel()
             player?.pause()
             isPlaying = false
@@ -2545,6 +2554,7 @@ fun InteractiveAudioStickerView(
     }
 
     fun startPlayback(userInitiated: Boolean = false) {
+        if (loadJob?.isActive == true) return
         val parsed = runCatching { Uri.parse(audioURL) }.getOrNull() ?: return
         val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
         if (!userInitiated && audioManager?.isMusicActive == true) return
@@ -2570,6 +2580,8 @@ fun InteractiveAudioStickerView(
                 if (!audioSession.activate(contentType = android.media.AudioAttributes.CONTENT_TYPE_SPEECH)) return@launch
                 claimed = true
                 active.setOnCompletionListener { stopPlayback() }
+                currentClock?.let { clock -> active.seekTo((clock.elapsed * 1000).toInt().coerceIn(0, active.duration)) }
+                if (currentClock?.let { !it.active || it.elapsed >= duration } == true) return@launch
                 player = active
                 active.start()
                 installed = true
@@ -2586,6 +2598,11 @@ fun InteractiveAudioStickerView(
     }
 
     fun togglePlayback() {
+        if (storyClock != null) {
+            interrupted = false
+            if (storyClock.active) onPauseStory() else onResumeStory()
+            return
+        }
         if (isPlaying) {
             player?.pause()
             audioSession.release()
@@ -2609,7 +2626,28 @@ fun InteractiveAudioStickerView(
     }
 
     LaunchedEffect(Unit) {
-        if (exportTime == null) startPlayback()
+        if (exportTime == null && storyClock == null) startPlayback()
+    }
+
+    LaunchedEffect(storyClock) {
+        val clock = storyClock ?: return@LaunchedEffect
+        if (exportTime != null) return@LaunchedEffect
+        if (!clock.active || clock.elapsed >= duration) {
+            loadJob?.cancel(); loadJob = null
+            player?.pause(); audioSession.release()
+            isPlaying = false; progressJob?.cancel()
+        } else if (!interrupted) {
+            val active = player
+            if (active == null) startPlayback(userInitiated = true)
+            else {
+                if (kotlin.math.abs(active.currentPosition / 1000.0 - clock.elapsed) > 0.35) {
+                    active.seekTo((clock.elapsed * 1000).toInt().coerceIn(0, active.duration))
+                }
+                if (!isPlaying && audioSession.activate(contentType = android.media.AudioAttributes.CONTENT_TYPE_SPEECH)) {
+                    active.start(); isPlaying = true; startProgressUpdates(active)
+                }
+            }
+        }
     }
 
     LaunchedEffect(isPlaying) {

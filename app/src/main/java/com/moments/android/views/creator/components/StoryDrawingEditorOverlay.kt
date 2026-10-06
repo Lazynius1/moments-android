@@ -72,6 +72,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -384,7 +385,7 @@ fun StoryDrawingEditorOverlay(
 
                 Row(
                     Modifier
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = 20.dp)
                         .fillMaxWidth()
                         .height(44.dp)
                         .momentsChromeGlass(RoundedCornerShape(14.dp), interactive = false)
@@ -396,27 +397,27 @@ fun StoryDrawingEditorOverlay(
                         ),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    BrushTool(Icons.Filled.Brush, StoryDrawingBrush.PEN, brush, controlFg, secondary, strokeColor) {
+                    BrushTool(R.drawable.editor_draw_pen, StoryDrawingBrush.PEN, brush, controlFg, secondary, strokeColor) {
                         brush = it
                     }
                     BrushDivider(dividerColor)
-                    BrushTool(Icons.Filled.NorthEast, StoryDrawingBrush.ARROW, brush, controlFg, secondary, strokeColor) {
+                    BrushTool(R.drawable.editor_draw_arrow, StoryDrawingBrush.ARROW, brush, controlFg, secondary, strokeColor) {
                         brush = it
                     }
                     BrushDivider(dividerColor)
-                    BrushTool(Icons.Filled.Highlight, StoryDrawingBrush.MARKER, brush, controlFg, secondary, strokeColor) {
+                    BrushTool(R.drawable.editor_draw_marker, StoryDrawingBrush.MARKER, brush, controlFg, secondary, strokeColor) {
                         brush = it
                     }
                     BrushDivider(dividerColor)
-                    BrushTool(Icons.Filled.Edit, StoryDrawingBrush.PENCIL, brush, controlFg, secondary, strokeColor) {
+                    BrushTool(R.drawable.editor_draw_pencil, StoryDrawingBrush.PENCIL, brush, controlFg, secondary, strokeColor) {
                         brush = it
                     }
                     BrushDivider(dividerColor)
-                    BrushTool(Icons.Filled.AutoAwesome, StoryDrawingBrush.GLOW, brush, controlFg, secondary, strokeColor) {
+                    BrushTool(R.drawable.editor_draw_neon, StoryDrawingBrush.GLOW, brush, controlFg, secondary, strokeColor) {
                         brush = it
                     }
                     BrushDivider(dividerColor)
-                    BrushTool(Icons.Filled.AutoFixHigh, StoryDrawingBrush.ERASER, brush, controlFg, secondary, strokeColor) {
+                    BrushTool(R.drawable.editor_draw_eraser, StoryDrawingBrush.ERASER, brush, controlFg, secondary, strokeColor) {
                         brush = it
                     }
                 }
@@ -498,7 +499,7 @@ private fun DrawingChromeButton(
 
 @Composable
 private fun RowScope.BrushTool(
-    icon: ImageVector,
+    iconRes: Int,
     type: StoryDrawingBrush,
     selected: StoryDrawingBrush,
     active: Color,
@@ -515,11 +516,11 @@ private fun RowScope.BrushTool(
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            icon,
+            painterResource(iconRes),
             null,
             tint = if (isSelected) active else inactive,
             modifier = Modifier
-                .size(18.dp)
+                .size(if (type == StoryDrawingBrush.GLOW) 40.dp else 24.dp)
                 .then(
                     if (isSelected && type == StoryDrawingBrush.GLOW) {
                         Modifier.shadow(

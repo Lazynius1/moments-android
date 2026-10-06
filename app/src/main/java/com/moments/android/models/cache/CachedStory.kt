@@ -26,6 +26,8 @@ data class CachedStory(
     val expirationDate: Date,
     val expirationHours: Int? = null,
     val mediaItemData: ByteArray,
+    val interactionSettings: Map<String, Boolean>? = null,
+    val storyDuration: Double? = null,
     val audience: String? = null,
     val customListId: String? = null,
     val text: String? = null,
@@ -57,11 +59,12 @@ data class CachedStory(
             authorId = authorId,
             username = username,
             mediaItem = mediaItem,
-            duration = 15.0,
+            duration = storyDuration ?: 15.0,
             timestamp = timestamp,
             expirationHours = expirationHours ?: if (chainId != null) 48 else 24,
             expirationDate = expirationDate,
             profileImagePath = profileImagePath,
+            interactionSettings = interactionSettings,
             audience = audience,
             customListId = customListId,
             text = text,
@@ -102,6 +105,8 @@ data class CachedStory(
             expirationDate == other.expirationDate &&
             expirationHours == other.expirationHours &&
             Arrays.equals(mediaItemData, other.mediaItemData) &&
+            interactionSettings == other.interactionSettings &&
+            storyDuration == other.storyDuration &&
             audience == other.audience &&
             customListId == other.customListId &&
             text == other.text &&
@@ -129,6 +134,8 @@ data class CachedStory(
         result = 31 * result + expirationDate.hashCode()
         result = 31 * result + (expirationHours ?: 0)
         result = 31 * result + Arrays.hashCode(mediaItemData)
+        result = 31 * result + (interactionSettings?.hashCode() ?: 0)
+        result = 31 * result + (storyDuration?.hashCode() ?: 0)
         result = 31 * result + (audience?.hashCode() ?: 0)
         result = 31 * result + (customListId?.hashCode() ?: 0)
         result = 31 * result + (text?.hashCode() ?: 0)
@@ -182,6 +189,8 @@ data class CachedStory(
                 expirationDate = story.expirationDate,
                 expirationHours = story.expirationHours,
                 mediaItemData = mediaItemData,
+                interactionSettings = story.interactionSettings,
+                storyDuration = story.duration,
                 audience = story.audience,
                 customListId = story.customListId,
                 text = story.text,
