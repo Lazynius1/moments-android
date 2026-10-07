@@ -237,8 +237,6 @@ object ClusterMessageGrouper {
 }
 
 object ClusterMediaLayout {
-    val frontWidth = 196.dp
-    val frontHeight = 244.dp
     val cornerRadius = 12.dp
     val fanBottomPadding = 10.dp
     const val maxVisible = 5
@@ -275,6 +273,19 @@ fun MediaGridBubble(
     val active = remember(messages) { messages.filterNot { it.isDeleted } }
     if (active.isEmpty()) return
     val visible = active.take(ClusterMediaLayout.maxVisible)
+    val sidePadding = ClusterMediaLayout.fanSidePadding(visible.size)
+    val availableWidth = ChatBubbleLayoutWidth.capped(
+        ChatMediaCardLayout.clusterMaxWidth + sidePadding * 2, gutter = if (isCurrentUser) 64.dp else 88.dp,
+    ) - sidePadding * 2
+    val cardSizes = visible.map {
+        val dimensions = rememberChatMediaDimensions(it)
+        ChatMediaCardLayout.fittedSize(
+            dimensions?.first, dimensions?.second, maxOf(1.dp, availableWidth),
+            ChatMediaCardLayout.clusterMaxHeight,
+        )
+    }
+    val stackWidth = cardSizes.maxOf { it.width }
+    val stackHeight = cardSizes.maxOf { it.height }
     val hasVideo = active.any { it.type == MessageType.VIDEO }
     val vanishProtected = active.any { it.isVanishModeMessage }
     val swipeState = rememberChatReplySwipeState()
@@ -341,8 +352,9 @@ fun MediaGridBubble(
                                 end = ClusterMediaLayout.fanSidePadding(visible.size),
                                 bottom = ClusterMediaLayout.fanBottomPadding,
                             )
-                            .size(ClusterMediaLayout.frontWidth, ClusterMediaLayout.frontHeight)
+                            .size(stackWidth, stackHeight)
                             .semantics { contentDescription = "$a11yLabel. $a11yHint" },
+                        contentAlignment = Alignment.BottomEnd,
                     ) {
                         // Dorso → frente (índice 0 = frontal)
                         visible.asReversed().forEachIndexed { reversedIndex, message ->
@@ -364,7 +376,6 @@ fun MediaGridBubble(
                                         translationX = with(density) { ox.toPx() }
                                         translationY = with(density) { oy.toPx() }
                                     }
-                                    .size(ClusterMediaLayout.frontWidth, ClusterMediaLayout.frontHeight)
                                     .then(
                                         if (isFront && !frontReactions.isNullOrEmpty()) {
                                             Modifier.padding(
@@ -376,7 +387,8 @@ fun MediaGridBubble(
                                         } else {
                                             Modifier
                                         },
-                                    ),
+                                    )
+                                    .size(cardSizes[index]),
                             ) {
                                 MediaGridTileView(
                                     message = message,

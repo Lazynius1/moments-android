@@ -1356,6 +1356,9 @@ object ChatService {
             conversationId = conversationId,
             messageId = messageId,
         ).getOrThrow()
+        val dimensions = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            ChatMediaFileDimensions.read(uploadResult.mediaUrl)
+        }
         val message = EnhancedMessage(
             id = messageId,
             conversationId = conversationId,
@@ -1370,6 +1373,8 @@ object ChatService {
             thumbnailEncryption = uploadResult.thumbnailEncryption,
             fileName = fileName,
             fileSize = mediaData.size.toLong(),
+            mediaWidth = dimensions?.first,
+            mediaHeight = dimensions?.second,
             timestamp = Date(),
             status = MessageStatus.SENDING,
             mediaBatchId = mediaBatchId,

@@ -1,6 +1,10 @@
 package com.moments.android.views.messaging.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -485,6 +489,18 @@ private fun ConversationFullScreenVideoPage(
     var duration by remember(videoUrl) { mutableStateOf(0.0) }
     var externalSeekTime by remember(videoUrl) { mutableStateOf<Double?>(null) }
     val effectivePaused = !isActive || isPaused
+    var showsControls by remember(videoUrl) { mutableStateOf(true) }
+    var controlsInteraction by remember(videoUrl) { mutableStateOf(0) }
+
+    LaunchedEffect(isActive) {
+        if (isActive) showsControls = true
+    }
+    LaunchedEffect(isActive, isPaused, showsControls, controlsInteraction) {
+        if (isActive && !isPaused && showsControls) {
+            delay(2500)
+            showsControls = false
+        }
+    }
 
     Box(modifier) {
         MomentsVideoPlayer(
@@ -493,7 +509,7 @@ private fun ConversationFullScreenVideoPage(
             isPaused = effectivePaused,
             isMuted = isMuted,
             prioritizeSmoothPlayback = true,
-            videoGravity = MomentsVideoGravity.RESIZE_ASPECT_FILL,
+            videoGravity = MomentsVideoGravity.RESIZE_ASPECT,
             onDurationReceived = { duration = maxOf(it, 0.0) },
             onProgressUpdate = { if (!effectivePaused) currentTime = maxOf(it, 0.0) },
             externalSeekTime = externalSeekTime,
@@ -501,86 +517,103 @@ private fun ConversationFullScreenVideoPage(
             modifier = Modifier.fillMaxSize(),
         )
 
-        // Centro play/pause
         Box(
-            Modifier
-                .align(Alignment.Center)
-                .size(64.dp)
-                .clip(CircleShape)
-                .momentsChromeGlass(CircleShape, interactive = true)
-                .clickable {
-                    HapticManager.shared.lightImpact()
-                    isPaused = !isPaused
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                contentDescription = null,
-                tint = primaryOverlay,
-                modifier = Modifier.size(28.dp),
-            )
-        }
-
-        // Mute + expand (arriba derecha). Expand solo si no es media protegida.
-        Row(
-            Modifier
-                .align(Alignment.TopEnd)
-                .padding(12.dp)
-                .clip(RoundedCornerShape(50))
-                .momentsChromeGlass(RoundedCornerShape(50), interactive = true),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(
-                onClick = {
-                    HapticManager.shared.lightImpact()
-                    isMuted = !isMuted
-                },
-                modifier = Modifier.size(40.dp),
+            Modifier.fillMaxSize().clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
             ) {
-                Icon(
-                    if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                    contentDescription = null,
-                    tint = primaryOverlay,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            if (allowExpand) {
+                showsControls = !showsControls
+                controlsInteraction += 1
+            },
+        )
+
+        AnimatedVisibility(visible = showsControls, enter = fadeIn(), exit = fadeOut()) {
+            Box(Modifier.fillMaxSize()) {
+                // Centro play/pause
                 Box(
                     Modifier
-                        .width(1.dp)
-                        .height(16.dp)
-                        .background(primaryOverlay.copy(alpha = 0.2f)),
-                )
-                IconButton(
-                    onClick = {
-                        isPaused = true
-                        onExpand()
-                    },
-                    modifier = Modifier.size(40.dp),
+                        .align(Alignment.Center)
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .momentsChromeGlass(CircleShape, interactive = true)
+                        .clickable {
+                            HapticManager.shared.lightImpact()
+                            isPaused = !isPaused
+                            controlsInteraction += 1
+                        },
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        Icons.Default.Fullscreen,
+                        if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
                         contentDescription = null,
                         tint = primaryOverlay,
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(28.dp),
                     )
                 }
+
+                // Mute + expand (arriba derecha). Expand solo si no es media protegida.
+                Row(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(12.dp)
+                        .clip(RoundedCornerShape(50))
+                        .momentsChromeGlass(RoundedCornerShape(50), interactive = true),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(
+                        onClick = {
+                            HapticManager.shared.lightImpact()
+                            isMuted = !isMuted
+                            controlsInteraction += 1
+                        },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                            contentDescription = null,
+                            tint = primaryOverlay,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    if (allowExpand) {
+                        Box(
+                            Modifier
+                                .width(1.dp)
+                                .height(16.dp)
+                                .background(primaryOverlay.copy(alpha = 0.2f)),
+                        )
+                        IconButton(
+                            onClick = {
+                                isPaused = true
+                                onExpand()
+                            },
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.Fullscreen,
+                                contentDescription = null,
+                                tint = primaryOverlay,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                }
+
+                MomentsVideoPlaybackTimeline(
+                    currentTime = currentTime,
+                    duration = duration,
+                    horizontalPadding = 18.dp,
+                    onSeek = { target ->
+                        currentTime = target
+                        externalSeekTime = target
+                        controlsInteraction += 1
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 16.dp),
+                )
             }
         }
-
-        MomentsVideoPlaybackTimeline(
-            currentTime = currentTime,
-            duration = duration,
-            horizontalPadding = 18.dp,
-            onSeek = { target ->
-                currentTime = target
-                externalSeekTime = target
-            },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 16.dp),
-        )
     }
 }
 

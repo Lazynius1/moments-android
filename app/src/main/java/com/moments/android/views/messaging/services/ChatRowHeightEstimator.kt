@@ -9,6 +9,7 @@ import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageType
 import com.moments.android.views.messaging.components.ChatTextBubbleMetrics
 import com.moments.android.views.messaging.components.ClusterMediaLayout
+import com.moments.android.views.messaging.components.ChatMediaCardLayout
 import com.moments.android.views.messaging.core.ChatRenderRow
 import com.moments.android.views.messaging.core.MessageItem
 import kotlin.math.ceil
@@ -114,13 +115,17 @@ object ChatRowHeightEstimator {
         }
         is MessageItem.MediaCluster -> {
             if (item.messages.all { it.isDeleted }) deletedRowHeight
-            else estimatedClusterHeight(item.messages.count { !it.isDeleted })
+            else estimatedClusterHeight(item.messages.filterNot { it.isDeleted }, bubbleWidth)
         }
     }
 
-    private fun estimatedClusterHeight(count: Int): Dp {
-        val visible = min(max(count, 1), ClusterMediaLayout.maxVisible)
-        return ClusterMediaLayout.frontHeight +
+    private fun estimatedClusterHeight(messages: List<EnhancedMessage>, bubbleWidth: Dp): Dp {
+        val visible = min(max(messages.size, 1), ClusterMediaLayout.maxVisible)
+        val maxWidth = maxOf(1.dp, minOf(ChatMediaCardLayout.clusterMaxWidth, bubbleWidth - ClusterMediaLayout.fanSidePadding(visible) * 2))
+        val height = messages.take(visible).maxOfOrNull {
+            ChatMediaCardLayout.fittedSize(it.mediaWidth, it.mediaHeight, maxWidth, ChatMediaCardLayout.clusterMaxHeight).height
+        } ?: ChatMediaCardLayout.clusterMaxHeight
+        return height +
             ClusterMediaLayout.fanTopPadding(visible) +
             ClusterMediaLayout.fanBottomPadding +
             6.dp
@@ -179,8 +184,9 @@ object ChatRowHeightEstimator {
             else fallbackAspect
         }
 
-        var height = (bubbleWidth.value / max(aspect, 0.35f)).dp
-        height = minOf(maxOf(height, mediaMinHeight), mediaMaxHeight)
+        var height = if (message.type == MessageType.IMAGE || message.type == MessageType.VIDEO) {
+            ChatMediaCardLayout.standaloneSize(message.mediaWidth, message.mediaHeight, bubbleWidth).height
+        } else minOf(maxOf((bubbleWidth.value / max(aspect, 0.35f)).dp, mediaMinHeight), mediaMaxHeight)
 
         val caption = message.content
         if (!caption.isNullOrEmpty()) {

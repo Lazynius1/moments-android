@@ -552,7 +552,14 @@ private fun AttachBubbleBadges(
 
 @Composable
 private fun MediaBubble(message: EnhancedMessage, video: Boolean, outgoing: Boolean, position: ChatMessageGroupPosition, progress: Double?, downloadProgress: Double?, downloading: Boolean, callbacks: ChatMessageBubbleCallbacks) {
-    val photoVideoSize = ChatBubbleLayoutWidth.cappedSize(208.dp, 272.dp)
+    val dimensions = rememberChatMediaDimensions(message)
+    val photoVideoSize = ChatMediaCardLayout.standaloneSize(
+        dimensions?.first, dimensions?.second,
+        ChatBubbleLayoutWidth.capped(
+            ChatBubbleLayoutWidth.maxTextBubbleWidth(isOutgoing = outgoing),
+            gutter = if (outgoing) 64.dp else 88.dp,
+        ),
+    )
     val mediaModifier = Modifier.size(photoVideoSize).clip(chatBubbleShape(outgoing, position))
     Box(mediaModifier) {
     if (video) {

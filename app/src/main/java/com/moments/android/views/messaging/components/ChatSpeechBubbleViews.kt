@@ -128,6 +128,47 @@ object ChatBubbleLayoutWidth {
     }
 }
 
+@Composable
+fun rememberChatMediaDimensions(message: com.moments.android.views.messaging.core.EnhancedMessage): Pair<Int, Int>? {
+    if (message.mediaWidth != null && message.mediaHeight != null && message.mediaWidth > 0 && message.mediaHeight > 0) {
+        return message.mediaWidth to message.mediaHeight
+    }
+    val dimensions by androidx.compose.runtime.produceState<Pair<Int, Int>?>(null, message.mediaUrl, message.thumbnailUrl, message.mediaWidth, message.mediaHeight) {
+        value = if (message.mediaWidth != null && message.mediaHeight != null) {
+            message.mediaWidth to message.mediaHeight
+        } else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.moments.android.views.messaging.services.ChatMediaFileDimensions.read(message.mediaUrl)
+                ?: com.moments.android.views.messaging.services.ChatMediaFileDimensions.read(message.thumbnailUrl)
+        }
+    }
+    return dimensions
+}
+
+object ChatMediaCardLayout {
+    val standaloneMaxWidth = 240.dp
+    val standaloneMaxHeight = 272.dp
+    val clusterMaxWidth = 220.dp
+    val clusterMaxHeight = 244.dp
+
+    fun standaloneSize(width: Int?, height: Int?, bubbleMaxWidth: Dp): DpSize {
+        val isLandscape = width != null && height != null && width > 0 && height > 0 && width > height
+        return fittedSize(
+            width, height,
+            if (isLandscape) bubbleMaxWidth else minOf(standaloneMaxWidth, bubbleMaxWidth),
+            maximumAspect = if (isLandscape) 1.5f else null,
+        )
+    }
+
+    fun fittedSize(width: Int?, height: Int?, maxWidth: Dp, maxHeight: Dp = standaloneMaxHeight, maximumAspect: Float? = null): DpSize {
+        val sourceWidth = width?.takeIf { it > 0 }?.toFloat() ?: 208f
+        val sourceHeight = height?.takeIf { it > 0 }?.toFloat() ?: 272f
+        // Las miniaturas muy verticales se recortan a 3:4; el visor conserva el archivo completo.
+        val previewAspect = minOf(maxOf(sourceWidth / sourceHeight, 3f / 4f), maximumAspect ?: Float.MAX_VALUE)
+        val fittedWidth = minOf(maxWidth.value, maxHeight.value * previewAspect)
+        return DpSize(fittedWidth.dp, (fittedWidth / previewAspect).dp)
+    }
+}
+
 /** ≡ iOS `ChatMessageFont.bubble` (~16pt escalado con tamaño de texto del sistema). */
 object ChatMessageFont {
     @Composable

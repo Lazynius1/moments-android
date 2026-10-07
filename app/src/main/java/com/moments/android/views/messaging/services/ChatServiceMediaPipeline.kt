@@ -421,3 +421,30 @@ suspend fun ChatService.deleteMediaFiles(urls: List<String>): Result<Unit> = run
     }
     firstError?.let { throw it }
 }
+
+/** Lee dimensiones locales sin descargar ni decodificar píxeles de la imagen. */
+object ChatMediaFileDimensions {
+    fun read(localUrl: String?): Pair<Int, Int>? = runCatching {
+        val uri = localUrl?.let(Uri::parse) ?: return null
+        if (uri.scheme != "file") return null
+        val file = File(uri.path ?: return null)
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, options)
+        if (options.outWidth > 0 && options.outHeight > 0) {
+            val orientation = androidx.exifinterface.media.ExifInterface(file).getAttributeInt(
+                androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION, 1,
+            )
+            return if (orientation in 5..8) options.outHeight to options.outWidth
+                   else options.outWidth to options.outHeight
+        }
+        val retriever = android.media.MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(file.path)
+            val width = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: return null
+            val height = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: return null
+            val rotation = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            if (width <= 0 || height <= 0) return null
+            if (rotation % 180 != 0) height to width else width to height
+        } finally { retriever.release() }
+    }.getOrNull()
+}
