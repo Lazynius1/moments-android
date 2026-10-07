@@ -52,7 +52,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
 import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.CancellationException
@@ -418,12 +417,10 @@ private suspend fun loginWithIdentifier(identifier: String, password: String) {
     val email = if (emailRegex.matches(trimmed)) {
         trimmed
     } else {
-        val doc = FirebaseFirestore.getInstance()
-            .collection("usernames")
-            .document(trimmed.lowercase())
-            .get()
-            .await()
-        doc.getString("email") ?: throw IllegalStateException("Usuario no encontrado")
+        when (val lookup = com.moments.android.services.auth.AuthLookupService.resolveLoginEmail(trimmed)) {
+            is com.moments.android.services.auth.AuthLookupService.EmailLookup.Found -> lookup.email
+            else -> throw IllegalStateException("Usuario no encontrado")
+        }
     }
     FirebaseAuth.getInstance().signInWithEmailAndPassword(email, password).await()
 }

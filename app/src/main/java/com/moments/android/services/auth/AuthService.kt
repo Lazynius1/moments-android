@@ -397,25 +397,15 @@ object AuthService {
         finishCredentialLogin(user)
     }
 
-    private suspend fun resolveEmailForUsername(username: String): String {
-        val doc = db.collection("usernames").document(username).get().await()
-        val data = doc.data ?: throw authError(R.string.auth_error_usernameNotFound)
-        val email = data["email"] as? String
-        if (!email.isNullOrEmpty()) {
-            prefs().edit().putString("cachedEmail_$username", email).apply()
-            return email
+    private suspend fun resolveEmailForUsername(username: String): String =
+        when (val lookup = AuthLookupService.resolveLoginEmail(username)) {
+            is AuthLookupService.EmailLookup.Found -> {
+                prefs().edit().putString("cachedEmail_$username", lookup.email).apply()
+                lookup.email
+            }
+            AuthLookupService.EmailLookup.NotFound -> throw authError(R.string.auth_error_usernameNotFound)
+            AuthLookupService.EmailLookup.RateLimited -> throw authError(R.string.auth_error_tooManyRequests)
         }
-        val userId = data["userId"] as? String ?: throw authError(R.string.auth_error_usernameNotFound)
-        val userDoc = db.collection("users").document(userId).get().await()
-        val userEmail = userDoc.getString("email")
-            ?: throw authError(R.string.auth_error_usernameNotFound)
-        db.collection("usernames").document(username).set(
-            mapOf("email" to userEmail, "updatedAt" to FieldValue.serverTimestamp()),
-            com.google.firebase.firestore.SetOptions.merge(),
-        )
-        prefs().edit().putString("cachedEmail_$username", userEmail).apply()
-        return userEmail
-    }
 
     private suspend fun finishCredentialLogin(user: FirebaseUser) {
         authMutex.withLock {

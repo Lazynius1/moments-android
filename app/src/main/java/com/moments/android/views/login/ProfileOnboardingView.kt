@@ -509,20 +509,12 @@ private fun bitmapFrom(context: android.content.Context, uri: Uri?): android.gra
     }
 
 /**
- * ¿Hay ya una cuenta con este correo? Se consulta el índice `usernames`, donde el
- * alta guarda el email junto al userId. Sirve para avisar en el propio paso del
- * correo en vez de dejar que falle al final, al pulsar "crear cuenta".
+ * ¿Hay ya una cuenta con este correo? Lo responde la Cloud Function `checkEmailAvailable`.
+ * Sirve para avisar en el propio paso del correo en vez de dejar que falle al final,
+ * al pulsar "crear cuenta".
  */
-private suspend fun isEmailAlreadyRegistered(email: String): Boolean = runCatching {
-    FirebaseFirestore.getInstance()
-        .collection("usernames")
-        .whereEqualTo("email", email.trim())
-        .limit(1)
-        .get()
-        .await()
-        .isEmpty
-        .not()
-}.getOrDefault(false)
+private suspend fun isEmailAlreadyRegistered(email: String): Boolean =
+    com.moments.android.services.auth.AuthLookupService.isEmailRegistered(email)
 
 private fun isValidEmail(email: String): Boolean =
     Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}$").matches(email)
