@@ -168,18 +168,18 @@ fun GlassmorphicMessageRow(
     var revealSpoilers by remember(message.id) { mutableStateOf(false) }
     val timestampAlpha = ((-revealOffset) / 40f).coerceIn(0f, 1f)
 
-    Row(
+    // La fila se desplaza con el swipe y la hora queda fija en el borde derecho, entrando
+    // desde fuera de pantalla (≡ iOS). `offset` del estado va en puntos.
+    Box(
         modifier
             .fillMaxWidth()
-            .padding(start = 8.dp, top = if (head) 5.dp else 1.dp, end = 8.dp, bottom = bottomPad)
-            .offset { IntOffset(revealOffset.roundToInt(), 0) },
-        verticalAlignment = Alignment.Bottom,
+            .padding(start = 8.dp, top = if (head) 5.dp else 1.dp, end = 8.dp, bottom = bottomPad),
     ) {
         Row(
             Modifier
-                .weight(1f)
+                .fillMaxWidth()
                 .height(IntrinsicSize.Max)
-                .rawPadding(end = (-67).dp),
+                .offset { IntOffset(revealOffset.dp.roundToPx(), 0) },
             verticalAlignment = Alignment.Bottom,
         ) {
             if (isCurrentUser) {
@@ -218,7 +218,7 @@ fun GlassmorphicMessageRow(
                 verticalArrangement = Arrangement.spacedBy(reactionSpacing),
             ) {
                 // La cita acompaña a la burbuja durante el swipe-to-reply (≡ iOS offset compartido).
-                val swipeFollow = Modifier.offset { IntOffset(swipeState.dragOffset.roundToInt(), 0) }
+                val swipeFollow = Modifier.offset { IntOffset(swipeState.dragOffset.dp.roundToPx(), 0) }
                 repliedMessage?.let {
                     StackedReplyQuote(it, isCurrentUser, otherParticipantName, callbacks.onReplyTap, modifier = swipeFollow)
                 }
@@ -324,11 +324,19 @@ fun GlassmorphicMessageRow(
             isCurrentUser = isCurrentUser,
             showSeenLabel = showSeenLabel,
             modifier = Modifier
-                .width(55.dp)
-                .padding(start = 12.dp)
+                // Centrada en la fila, como el HStack de iOS.
+                .align(Alignment.CenterEnd)
+                .width(ChatTimestampRevealMetrics.columnWidth)
+                .offset { IntOffset((ChatTimestampRevealMetrics.revealDistance + revealOffset.dp).roundToPx(), 0) }
                 .graphicsLayer { alpha = timestampAlpha },
         )
     }
+}
+
+/** Columna de hora del swipe: ancho y distancia hasta quedar visible junto a la burbuja (≡ iOS). */
+object ChatTimestampRevealMetrics {
+    val columnWidth = 55.dp
+    val revealDistance = 67.dp
 }
 
 @Composable

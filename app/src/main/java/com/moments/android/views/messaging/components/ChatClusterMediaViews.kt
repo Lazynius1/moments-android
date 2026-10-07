@@ -139,7 +139,7 @@ fun GlassmorphicClusterRow(
             repliedMessage?.let {
                 StackedReplyQuote(
                     it, isCurrentUser, otherParticipantName, onReplyTap,
-                    modifier = Modifier.offset { IntOffset(swipeState.dragOffset.roundToInt(), 0) },
+                    modifier = Modifier.offset { IntOffset(swipeState.dragOffset.dp.roundToPx(), 0) },
                 )
             }
             Box {

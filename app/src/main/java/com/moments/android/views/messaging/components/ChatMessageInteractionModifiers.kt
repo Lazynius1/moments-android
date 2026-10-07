@@ -211,7 +211,7 @@ fun ChatBubbleReplySwipeContainer(
         Box(
             Modifier
                 .zIndex(1f)
-                .offset { IntOffset(state.dragOffset.toInt(), 0) },
+                .offset { IntOffset(state.dragOffset.dp.roundToPx(), 0) },
         ) {
             content()
         }
@@ -287,7 +287,8 @@ private fun Modifier.chatReplySwipeGesture(
     detectChatHorizontalPan(
         direction = direction,
         onChanged = { horizontal ->
-            state.dragOffset = ChatReplySwipeMetrics.signedDrag(horizontal, isOutgoing)
+            // Métricas en puntos (≡ iOS): el gesto llega en píxeles.
+            state.dragOffset = ChatReplySwipeMetrics.signedDrag(horizontal / density, isOutgoing)
             val magnitude = abs(state.dragOffset)
             val progress = ChatReplySwipeMetrics.progress(state.dragOffset)
             val nextStep = if (progress >= 1f) {
@@ -336,7 +337,8 @@ fun Modifier.chatTimestampRevealGesture(
         detectChatHorizontalPan(
             direction = ChatHorizontalPanDirection.LEFT,
             onChanged = { horizontal ->
-                val base = horizontal
+                // Métricas en puntos (≡ iOS): el gesto llega en píxeles.
+                val base = horizontal / density
                 val offset = if (base < -70f) -70f + (base + 70f) * 0.25f else base
                 state.offset = offset.coerceAtLeast(-90f)
             },
