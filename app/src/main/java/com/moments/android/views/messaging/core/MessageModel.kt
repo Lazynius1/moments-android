@@ -374,6 +374,11 @@ data class EnhancedMessage(
     var isVanishModeMessage: Boolean = false,
     var vanishedFor: List<String> = emptyList(),
     var vanishExpiresAt: Date? = null,
+    /**
+     * Local (no Firestore): el texto no se pudo descifrar. `content` lleva el aviso localizado,
+     * nunca el ciphertext; el snapshot/clave nueva lo reintenta.
+     */
+    var isUndecryptable: Boolean = false,
     /** Session-only (no Firestore) — ≡ iOS `@Published` en EnhancedMessage. */
     var replayAvailableInCurrentChatSession: Boolean = false,
     var replayConsumedInCurrentChatSession: Boolean = false,
@@ -443,6 +448,7 @@ data class EnhancedMessage(
         put("isVanishModeMessage", isVanishModeMessage)
         put("vanishedFor", JSONArray(vanishedFor))
         vanishExpiresAt?.let { put("vanishExpiresAt", it.time) }
+        if (isUndecryptable) put("isUndecryptable", true)
     }
 
     fun toCachedMessage(): CachedMessage = CachedMessage.from(this)
@@ -752,6 +758,7 @@ data class EnhancedMessage(
                 (0 until arr.length()).map { arr.getString(it) }
             } ?: emptyList(),
             vanishExpiresAt = obj.optLong("vanishExpiresAt").takeIf { obj.has("vanishExpiresAt") }?.let { Date(it) },
+            isUndecryptable = obj.optBoolean("isUndecryptable"),
         )
 
         fun fromCached(cached: CachedMessage): EnhancedMessage = cached.toEnhancedMessage()
@@ -890,9 +897,15 @@ data class Conversation(
     fun inboxMessagePreview(context: Context, currentUserId: String): String {
         val type = lastMessageType
         if (type != null && type.isViewOnce && !isOwnLastMessage(currentUserId)) {
+            // Ya vista → "Ha enviado una foto/un vídeo"; sin abrir → "Ver foto"/"Ver vídeo" (≡ iOS).
+            if (!lastMessageViewOncePending) {
+                return context.getString(
+                    if (type == MessageType.VIEW_ONCE_VIDEO) R.string.chat_preview_view_once_sent_video else R.string.chat_preview_view_once_sent_photo,
+                )
+            }
             return when (type) {
-                MessageType.VIEW_ONCE_VIDEO -> context.getString(R.string.chat_preview_video)
-                else -> context.getString(R.string.chat_preview_photo)
+                MessageType.VIEW_ONCE_VIDEO -> context.getString(R.string.chat_preview_view_once_tap_video)
+                else -> context.getString(R.string.chat_preview_view_once_tap_photo)
             }
         }
         return messagePreview(context)

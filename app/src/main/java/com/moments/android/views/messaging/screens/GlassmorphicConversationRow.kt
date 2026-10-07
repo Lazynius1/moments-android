@@ -1,5 +1,6 @@
 package com.moments.android.views.messaging.screens
 
+import com.moments.android.views.messaging.components.cachedChatBubbleColor
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,7 +43,7 @@ import com.moments.android.R
 import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.components.VerifiedBadgeView
 import com.moments.android.views.messaging.components.ChatVanishInboxIndicator
-import com.moments.android.views.messaging.components.ChatViewOnceInboxIndicator
+import com.moments.android.views.messaging.components.ChatViewOnceInboxAction
 import com.moments.android.views.messaging.components.ConversationListInteraction
 import com.moments.android.views.messaging.components.conversationRowMenuHighlight
 import com.moments.android.views.messaging.core.Conversation
@@ -73,6 +74,9 @@ fun GlassmorphicConversationRow(
     pressScale: Float = 1f,
     modifier: Modifier = Modifier,
     onNeedsParticipantState: () -> Unit = {},
+    /** "▶ Reproducir": abre el ver una vez pendiente sin entrar al chat (≡ iOS `onPlayViewOnce`). */
+    onPlayViewOnce: (() -> Unit)? = null,
+    isPreparingViewOnce: Boolean = false,
 ) {
     val isDark = isSystemInDarkTheme()
     val context = LocalContext.current
@@ -123,6 +127,8 @@ fun GlassmorphicConversationRow(
         isOwnLast -> stringResource(R.string.chat_status_sent)
         else -> conversation.inboxMessagePreview(context, uid)
     }
+    // Ver una vez recibido sin abrir: "Ver foto"/"Ver vídeo" destacado, como un no leído (≡ iOS).
+    val emphasizesViewOnce = !showsDraftPreview && conversation.showsViewOnceInboxPlayButton(uid)
 
     val previewColor = when {
         showsDraftPreview -> Color(0xFF3F6F8F)
@@ -242,8 +248,8 @@ fun GlassmorphicConversationRow(
                 Text(
                     resolvedPreview,
                     fontSize = 14.sp,
-                    fontWeight = if (isUnread && !showsDraftPreview) FontWeight.SemiBold else FontWeight.Normal,
-                    color = previewColor,
+                    fontWeight = if ((isUnread || emphasizesViewOnce) && !showsDraftPreview) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (emphasizesViewOnce) (if (isDark) Color.White else Color.Black) else previewColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
@@ -253,7 +259,13 @@ fun GlassmorphicConversationRow(
         }
 
         when {
-            conversation.showsViewOnceInboxPlayButton(uid) -> ChatViewOnceInboxIndicator()
+            conversation.showsViewOnceInboxPlayButton(uid) -> ChatViewOnceInboxAction(
+                isVideo = conversation.lastMessageType == com.moments.android.views.messaging.core.MessageType.VIEW_ONCE_VIDEO,
+                // ≡ iOS: reproduce el ver una vez sobre la lista; sin host que lo soporte, abre el chat.
+                onClick = onPlayViewOnce ?: listInteraction?.onTap ?: onTap,
+                tint = cachedChatBubbleColor(context, uid, conversation.id.orEmpty()),
+                isLoading = isPreparingViewOnce,
+            )
             conversation.vanishModeActive == true -> ChatVanishInboxIndicator(isUnread = isUnread)
             isUnread -> {
                 Box(

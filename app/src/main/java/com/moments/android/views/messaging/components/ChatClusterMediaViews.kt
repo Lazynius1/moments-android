@@ -4,6 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
+import com.moments.android.views.feed.AdaptiveColors
+import kotlin.math.roundToInt
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.border
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -129,11 +134,17 @@ fun GlassmorphicClusterRow(
             ),
             horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start,
         ) {
+            // Estado del swipe elevado: la cita se desplaza junto a la ráfaga.
+            val swipeState = rememberChatReplySwipeState()
             repliedMessage?.let {
-                StackedReplyQuote(it, isCurrentUser, otherParticipantName, onReplyTap)
+                StackedReplyQuote(
+                    it, isCurrentUser, otherParticipantName, onReplyTap,
+                    modifier = Modifier.offset { IntOffset(swipeState.dragOffset.roundToInt(), 0) },
+                )
             }
             Box {
                 MediaGridBubble(
+                    swipeState = swipeState,
                     messages = messages,
                     isCurrentUser = isCurrentUser,
                     uploadProgress = uploadProgress,
@@ -238,6 +249,7 @@ object ClusterMessageGrouper {
 
 object ClusterMediaLayout {
     val cornerRadius = 12.dp
+    val backCardBorderWidth = 1.5.dp
     val fanBottomPadding = 10.dp
     const val maxVisible = 5
     val rotations = listOf(-4f, 3f, -2.5f, 4f, -3f)
@@ -264,6 +276,7 @@ fun MediaGridBubble(
     onReply: () -> Unit = {},
     onDoubleTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    swipeState: ChatReplySwipeState = rememberChatReplySwipeState(),
 ) {
     val front = messages.firstOrNull() ?: return
     if (messages.all { it.isDeleted }) {
@@ -288,7 +301,7 @@ fun MediaGridBubble(
     val stackHeight = cardSizes.maxOf { it.height }
     val hasVideo = active.any { it.type == MessageType.VIDEO }
     val vanishProtected = active.any { it.isVanishModeMessage }
-    val swipeState = rememberChatReplySwipeState()
+    val stackBorder = AdaptiveColors(isSystemInDarkTheme()).chatBackground.first()
     val density = LocalDensity.current
     val a11yLabel = stringResource(
         if (isCurrentUser) R.string.chat_cluster_sent_photos else R.string.chat_cluster_received_photos,
@@ -390,23 +403,33 @@ fun MediaGridBubble(
                                     )
                                     .size(cardSizes[index]),
                             ) {
+                                val cardShape = RoundedCornerShape(ClusterMediaLayout.cornerRadius)
                                 MediaGridTileView(
                                     message = message,
                                     progress = uploadProgress[message.id],
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .clip(RoundedCornerShape(ClusterMediaLayout.cornerRadius)),
+                                        .then(
+                                            if (isFront) {
+                                                Modifier
+                                            } else {
+                                                // Tarjetas traseras: sombra suave + filete del fondo para separar el abanico.
+                                                Modifier.shadow(
+                                                    elevation = 3.dp,
+                                                    shape = cardShape,
+                                                    ambientColor = Color.Black.copy(0.18f),
+                                                    spotColor = Color.Black.copy(0.18f),
+                                                )
+                                            },
+                                        )
+                                        .clip(cardShape)
+                                        .then(
+                                            if (isFront) Modifier
+                                            else Modifier.border(ClusterMediaLayout.backCardBorderWidth, stackBorder, cardShape),
+                                        ),
                                 )
-                                if (message.type == MessageType.VIDEO) {
-                                    Icon(
-                                        Icons.Default.PlayArrow,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier
-                                            .align(Alignment.BottomStart)
-                                            .padding(6.dp)
-                                            .size(14.dp),
-                                    )
+                                if (isFront && message.type == MessageType.VIDEO) {
+                                    ChatVideoCenterPlayButton(Modifier.align(Alignment.Center), diameter = 36.dp)
                                 }
                                 if (isFront) {
                                     ClusterCountBadge(Modifier.align(Alignment.TopEnd).padding(8.dp))
@@ -1116,12 +1139,7 @@ fun GlassmorphicMediaSelectionSheet(
                 ) {
                     MediaGridTileView(message, null, modifier = Modifier.fillMaxSize())
                     if (message.type == MessageType.VIDEO) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            null,
-                            tint = Color.White,
-                            modifier = Modifier.align(Alignment.BottomStart).padding(10.dp).size(18.dp),
-                        )
+                        ChatVideoCenterPlayButton(Modifier.align(Alignment.Center), diameter = 44.dp)
                     }
                 }
             }

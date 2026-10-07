@@ -26,6 +26,7 @@ import java.util.Date
  */
 object MessagePersistenceStore {
     private const val MAX_MESSAGES_PER_CONVERSATION = 2_000
+    private const val SQL_IN_CHUNK = 500
     private val lock = Mutex()
 
     fun initialize(context: Context) {
@@ -41,10 +42,15 @@ object MessagePersistenceStore {
             val messages = decodeMessages(encodedMessages)
             if (messages.isEmpty() && !sync) return@lockedIo
 
-            val existing = if (sync) emptyList() else loadMessagesUnsafe(conversationId)
-            val merged = mergeMessages(existing, messages, sync)
-            writeMessagesUnsafe(conversationId, merged)
-            trimMessagesUnsafe(conversationId, merged)
+            if (sync) {
+                writeMessagesUnsafe(conversationId, mergeMessages(emptyList(), messages, sync = true))
+            } else {
+                // Upsert por fila: solo se leen y escriben las filas del lote (antes se reescribía
+                // la conversación completa, hasta 2000 filas, en cada snapshot).
+                val existing = loadMessagesByIdsUnsafe(conversationId, messages.map { it.id })
+                upsertMessagesUnsafe(conversationId, mergeMessages(existing, messages, sync = false))
+            }
+            trimMessagesUnsafe(conversationId)
         }
     }
 
@@ -56,12 +62,23 @@ object MessagePersistenceStore {
         val oldest = messages.minOf { it.timestamp }
         val remoteIds = messages.map { it.id }.toSet()
         lockedIo {
-            val kept = loadMessagesUnsafe(conversationId).filter { msg ->
-                msg.timestamp < oldest || msg.id in remoteIds
-            }
-            writeMessagesUnsafe(conversationId, kept)
+            // Dentro de la ventana del snapshot, lo que no viene se borró en remoto. Excepción:
+            // salientes aún no confirmados (pending/failed/sending) que el servidor todavía no tiene.
+            val removedIds = room { messagesFrom(conversationId, oldest.time) }
+                .asSequence()
+                .filter { it.id !in remoteIds }
+                .mapNotNull(::decodeMessageEntity)
+                .filterNot(::isUnconfirmedOutgoing)
+                .map { it.id }
+                .toList()
+            deleteMessagesByIdsUnsafe(conversationId, removedIds)
         }
     }
+
+    private fun isUnconfirmedOutgoing(message: EnhancedMessage): Boolean =
+        message.status == com.moments.android.views.messaging.core.MessageStatus.PENDING ||
+            message.status == com.moments.android.views.messaging.core.MessageStatus.FAILED ||
+            message.status == com.moments.android.views.messaging.core.MessageStatus.SENDING
 
     suspend fun recentMessages(
         conversationId: String,
@@ -160,25 +177,23 @@ object MessagePersistenceStore {
     }
 
     suspend fun updateMessageStatus(conversationId: String, messageId: String, status: String) = lockedIo {
-        val messages = loadMessagesUnsafe(conversationId).map { msg ->
-            if (msg.id == messageId) msg.copy(status = com.moments.android.views.messaging.core.MessageStatus.from(status)) else msg
+        mutateRowsUnsafe(conversationId, listOf(messageId)) { msg ->
+            msg.copy(status = com.moments.android.views.messaging.core.MessageStatus.from(status))
         }
-        writeMessagesUnsafe(conversationId, messages)
     }
 
     suspend fun markMessagesAsRead(conversationId: String, messageIds: Set<String>) = lockedIo {
         if (messageIds.isEmpty()) return@lockedIo
-        val messages = loadMessagesUnsafe(conversationId).map { msg ->
-            if (msg.id in messageIds && !msg.isRead) msg.copy(isRead = true) else msg
+        mutateRowsUnsafe(conversationId, messageIds.toList()) { msg ->
+            if (!msg.isRead) msg.copy(isRead = true) else msg
         }
-        writeMessagesUnsafe(conversationId, messages)
     }
 
     suspend fun markAllIncomingAsRead(conversationId: String, currentUserId: String) = lockedIo {
-        val messages = loadMessagesUnsafe(conversationId).map { msg ->
-            if (msg.senderId != currentUserId && !msg.isRead) msg.copy(isRead = true) else msg
-        }
-        writeMessagesUnsafe(conversationId, messages)
+        val changed = loadMessagesUnsafe(conversationId)
+            .filter { msg -> msg.senderId != currentUserId && !msg.isRead }
+            .map { it.copy(isRead = true) }
+        upsertMessagesUnsafe(conversationId, changed)
     }
 
     suspend fun deleteConversation(conversationId: String) = lockedIo {
@@ -189,9 +204,8 @@ object MessagePersistenceStore {
     }
 
     suspend fun markMessageDeletedForEveryone(conversationId: String, messageId: String) = lockedIo {
-        val messages = loadMessagesUnsafe(conversationId).map { msg ->
-            if (msg.id != messageId) msg
-            else msg.copy(
+        mutateRowsUnsafe(conversationId, listOf(messageId)) { msg ->
+            msg.copy(
                 isDeleted = true,
                 deletedAt = Date(),
                 content = null,
@@ -204,14 +218,12 @@ object MessagePersistenceStore {
                 audioWaveform = null,
             )
         }
-        writeMessagesUnsafe(conversationId, messages)
         ChatCacheStore.deleteMessageFiles(conversationId, messageId)
     }
 
     suspend fun removeCachedMessage(conversationId: String, messageId: String) = lockedIo {
         ChatCacheStore.deleteMessageFiles(conversationId, messageId)
-        val kept = loadMessagesUnsafe(conversationId).filter { it.id != messageId }
-        writeMessagesUnsafe(conversationId, kept)
+        deleteMessagesByIdsUnsafe(conversationId, listOf(messageId))
     }
 
     suspend fun unreadMessageCount(
@@ -223,17 +235,11 @@ object MessagePersistenceStore {
     }
 
     suspend fun updateMessageVanishExpiresAt(conversationId: String, messageId: String, expiresAt: Date) = lockedIo {
-        val messages = loadMessagesUnsafe(conversationId).map { msg ->
-            if (msg.id == messageId) msg.copy(vanishExpiresAt = expiresAt) else msg
-        }
-        writeMessagesUnsafe(conversationId, messages)
+        mutateRowsUnsafe(conversationId, listOf(messageId)) { it.copy(vanishExpiresAt = expiresAt) }
     }
 
     suspend fun updateMessageNoticeContent(conversationId: String, messageId: String, content: String) = lockedIo {
-        val messages = loadMessagesUnsafe(conversationId).map { msg ->
-            if (msg.id == messageId) msg.copy(content = content) else msg
-        }
-        writeMessagesUnsafe(conversationId, messages)
+        mutateRowsUnsafe(conversationId, listOf(messageId)) { it.copy(content = content) }
     }
 
     suspend fun toggleMessageReactionLocally(messageId: String, emoji: String, userId: String): Boolean = lockedIo {
@@ -266,7 +272,7 @@ object MessagePersistenceStore {
         if (normalizedQuery.isEmpty()) return@lockedIo emptyList()
         val matches = mutableListOf<String>()
         for (message in loadMessagesUnsafe(conversationId).sortedBy { it.timestamp }) {
-            if (message.type != MessageType.TEXT) continue
+            if (message.type != MessageType.TEXT || message.isUndecryptable) continue
             if (!SearchNormalization.containsNormalized(message.content.orEmpty(), normalizedQuery)) continue
             matches += message.id
             if (matches.size >= limit) break
@@ -283,7 +289,7 @@ object MessagePersistenceStore {
         val matches = mutableListOf<EnhancedMessage>()
         for (conversationId in allConversationIdsUnsafe()) {
             for (message in loadMessagesUnsafe(conversationId)) {
-                if (message.type != MessageType.TEXT || message.isDeleted || message.isVanishModeMessage) continue
+                if (message.type != MessageType.TEXT || message.isDeleted || message.isVanishModeMessage || message.isUndecryptable) continue
                 val content = message.content ?: continue
                 if (!SearchNormalization.containsNormalized(content, normalizedQuery)) continue
                 matches += message
@@ -423,13 +429,14 @@ object MessagePersistenceStore {
         return File(path).exists()
     }
 
-    private suspend fun trimMessagesUnsafe(conversationId: String, messages: List<EnhancedMessage>) {
-        val sorted = messages.sortedWith(compareByDescending<EnhancedMessage> { it.timestamp }.thenByDescending { it.id })
-        if (sorted.size <= MAX_MESSAGES_PER_CONVERSATION) return
-        val overflow = sorted.drop(MAX_MESSAGES_PER_CONVERSATION)
-        val kept = sorted.take(MAX_MESSAGES_PER_CONVERSATION)
-        writeMessagesUnsafe(conversationId, kept)
-        overflow.forEach { ChatCacheStore.deleteMessageFiles(conversationId, it.id) }
+    /** Recorta a [MAX_MESSAGES_PER_CONVERSATION] en SQL (mismo orden: timestamp/id desc). */
+    private suspend fun trimMessagesUnsafe(conversationId: String) {
+        if (room { messageCountIn(conversationId) } <= MAX_MESSAGES_PER_CONVERSATION) return
+        val overflowIds = room {
+            staleMessageIdsOutsideRecentWindow(conversationId, Long.MAX_VALUE, MAX_MESSAGES_PER_CONVERSATION)
+        }
+        deleteMessagesByIdsUnsafe(conversationId, overflowIds)
+        overflowIds.forEach { ChatCacheStore.deleteMessageFiles(conversationId, it) }
     }
 
     private suspend fun loadMessagesUnsafe(conversationId: String): List<EnhancedMessage> =
@@ -437,28 +444,57 @@ object MessagePersistenceStore {
             messagesIn(conversationId).mapNotNull(::decodeMessageEntity)
         }
 
-    private suspend fun writeMessagesUnsafe(conversationId: String, messages: List<EnhancedMessage>) {
-        room {
-            replaceMessagesIn(
-                conversationId,
-                messages.map {
-                    MessageEntity(
-                        conversationId = conversationId,
-                        id = it.id,
-                        timestamp = it.timestamp.time,
-                        senderId = it.senderId,
-                        type = it.type.raw,
-                        content = it.content,
-                        isRead = it.isRead,
-                        isDeleted = it.isDeleted,
-                        isVanishModeMessage = it.isVanishModeMessage,
-                        payload = it.toJson().toString(),
-                    )
-                },
-            )
+    private suspend fun loadMessagesByIdsUnsafe(conversationId: String, ids: List<String>): List<EnhancedMessage> {
+        val unique = ids.distinct()
+        if (unique.isEmpty()) return emptyList()
+        // SQLite limita las variables por sentencia: trocear.
+        return unique.chunked(SQL_IN_CHUNK).flatMap { chunk ->
+            room { messagesByIds(conversationId, chunk) }.mapNotNull(::decodeMessageEntity)
         }
+    }
+
+    private suspend fun deleteMessagesByIdsUnsafe(conversationId: String, ids: List<String>) {
+        if (ids.isEmpty()) return
+        ids.distinct().chunked(SQL_IN_CHUNK).forEach { chunk -> room { deleteMessagesByIds(conversationId, chunk) } }
         UnreadMessageCountStore.invalidate(conversationId)
     }
+
+    /** Lee solo [ids], aplica [transform] y hace upsert de esas filas. */
+    private suspend fun mutateRowsUnsafe(
+        conversationId: String,
+        ids: List<String>,
+        transform: (EnhancedMessage) -> EnhancedMessage,
+    ) {
+        val rows = loadMessagesByIdsUnsafe(conversationId, ids)
+        if (rows.isEmpty()) return
+        upsertMessagesUnsafe(conversationId, rows.map(transform))
+    }
+
+    private suspend fun upsertMessagesUnsafe(conversationId: String, messages: List<EnhancedMessage>) {
+        if (messages.isEmpty()) return
+        room { upsertMessages(messages.map { it.toEntity(conversationId) }) }
+        UnreadMessageCountStore.invalidate(conversationId)
+    }
+
+    /** Reemplazo completo de la conversación (sync=true y mutaciones globales). */
+    private suspend fun writeMessagesUnsafe(conversationId: String, messages: List<EnhancedMessage>) {
+        room { replaceMessagesIn(conversationId, messages.map { it.toEntity(conversationId) }) }
+        UnreadMessageCountStore.invalidate(conversationId)
+    }
+
+    private fun EnhancedMessage.toEntity(conversationId: String) = MessageEntity(
+        conversationId = conversationId,
+        id = id,
+        timestamp = timestamp.time,
+        senderId = senderId,
+        type = type.raw,
+        // No indexar el aviso de "no descifrable" como contenido buscable.
+        content = if (isUndecryptable) null else content,
+        isRead = isRead,
+        isDeleted = isDeleted,
+        isVanishModeMessage = isVanishModeMessage,
+        payload = toJson().toString(),
+    )
 
     private fun decodeMessageEntity(entity: MessageEntity): EnhancedMessage? = runCatching {
         val obj = JSONObject(entity.payload)

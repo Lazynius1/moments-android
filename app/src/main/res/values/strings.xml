@@ -574,6 +574,10 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="chat_status_delivered">Delivered</string>
     <string name="chat_status_read">Read</string>
     <string name="chat_status_failed">Failed</string>
+    <string name="chat_message_undecryptable">This message can\'t be displayed</string>
+    <string name="chat_error_conversation_key_missing">This chat\'s encryption key isn\'t available on this device yet. Try again later or restore your chats.</string>
+    <string name="chat_outbox_channel_name">Sending messages</string>
+    <string name="chat_outbox_sending">Sending messages…</string>
     <string name="banner_verb_media_moderation_partial">Some content was hidden from your post</string>
     <string name="banner_verb_media_moderation_full">Your post is now only visible to you</string>
     <string name="banner_verb_media_moderation_story_partial">Some content was hidden from your story</string>
@@ -1712,7 +1716,7 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="story_chains_previous_part">Previous part</string>
     <string name="story_chains_next_part">Next part</string>
     <string name="chat_input_placeholder">Message</string>
-    <string name="chat_input_vanish_placeholder">Vanish message</string>
+    <string name="chat_input_vanish_placeholder">Temporary message</string>
     <string name="chat_voice_slide_to_cancel">Slide to cancel</string>
     <string name="chat_voice_record_locked">Recording locked</string>
     <string name="chat_voice_record_pause">Pause recording</string>
@@ -1744,7 +1748,7 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="whats_new_stories_title">Stories</string>
     <string name="whats_new_stories_description">Capture and share stories that disappear, with interactive stickers and replies.</string>
     <string name="whats_new_chat_title">Private chat</string>
-    <string name="whats_new_chat_description">End-to-end encrypted conversations with voice notes, media and vanish mode.</string>
+    <string name="whats_new_chat_description">End-to-end encrypted conversations with voice notes, media and disappearing messages.</string>
     <string name="whats_new_map_title">Discover nearby</string>
     <string name="whats_new_map_description">Explore Moments on the map and find places where friends have been.</string>
     <string name="whats_new_privacy_title">Audience control</string>
@@ -1794,10 +1798,6 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="chat_vanish_swipe_hint_off">Pull up to turn off disappearing messages</string>
     <string name="chat_vanish_active_accessibility">Disappearing messages are active</string>
     <string name="chat_vanish_inactive_accessibility">Disappearing messages are inactive</string>
-    <string name="chat_vanish_notice_enabled_self">You turned on disappearing messages. New messages and reactions will disappear</string>
-    <string name="chat_vanish_notice_enabled_other">%1$s turned on disappearing messages. New messages and reactions will disappear</string>
-    <string name="chat_vanish_notice_enabled">%1$s for %2$s</string>
-    <string name="chat_vanish_notice_enabled_suffix">.</string>
     <string name="chat_vanish_notice_change">Change</string>
     <string name="chat_vanish_notice_disabled_self">You turned off disappearing messages.</string>
     <string name="chat_vanish_notice_disabled_other">%1$s turned off disappearing messages.</string>
@@ -3094,4 +3094,13 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="story_audio_unsaved_confirmation">Audio removed from favorites</string>
     <string name="settings_group_profile_content">Profile and content</string>
     <string name="settings_group_messaging_privacy">Messages and interactions</string>
+    <string name="chat_vanish_notice_enabled_self_format">You turned on disappearing messages. New messages and reactions will disappear %1$s.</string>
+    <string name="chat_vanish_notice_enabled_other_format">%1$s turned on disappearing messages. New messages and reactions will disappear %2$s.</string>
+    <string name="notification_message_view_once_photo">Sent you a photo</string>
+    <string name="notification_message_view_once_video">Sent you a video</string>
+    <string name="chat_preview_view_once_tap_photo">View photo</string>
+    <string name="chat_preview_view_once_tap_video">View video</string>
+    <string name="chat_view_once_inbox_action">Play</string>
+    <string name="chat_preview_view_once_sent_photo">Sent a photo</string>
+    <string name="chat_preview_view_once_sent_video">Sent a video</string>
 </resources>

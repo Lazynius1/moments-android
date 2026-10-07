@@ -250,7 +250,8 @@ object OfflineSyncService {
 
             CachedAction.ActionType.MESSAGE.raw -> {
                 decodeMessagePayload(action.payloadData)?.let { payload ->
-                    ChatService.sendMessage(payload.message, payload.useServerTimestamp)
+                    // Reintento idempotente: si el SDK ya llevó el `set` al servidor no se reescribe.
+                    ChatService.sendMessage(payload.message, payload.useServerTimestamp, isRetry = true)
                         .onSuccess { sent ->
                             if (sent.status != MessageStatus.PENDING) {
                                 LocalPersistenceService.deleteActionAsync(action.id)
@@ -279,13 +280,14 @@ object OfflineSyncService {
                             ChatService.sendAudioMessage(
                                 payload.conversationId, payload.senderId, mediaData,
                                 payload.duration ?: 0.0, payload.audioWaveform, payload.messageId,
-                                payload.isVanishModeMessage,
+                                payload.isVanishModeMessage, isRetry = true,
                             )
                         } else {
                             ChatService.sendMediaMessage(
                                 payload.conversationId, payload.senderId, type, mediaData,
                                 payload.fileName, payload.messageId, payload.mediaBatchId,
                                 payload.isVanishModeMessage, payload.vanishExpiresAt, payload.replyTo, payload.stickers, payload.textOverlays,
+                                isRetry = true,
                             )
                         }
                         result.onSuccess { sent ->

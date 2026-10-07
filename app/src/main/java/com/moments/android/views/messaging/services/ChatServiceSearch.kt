@@ -41,7 +41,7 @@ suspend fun ChatService.searchMessages(
             val data = document.data ?: continue
             if (data["type"] != MessageType.TEXT.raw || data["isDeleted"] == true || document.id in excludingIds) continue
             val encryptedContent = data["content"] as? String ?: continue
-            val plainText = decryptMessageContent(encryptedContent, conversationId)
+            val plainText = decryptMessageContentOrNull(encryptedContent, conversationId) ?: continue
             if (!normalizeSearchText(plainText).contains(normalizedQuery)) continue
             matches += buildEnhancedMessage(
                 data = data,

@@ -2,6 +2,7 @@
 
 package com.moments.android.views.messaging.components
 
+import androidx.compose.ui.platform.LocalContext
 import android.net.Uri
 import java.net.URL
 import java.net.URLConnection
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -215,17 +217,12 @@ fun GlassmorphicMessageRow(
                 horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start,
                 verticalArrangement = Arrangement.spacedBy(reactionSpacing),
             ) {
+                // La cita acompaña a la burbuja durante el swipe-to-reply (≡ iOS offset compartido).
+                val swipeFollow = Modifier.offset { IntOffset(swipeState.dragOffset.roundToInt(), 0) }
                 repliedMessage?.let {
-                    StackedReplyQuote(it, isCurrentUser, otherParticipantName, callbacks.onReplyTap)
+                    StackedReplyQuote(it, isCurrentUser, otherParticipantName, callbacks.onReplyTap, modifier = swipeFollow)
                 }
-                if (message.editedAt != null && !message.isDeleted) {
-                    Text(
-                        text = stringResource(R.string.chat_edited),
-                        fontSize = 11.sp,
-                        color = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()).timestampColor,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                }
+                Column(horizontalAlignment = if (isCurrentUser) Alignment.End else Alignment.Start) {
                 ChatTranslationContainer(
                     text = message.content.orEmpty(),
                     messageId = message.id,
@@ -252,6 +249,7 @@ fun GlassmorphicMessageRow(
                         isOutgoing = isCurrentUser,
                         cornerRadius = cornerRadius,
                         isFlashing = isBubbleFlashing,
+                        flashShape = chatMessageBubbleShape(message, isCurrentUser, groupPosition),
                         onTap = when {
                             childHandlesTap -> {
                                 { revealSpoilers = !revealSpoilers }
@@ -299,6 +297,17 @@ fun GlassmorphicMessageRow(
                     }
                 }
                 }
+                // "Editado" bajo la burbuja, del lado del autor (≡ iOS caption timestamp).
+                if (message.editedAt != null && !message.isDeleted) {
+                    Text(
+                        text = stringResource(R.string.chat_edited),
+                        fontSize = 11.sp,
+                        color = chatFloatingTextColor(com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme()).timestampColor),
+                        style = androidx.compose.ui.text.TextStyle(shadow = chatFloatingTextShadow()),
+                        modifier = swipeFollow.padding(top = 2.dp, start = 4.dp, end = 4.dp),
+                    )
+                }
+                }
             }
             if (!isCurrentUser) {
                 ChatTimestampRevealGutter(
@@ -323,8 +332,18 @@ fun GlassmorphicMessageRow(
 }
 
 @Composable
-fun DeletedMessageBubble(message: EnhancedMessage, isCurrentUser: Boolean, modifier: Modifier = Modifier) {
+fun DeletedMessageBubble(
+    message: EnhancedMessage,
+    isCurrentUser: Boolean,
+    modifier: Modifier = Modifier,
+    groupPosition: ChatMessageGroupPosition = ChatMessageGroupPosition.SINGLE,
+) {
     val colors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme())
+    // ≡ iOS: une esquinas en ráfagas como el texto (radio 20, unida 5).
+    val shape = chatBubbleShape(
+        side = if (isCurrentUser) ChatBubbleSide.TRAILING else ChatBubbleSide.LEADING,
+        position = groupPosition,
+    )
     // ≡ getDeletedIcon / getDeletedText
     val (icon, label) = when (message.type) {
         MessageType.AUDIO -> Icons.Default.MicOff to R.string.chat_deleted_audio
@@ -338,9 +357,9 @@ fun DeletedMessageBubble(message: EnhancedMessage, isCurrentUser: Boolean, modif
     }
     Row(
         modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(shape)
             .background(colors.messageBubbleBackground)
-            .border(0.5.dp, colors.messageBubbleStroke, RoundedCornerShape(20.dp))
+            .border(0.5.dp, colors.messageBubbleStroke, shape)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -371,7 +390,7 @@ fun GlassmorphicMessageBubble(
 ) {
     val colors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme())
     if (message.isDeleted) {
-        DeletedMessageBubble(message, isCurrentUser, modifier)
+        DeletedMessageBubble(message, isCurrentUser, modifier, groupPosition)
         return
     }
     val currentUserId = remember { FirebaseAuth.getInstance().currentUser?.uid.orEmpty() }
@@ -560,7 +579,13 @@ private fun MediaBubble(message: EnhancedMessage, video: Boolean, outgoing: Bool
             gutter = if (outgoing) 64.dp else 88.dp,
         ),
     )
-    val mediaModifier = Modifier.size(photoVideoSize).clip(chatBubbleShape(outgoing, position))
+    // La forma agrupada externa manda: se pasa al contenido para que no recorte con radio fijo.
+    val shape = chatBubbleShape(
+        side = if (outgoing) ChatBubbleSide.TRAILING else ChatBubbleSide.LEADING,
+        position = position,
+        cornerRadius = ChatMediaBubbleMetrics.cornerRadius,
+    )
+    val mediaModifier = Modifier.size(photoVideoSize).clip(shape)
     Box(mediaModifier) {
     if (video) {
         GlassmorphicVideoMessage(
@@ -574,6 +599,7 @@ private fun MediaBubble(message: EnhancedMessage, video: Boolean, outgoing: Bool
             downloadProgress = downloadProgress,
             progress = progress,
             modifier = Modifier.fillMaxSize(),
+            shape = shape,
         )
     } else {
         GlassmorphicImageMessage(
@@ -587,6 +613,7 @@ private fun MediaBubble(message: EnhancedMessage, video: Boolean, outgoing: Bool
             downloadProgress = downloadProgress,
             progress = progress,
             modifier = Modifier.fillMaxSize(),
+            shape = shape,
         )
     }
         com.moments.android.views.messaging.media.ChatMessageStaticOverlay(message, modifier = Modifier.matchParentSize())
@@ -631,24 +658,26 @@ private fun ChatUnsupportedBubble(colors: com.moments.android.views.feed.Adaptiv
     Text(stringResource(R.string.chat_message_unsupported), color = colors.messageTextColor.copy(.6f), modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(colors.messageBubbleBackground).padding(horizontal = 16.dp, vertical = 10.dp))
 }
 
-@Composable
-private fun ChatReactionBadges(reactions: Map<String, List<String>>, outgoing: Boolean, onReaction: (String) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier.clip(RoundedCornerShape(50)).background(if (androidx.compose.foundation.isSystemInDarkTheme()) Color(0xFF25262A) else Color.White).padding(horizontal = 5.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        reactions.keys.sorted().take(4).forEach { emoji -> Text(emoji, fontSize = 13.sp, modifier = Modifier.combinedClickable(onClick = { onReaction(emoji) })) }
-    }
+/** ≡ iOS `ChatMediaViews.bubbleShape` (radio de foto/vídeo; la esquina unida es la del texto). */
+object ChatMediaBubbleMetrics {
+    val cornerRadius = 16.dp
 }
 
-private fun chatBubbleShape(outgoing: Boolean, position: ChatMessageGroupPosition): RoundedCornerShape {
-    val joined = 6.dp
-    val radius = 18.dp
+/** Forma real de la burbuja según tipo y posición en la ráfaga (flash al saltar a una cita). */
+private fun chatMessageBubbleShape(
+    message: EnhancedMessage,
+    isCurrentUser: Boolean,
+    position: ChatMessageGroupPosition,
+): androidx.compose.ui.graphics.Shape? {
+    val side = if (isCurrentUser) ChatBubbleSide.TRAILING else ChatBubbleSide.LEADING
     return when {
-        outgoing && position == ChatMessageGroupPosition.FIRST -> RoundedCornerShape(radius, radius, joined, radius)
-        outgoing && position == ChatMessageGroupPosition.MIDDLE -> RoundedCornerShape(radius, joined, joined, radius)
-        outgoing && position == ChatMessageGroupPosition.LAST -> RoundedCornerShape(radius, joined, radius, radius)
-        !outgoing && position == ChatMessageGroupPosition.FIRST -> RoundedCornerShape(radius, radius, radius, joined)
-        !outgoing && position == ChatMessageGroupPosition.MIDDLE -> RoundedCornerShape(joined, radius, radius, joined)
-        !outgoing && position == ChatMessageGroupPosition.LAST -> RoundedCornerShape(joined, radius, radius, radius)
-        else -> RoundedCornerShape(radius)
+        // Borrados no pasan por MessageReactionOverlayBox: el chrome resalta el contenedor (sin reacciones).
+        message.isDeleted -> null
+        message.type == MessageType.TEXT && message.storyReplyData == null -> chatBubbleShape(side, position)
+        message.type == MessageType.IMAGE || message.type == MessageType.VIDEO ->
+            chatBubbleShape(side, position, cornerRadius = ChatMediaBubbleMetrics.cornerRadius)
+        message.type == MessageType.AUDIO -> chatBubbleShape(side, position, cornerRadius = 18.dp)
+        else -> RoundedCornerShape(ChatBubbleAnchorMetrics.cornerRadiusFor(message).dp)
     }
 }
 
@@ -691,6 +720,101 @@ private object LinkMetadataCache {
     }.also { entries[url] = it }
 }
 
+/** ≡ iOS `LinkPreviewCard.embedded*`: margen hasta el borde de la burbuja y ancho máximo con enlace. */
+object LinkPreviewMetrics {
+    val embeddedInset = 4.dp
+    val embeddedMaxWidth = 260.dp
+    val compactThumbSize = 52.dp
+    const val largeImageAspect = 1.91f
+    val largeImageMaxHeight = 140.dp
+}
+
+/** Tarjeta integrada: imagen grande si es horizontal, si no fila compacta con miniatura (≡ iOS). */
+@Composable
+private fun EmbeddedLinkPreviewCard(url: String, outgoing: Boolean, modifier: Modifier = Modifier) {
+    var metadata by remember(url) { mutableStateOf<LinkPreviewMetadata?>(null) }
+    var loading by remember(url) { mutableStateOf(true) }
+    var imageSize by remember(url) { mutableStateOf<androidx.compose.ui.geometry.Size?>(null) }
+    val uriHandler = LocalUriHandler.current
+    val dark = isSystemInDarkTheme()
+    val host = remember(url) { Uri.parse(url).host.orEmpty() }
+    val onOutgoing = chatBubbleTextColor(LocalChatOutgoingBubbleColor.current)
+    val panelBg = when {
+        outgoing -> onOutgoing.copy(.16f)
+        dark -> Color.White.copy(.08f)
+        else -> Color.White.copy(.55f)
+    }
+    val titleColor = if (outgoing) onOutgoing else if (dark) Color.White else Color.Black
+    val hostColor = if (outgoing) onOutgoing.copy(.75f) else titleColor.copy(.55f)
+    LaunchedEffect(url) { metadata = LinkMetadataCache.fetch(url); loading = false }
+    val imageUrl = metadata?.imageUrl
+    val size = imageSize
+    val showsLarge = !loading && imageUrl != null && size != null &&
+        size.width >= 300f && size.width / maxOf(size.height, 1f) >= 1.3f
+    val title = if (loading) host.ifBlank { url } else metadata?.title ?: host.ifBlank { url }
+    val shape = RoundedCornerShape(16.dp)
+    val text: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, color = titleColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(host, color = hostColor, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(panelBg)
+            .combinedClickable(onClick = {
+                com.moments.android.utilities.HapticManager.shared.lightImpact()
+                uriHandler.openUri(url)
+            }),
+    ) {
+        if (showsLarge) {
+            AsyncImage(
+                imageUrl,
+                null,
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(LinkPreviewMetrics.largeImageAspect)
+                    .heightIn(max = LinkPreviewMetrics.largeImageMaxHeight),
+                contentScale = ContentScale.Crop,
+            )
+            Box(Modifier.padding(start = 9.dp, end = 9.dp, top = 7.dp, bottom = 8.dp)) { text() }
+        } else {
+            Row(
+                Modifier.padding(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier
+                        .size(LinkPreviewMetrics.compactThumbSize)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(titleColor.copy(.1f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    when {
+                        loading -> CircularProgressIndicator(Modifier.size(16.dp), color = titleColor.copy(.7f), strokeWidth = 1.5.dp)
+                        imageUrl != null -> AsyncImage(
+                            // Tamaño original: decide imagen grande vs. compacta con las medidas reales, no con la miniatura de 52.
+                            coil.request.ImageRequest.Builder(LocalContext.current)
+                                .data(imageUrl)
+                                .size(coil.size.Size.ORIGINAL)
+                                .build(),
+                            null,
+                            Modifier.matchParentSize(),
+                            contentScale = ContentScale.Crop,
+                            onSuccess = { state -> imageSize = state.painter.intrinsicSize },
+                        )
+                        else -> Icon(Icons.Default.Link, null, tint = titleColor.copy(.7f), modifier = Modifier.size(18.dp))
+                    }
+                }
+                Box(Modifier.weight(1f)) { text() }
+            }
+        }
+    }
+}
+
 @Composable
 fun LinkPreviewCard(
     url: String,
@@ -698,26 +822,32 @@ fun LinkPreviewCard(
     modifier: Modifier = Modifier,
     embedded: Boolean = false,
 ) {
+    if (embedded) {
+        EmbeddedLinkPreviewCard(url, outgoing, modifier)
+        return
+    }
     var metadata by remember(url) { mutableStateOf<LinkPreviewMetadata?>(null) }
     var loading by remember(url) { mutableStateOf(true) }
     val uriHandler = LocalUriHandler.current
     val dark = isSystemInDarkTheme()
     val host = remember(url) { Uri.parse(url).host.orEmpty() }
     val panelBg = when {
-        embedded && outgoing -> Color.White.copy(.16f)
+        embedded && outgoing -> chatBubbleTextColor(LocalChatOutgoingBubbleColor.current).copy(.16f)
         embedded && dark -> Color.White.copy(.08f)
         embedded -> Color.White.copy(.55f)
         dark -> Color.White.copy(.08f)
         else -> Color.White.copy(.6f)
     }
+    // Saliente: color de texto de la burbuja elegida (no blanco fijo).
+    val onOutgoing = chatBubbleTextColor(LocalChatOutgoingBubbleColor.current)
     val titleColor = when {
-        embedded && outgoing -> Color.White
+        embedded && outgoing -> onOutgoing
         dark -> Color.White
         else -> Color.Black
     }
     val hostColor = when {
-        embedded && outgoing -> Color.White.copy(.85f)
-        else -> Color(0xFF007AFF)
+        embedded && outgoing -> onOutgoing.copy(.85f)
+        else -> chatSystemBlue(dark)
     }
     val corner = if (embedded) 13.dp else 10.dp
     val imageMax = if (embedded) 150.dp else 120.dp
@@ -751,7 +881,7 @@ fun LinkPreviewCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     CircularProgressIndicator(Modifier.size(14.dp), color = hostColor, strokeWidth = 1.5.dp)
-                    Text(host.ifBlank { url }, color = if (embedded && outgoing) Color.White.copy(.8f) else Color.Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(host.ifBlank { url }, color = if (embedded && outgoing) onOutgoing.copy(.8f) else Color.Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             metadata?.title != null || metadata != null -> {

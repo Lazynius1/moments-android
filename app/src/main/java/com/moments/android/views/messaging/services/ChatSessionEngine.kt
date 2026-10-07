@@ -149,7 +149,7 @@ object ChatSessionEngine {
             conversationById.clear()
             values
         }
-        cached.forEach { it.stopListening() }
+        cached.forEach { it.dispose() }
         MomentsApplication.instance?.let { ChatScrollStateStore.clearAll(it) }
         ownerUserId = FirebaseAuth.getInstance().currentUser?.uid
         syncInAppFallbackListeners()
@@ -163,7 +163,7 @@ object ChatSessionEngine {
             conversationById.remove(conversationId)
             sessions.remove(conversationId)
         }
-        session?.stopListening()
+        session?.dispose()
         syncInAppFallbackListeners()
     }
 
@@ -198,7 +198,7 @@ object ChatSessionEngine {
             .sortedBy { it.conversation.timestamp?.time ?: Long.MIN_VALUE }
         evictable.take((sessions.size - MAX_CACHED_SESSIONS + 1).coerceAtLeast(0)).forEach { session ->
             val id = session.conversation.id ?: return@forEach
-            session.stopListening()
+            session.dispose()
             sessions.remove(id)
             conversationById.remove(id)
         }
@@ -219,7 +219,7 @@ object ChatSessionEngine {
             conversationById.clear()
             values
         }
-        cached.forEach { it.stopListening() }
+        cached.forEach { it.dispose() }
         MomentsApplication.instance?.let { ChatScrollStateStore.clearAll(it) }
         ChatAccessCoordinator.invalidateAll()
         MessageIngestService.resetOnSignOut()

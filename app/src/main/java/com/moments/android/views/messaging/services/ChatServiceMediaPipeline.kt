@@ -79,7 +79,9 @@ object ChatServiceMediaPipeline {
         val resolvedMessageId = messageId ?: UUID.randomUUID().toString()
         val ext = fileExtensionFor(type)
         val contentType = contentTypeFor(type)
-        val mediaFileId = UUID.randomUUID().toString()
+        // Ruta determinista por messageId en 1:1: un reintento sobrescribe el mismo objeto en vez
+        // de dejar huérfanos. En grupos las reglas de Storage prohíben `update` → id aleatorio.
+        val mediaFileId = deterministicChatFileId(conversationId, "primary")
         val tempFiles = mutableListOf<File>()
 
         try {
@@ -220,7 +222,7 @@ object ChatServiceMediaPipeline {
             if (thumbnailData != null) {
                 // Thumbnail opcional; el media principal ya está subido.
                 runCatching {
-                    val thumbId = UUID.randomUUID().toString()
+                    val thumbId = deterministicChatFileId(conversationId, "thumbnail")
                     val thumbBase = StoragePathBuilder.build(
                         senderId,
                         StorageUploadDomain.ChatThumbnail(
@@ -346,6 +348,14 @@ object ChatServiceMediaPipeline {
         }
         return null
     }
+
+    /** `fixedName` en 1:1 (ruta estable por mensaje); UUID en grupos (sin `update` en reglas). */
+    fun deterministicChatFileId(conversationId: String, fixedName: String): String =
+        if (com.moments.android.services.messaging.GroupChatScope.isGroup(conversationId)) {
+            UUID.randomUUID().toString()
+        } else {
+            fixedName
+        }
 
     fun chatEncryptedStorageTarget(
         userId: String,

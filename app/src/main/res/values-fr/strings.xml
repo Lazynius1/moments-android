@@ -1915,11 +1915,8 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="question_responses_prompt_label">Sticker</string>
     <string name="question_responses_question_label">Question</string>
     <string name="chat_a11y_spoiler_hint">Contenu masqué. Toucher pour afficher.</string>
-    <string name="chat_vanish_notice_enabled_self">Vous avez activé les messages éphémères. Les nouveaux messages et réactions disparaîtront</string>
-    <string name="chat_vanish_notice_enabled_other">%1$s a activé les messages éphémères. Les nouveaux messages et réactions disparaîtront</string>
     <string name="chat_vanish_duration_once_seen">une fois que tout le monde les aura vus</string>
     <string name="chat_vanish_duration_7d">7 jours après que tout le monde les aura vus</string>
-    <string name="chat_vanish_notice_enabled_suffix">.</string>
     <string name="chat_vanish_notice_disabled_self">Vous avez désactivé les messages éphémères.</string>
     <string name="chat_vanish_notice_disabled_other">%1$s a désactivé les messages éphémères.</string>
     <string name="messaging_compose_title">Nouveau message</string>
@@ -2140,7 +2137,6 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="chat_shared_moment">A partagé un Moment</string>
     <string name="chat_shared_story">A partagé une story</string>
     <string name="chat_toolbar_profile">Ouvrir le profil</string>
-    <string name="chat_vanish_notice_enabled">%1$s pendant %2$s</string>
     <string name="chat_view_once_photo">Photo</string>
     <string name="chat_voice_duration">%1$d:%2$02d</string>
     <string name="chat_voice_speed">%1$.1fx</string>
@@ -2469,4 +2465,17 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="maps_chrome_recenter">Ma position</string>
     <string name="settings_group_profile_content">Profil et contenu</string>
     <string name="settings_group_messaging_privacy">Messages et interactions</string>
+    <string name="chat_vanish_notice_enabled_self_format">Vous avez activé les messages éphémères. Les nouveaux messages et réactions disparaîtront %1$s.</string>
+    <string name="chat_vanish_notice_enabled_other_format">%1$s a activé les messages éphémères. Les nouveaux messages et réactions disparaîtront %2$s.</string>
+    <string name="notification_message_view_once_photo">Vous a envoyé une photo</string>
+    <string name="notification_message_view_once_video">Vous a envoyé une vidéo</string>
+    <string name="chat_preview_view_once_tap_photo">Voir la photo</string>
+    <string name="chat_preview_view_once_tap_video">Voir la vidéo</string>
+    <string name="chat_view_once_inbox_action">Lire</string>
+    <string name="chat_preview_view_once_sent_photo">A envoyé une photo</string>
+    <string name="chat_preview_view_once_sent_video">A envoyé une vidéo</string>
+    <string name="chat_message_undecryptable">Impossible d\'afficher ce message</string>
+    <string name="chat_error_conversation_key_missing">La clé de chiffrement de ce chat n\'est pas encore disponible sur cet appareil. Réessayez plus tard ou restaurez vos chats.</string>
+    <string name="chat_outbox_channel_name">Envoi des messages</string>
+    <string name="chat_outbox_sending">Envoi des messages…</string>
 </resources>

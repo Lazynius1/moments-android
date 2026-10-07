@@ -165,6 +165,9 @@ object LocalPersistenceService {
         runCatching { saveActionOrThrowAsync(action) }.onFailure { return }
         val isUpload = action.type == CachedAction.ActionType.MOMENT_UPLOAD.raw ||
             action.type == CachedAction.ActionType.STORY_UPLOAD.raw
+        // Drenado vía WorkManager (one-time expedited con red): sobrevive a background y a la
+        // muerte del proceso. Las subidas de momentos/historias tienen su propio servicio.
+        if (!isUpload) appContext?.let { com.moments.android.services.network.OfflineSyncWorker.enqueueNow(it) }
         if (NetworkMonitor.isConnected && !isUpload) {
             ioScope.launch { OfflineSyncService.syncPendingActions() }
         }

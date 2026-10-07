@@ -328,6 +328,19 @@ interface MomentsDao {
     @Query("SELECT * FROM cached_messages WHERE conversationId = :conversationId ORDER BY timestamp ASC, id ASC")
     suspend fun messagesIn(conversationId: String): List<MessageEntity>
 
+    /** Filas concretas (upsert por fila en vez de reescribir la conversación entera). */
+    @Query("SELECT * FROM cached_messages WHERE conversationId = :conversationId AND id IN (:ids)")
+    suspend fun messagesByIds(conversationId: String, ids: List<String>): List<MessageEntity>
+
+    @Query("DELETE FROM cached_messages WHERE conversationId = :conversationId AND id IN (:ids)")
+    suspend fun deleteMessagesByIds(conversationId: String, ids: List<String>)
+
+    @Query("SELECT COUNT(*) FROM cached_messages WHERE conversationId = :conversationId")
+    suspend fun messageCountIn(conversationId: String): Int
+
+    @Query("SELECT * FROM cached_messages WHERE conversationId = :conversationId AND timestamp >= :fromTimestamp")
+    suspend fun messagesFrom(conversationId: String, fromTimestamp: Long): List<MessageEntity>
+
     @Query("""
         SELECT * FROM cached_messages
         WHERE conversationId = :conversationId

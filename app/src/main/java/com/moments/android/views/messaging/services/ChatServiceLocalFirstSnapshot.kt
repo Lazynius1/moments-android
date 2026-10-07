@@ -94,6 +94,8 @@ suspend fun ChatService.buildMessagesFromSnapshotUsingLocalCache(
 private fun snapshotNeedsFullHydrate(data: Map<String, Any?>, cached: EnhancedMessage): Boolean {
     val typeString = data["type"] as? String ?: MessageType.TEXT.raw
     if (typeString != cached.type.raw) return true
+    // No descifrado antes: reintentar con la clave que haya ahora.
+    if (cached.isUndecryptable) return true
 
     val remoteEditedAt = (data["editedAt"] as? Timestamp)?.toDate()
     if (remoteEditedAt != cached.editedAt) return true

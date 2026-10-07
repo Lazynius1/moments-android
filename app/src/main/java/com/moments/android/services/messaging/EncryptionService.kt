@@ -44,6 +44,15 @@ object EncryptionService {
         object KeyNotFound : EncryptionError("key not found")
         object InvalidPIN : EncryptionError("invalid PIN")
         object PeerKeyUnavailable : EncryptionError("peer key unavailable")
+        /**
+         * Ya existe una clave del par en `wrappedKeys` pero no hay entrada para mí: no se genera
+         * otra (divergiría la conversación). El envío queda bloqueado hasta que el par re-envuelva.
+         */
+        object ConversationKeyMissingForDevice : EncryptionError("conversation key not wrapped for this device") {
+            override val message: String
+                get() = appContext?.getString(com.moments.android.R.string.chat_error_conversation_key_missing)
+                    ?: "conversation key not wrapped for this device"
+        }
         data class RecoveryLocked(val remainingSeconds: Double) : EncryptionError("recovery locked")
         object MigrationExpired : EncryptionError("migration expired") {
             override val message: String
@@ -95,6 +104,20 @@ object EncryptionService {
     private val userKeyCache = ConcurrentHashMap<String, ByteArray>()
     private val conversationKeyCache = ConcurrentHashMap<String, ByteArray>()
     private val conversationKeyMutex = Mutex()
+    /** Último refresco de clave desde servidor tras un fallo de descifrado (throttle por conversación). */
+    private val serverKeyRefreshAt = ConcurrentHashMap<String, Long>()
+    private const val SERVER_KEY_REFRESH_INTERVAL_MS = 30_000L
+    /** 12 bytes nonce + 16 bytes tag AES-GCM: mínimo de un ciphertext válido. */
+    private const val MIN_SEALED_BYTES = 28
+    private val ciphertextPattern = Regex("^[A-Za-z0-9+/]+={0,2}$")
+
+    private val _conversationKeyAvailable =
+        kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 32)
+    /**
+     * Emite el id de conversación cuando se carga (o cambia) su clave; `"*"` cuando se restaura la
+     * identidad. Lo usa el chat para reintentar mensajes que no se pudieron descifrar.
+     */
+    val conversationKeyAvailable: kotlinx.coroutines.flow.SharedFlow<String> = _conversationKeyAvailable
     private val db get() = FirebaseFirestore.getInstance()
 
     var isEncryptionEnabled: Boolean = true
@@ -593,6 +616,8 @@ object EncryptionService {
         val privateKey = Base64.decode(payload.privateKey, Base64.DEFAULT)
         if (privateKey.size != CURVE25519_PRIVATE_KEY_BYTES) throw EncryptionError.MigrationInvalid
         EncryptionKeyStore.store(CHAT_IDENTITY_KEY_PREFIX + userId, privateKey)
+        // Identidad restaurada: los chats reintentan lo que no pudieron descifrar.
+        _conversationKeyAvailable.tryEmit("*")
         val publicKeyBase64 = Base64.encodeToString(
             Curve25519Helper.publicKeyFromPrivate(privateKey),
             Base64.NO_WRAP,
@@ -757,12 +782,56 @@ object EncryptionService {
         return encryptText(text, key)
     }
 
+    /**
+     * Descifra el texto de un mensaje. Devuelve `null` si no se puede descifrar: nunca se devuelve
+     * el ciphertext como contenido. Excepción: texto legacy en claro (no parece AES-GCM base64).
+     */
     suspend fun decryptChatMessage(encryptedText: String, conversationId: String): String? {
         if (!isEncryptionEnabled) return encryptedText
-        return runCatching {
-            decryptChatMessageStrict(encryptedText, conversationId)
-        }.getOrDefault(encryptedText)
+        runCatching { decryptChatMessageStrict(encryptedText, conversationId) }
+            .onSuccess { return it }
+        if (!looksLikeSealedText(encryptedText)) return encryptedText
+        // La clave local puede estar obsoleta (p. ej. tras una carrera de claves): probar la del servidor.
+        refreshConversationKeyFromServer(conversationId)?.let { key ->
+            runCatching { decryptText(encryptedText, key) }.onSuccess { return it }
+        }
+        return null
     }
+
+    private fun looksLikeSealedText(text: String): Boolean {
+        if (!ciphertextPattern.matches(text)) return false
+        val decoded = runCatching { Base64.decode(text, Base64.NO_WRAP) }.getOrNull() ?: return false
+        return decoded.size >= MIN_SEALED_BYTES
+    }
+
+    /**
+     * Relee la clave de la conversación desde servidor (máx. 1 vez cada 30s por conversación).
+     * Si difiere de la cacheada la sustituye y notifica; devuelve la clave solo si es nueva.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun refreshConversationKeyFromServer(conversationId: String): ByteArray? =
+        withContext(Dispatchers.IO) {
+            if (conversationId.isBlank()) return@withContext null
+            val now = System.currentTimeMillis()
+            val last = serverKeyRefreshAt[conversationId]
+            if (last != null && now - last < SERVER_KEY_REFRESH_INTERVAL_MS) return@withContext null
+            serverKeyRefreshAt[conversationId] = now
+            val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return@withContext null
+            val collection = if (GroupChatScope.isGroup(conversationId)) "groupConversations" else "conversations"
+            val data = runCatching {
+                db.collection(collection).document(conversationId)
+                    .get(com.google.firebase.firestore.Source.SERVER).await().data
+            }.getOrNull() ?: return@withContext null
+            val envelope = (data["wrappedKeys"] as? Map<String, Any?>)?.get(uid) as? Map<String, Any?>
+                ?: return@withContext null
+            val wrapped = WrappedConversationKey.from(envelope) ?: return@withContext null
+            val key = runCatching { unwrapConversationKey(wrapped, uid) }.getOrNull() ?: return@withContext null
+            if (conversationKeyCache[conversationId]?.contentEquals(key) == true) return@withContext null
+            conversationKeyCache[conversationId] = key
+            EncryptionKeyStore.store(CONVERSATION_KEYS_PREFIX + conversationId, key)
+            _conversationKeyAvailable.tryEmit(conversationId)
+            key
+        }
 
     /** Solicitudes V2: nunca representa el ciphertext como contenido del usuario. */
     suspend fun decryptChatMessageStrict(encryptedText: String, conversationId: String): String {
@@ -798,13 +867,16 @@ object EncryptionService {
         if (conversationId.isEmpty()) throw EncryptionError.InvalidInput
         conversationKeyCache[conversationId]?.let { return it }
 
-        return conversationKeyMutex.withLock {
+        val loaded = conversationKeyMutex.withLock {
             conversationKeyCache[conversationId]?.let { return it }
             val key = loadConversationKeyFromStorage(conversationId)
             conversationKeyCache[conversationId] = key
             EncryptionKeyStore.store(CONVERSATION_KEYS_PREFIX + conversationId, key)
             key
         }
+        // Clave recién disponible en este proceso → el chat reintenta los no descifrables.
+        _conversationKeyAvailable.tryEmit(conversationId)
+        return loaded
     }
 
     private suspend fun loadConversationKeyFromStorage(conversationId: String): ByteArray =
@@ -966,10 +1038,24 @@ object EncryptionService {
         return wrapped
     }
 
+    /** Resultado de la transacción "crear clave solo si no existe". */
+    private sealed class KeyPublishOutcome {
+        object Published : KeyPublishOutcome()
+        data class ExistingForMe(val envelope: Map<String, Any?>) : KeyPublishOutcome()
+        data class ExistingLegacy(val keyBase64: String) : KeyPublishOutcome()
+        object ExistingForPeerOnly : KeyPublishOutcome()
+        object ConversationMissing : KeyPublishOutcome()
+    }
+
     /**
      * Port de `createNewSharedConversationKey`.
      * Sin fallback en claro: si no se puede wrappear para todos → PeerKeyUnavailable.
+     *
+     * Se publica con transacción (lectura de servidor) "solo si no existe": si el par ya publicó
+     * una clave se usa la suya; si existe pero sin entrada para mí no se genera otra (no se pisa la
+     * del par) → [EncryptionError.ConversationKeyMissingForDevice].
      */
+    @Suppress("UNCHECKED_CAST")
     private suspend fun createAndPublishConversationKey(
         conversationId: String,
         participants: List<String>,
@@ -981,16 +1067,48 @@ object EncryptionService {
             throw EncryptionError.PeerKeyUnavailable
         }
 
-        db.collection("conversations").document(conversationId).set(
-            mapOf(
-                "wrappedKeys" to wrappedMaps,
-                "conversationKeyVersion" to 1,
-                "encryptionVersion" to "3.0",
-            ),
-            com.google.firebase.firestore.SetOptions.merge(),
-        ).await()
+        val ref = db.collection("conversations").document(conversationId)
+        val outcome = db.runTransaction { tx ->
+            val snapshot = tx.get(ref)
+            if (!snapshot.exists()) return@runTransaction KeyPublishOutcome.ConversationMissing
+            val existing = (snapshot.get("wrappedKeys") as? Map<String, Any?>).orEmpty()
+            val mine = existing[currentUserId] as? Map<String, Any?>
+            when {
+                mine != null -> KeyPublishOutcome.ExistingForMe(mine)
+                existing.isNotEmpty() -> KeyPublishOutcome.ExistingForPeerOnly
+                else -> {
+                    val legacy = (snapshot.get("sharedEncryptionKey") as? String)
+                        ?: (snapshot.get("encryptionKey") as? String)
+                    if (!legacy.isNullOrBlank()) {
+                        KeyPublishOutcome.ExistingLegacy(legacy)
+                    } else {
+                        tx.set(
+                            ref,
+                            mapOf(
+                                "wrappedKeys" to wrappedMaps,
+                                "conversationKeyVersion" to 1,
+                                "encryptionVersion" to "3.0",
+                            ),
+                            com.google.firebase.firestore.SetOptions.merge(),
+                        )
+                        KeyPublishOutcome.Published
+                    }
+                }
+            }
+        }.await()
 
-        return conversationKey
+        return when (outcome) {
+            KeyPublishOutcome.Published -> conversationKey
+            is KeyPublishOutcome.ExistingForMe -> {
+                val wrapped = WrappedConversationKey.from(outcome.envelope)
+                    ?: throw EncryptionError.DecryptionFailed
+                unwrapConversationKey(wrapped, currentUserId)
+            }
+            is KeyPublishOutcome.ExistingLegacy -> Base64.decode(outcome.keyBase64, Base64.DEFAULT)
+                .takeIf { it.isNotEmpty() } ?: throw EncryptionError.KeyNotFound
+            KeyPublishOutcome.ExistingForPeerOnly -> throw EncryptionError.ConversationKeyMissingForDevice
+            KeyPublishOutcome.ConversationMissing -> throw EncryptionError.KeyNotFound
+        }
     }
 
     /** Desenvuelve clave de conversación (paridad unwrapConversationKey iOS). */
@@ -1392,6 +1510,8 @@ object EncryptionService {
         // Constructor validation is the Android equivalent of CryptoKit's rawRepresentation initializer.
         val publicKey = Base64.encodeToString(Curve25519Helper.publicKeyFromPrivate(privateKey), Base64.NO_WRAP)
         EncryptionKeyStore.store(CHAT_IDENTITY_KEY_PREFIX + userId, privateKey)
+        // Identidad restaurada: los chats reintentan lo que no pudieron descifrar.
+        _conversationKeyAvailable.tryEmit("*")
         val identity = ChatIdentityRecord(
             keyId = resolveStableChatKeyId(userId, publicKey, bundle.keyId),
             publicKeyBase64 = publicKey,

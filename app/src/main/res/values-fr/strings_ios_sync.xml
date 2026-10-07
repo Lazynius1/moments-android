@@ -326,12 +326,6 @@
     <string name="chat_vanish_inactive_accessibility">Glissez vers le haut pour activer les messages éphémères</string>
     <string name="chat_vanish_notice_change">Modifier</string>
     <string name="chat_vanish_notice_disabled">Vous avez désactivé les messages éphémères.</string>
-    <string name="chat_vanish_notice_duration_24h">24 heures après que tout le monde les aura vus</string>
-    <string name="chat_vanish_notice_duration_7d">7 jours après que tout le monde les aura vus</string>
-    <string name="chat_vanish_notice_duration_once_seen">une fois que tout le monde les aura vus</string>
-    <string name="chat_vanish_notice_enabled_prefix">Vous avez activé les messages éphémères. Les nouveaux messages et réactions disparaîtront</string>
-    <string name="chat_vanish_notice_enabled_prefix_other">%1$s a activé les messages éphémères. Les nouveaux messages et réactions disparaîtront</string>
-    <string name="chat_vanish_notice_enabled_prefix_self">Vous avez activé les messages éphémères. Les nouveaux messages et réactions disparaîtront</string>
     <string name="chat_vanish_notice_preview_disabled">Les messages éphémères sont désactivés</string>
     <string name="chat_vanish_notice_preview_enabled">Les messages éphémères sont activés</string>
     <string name="chat_vanish_screen_recording">Vous avez enregistré l\'écran.</string>

@@ -1739,10 +1739,6 @@
     <string name="chat_vanish_swipe_hint_off">गायब होने वाले मैसेज बंद करने के लिए ऊपर खींचें</string>
     <string name="chat_vanish_active_accessibility">गायब होने वाले मैसेज चालू हैं</string>
     <string name="chat_vanish_inactive_accessibility">गायब होने वाले मैसेज बंद हैं</string>
-    <string name="chat_vanish_notice_enabled_self">आपने गायब होने वाले मैसेज चालू किए हैं। नए मैसेज और रिएक्शन गायब हो जाएँगे</string>
-    <string name="chat_vanish_notice_enabled_other">%1$s ने गायब होने वाले मैसेज चालू किए हैं। नए मैसेज और रिएक्शन गायब हो जाएँगे</string>
-    <string name="chat_vanish_notice_enabled">%2$s के लिए %1$s</string>
-    <string name="chat_vanish_notice_enabled_suffix">.</string>
     <string name="chat_vanish_notice_change">बदलें</string>
     <string name="chat_vanish_notice_disabled_self">आपने गायब होने वाले मैसेज बंद कर दिए।</string>
     <string name="chat_vanish_notice_disabled_other">%1$s ने गायब होने वाले मैसेज बंद कर दिए।</string>
@@ -3019,4 +3015,17 @@
     <string name="maps_chrome_recenter">मेरा स्थान</string>
     <string name="settings_group_profile_content">प्रोफ़ाइल और सामग्री</string>
     <string name="settings_group_messaging_privacy">संदेश और इंटरैक्शन</string>
+    <string name="chat_vanish_notice_enabled_self_format">आपने गायब होने वाले मैसेज चालू कर दिए। नए मैसेज और रिएक्शन %1$s गायब हो जाएंगे।</string>
+    <string name="chat_vanish_notice_enabled_other_format">%1$s ने गायब होने वाले मैसेज चालू कर दिए। नए मैसेज और रिएक्शन %2$s गायब हो जाएंगे।</string>
+    <string name="notification_message_view_once_photo">आपको एक फ़ोटो भेजी</string>
+    <string name="notification_message_view_once_video">आपको एक वीडियो भेजा</string>
+    <string name="chat_preview_view_once_tap_photo">फ़ोटो देखें</string>
+    <string name="chat_preview_view_once_tap_video">वीडियो देखें</string>
+    <string name="chat_view_once_inbox_action">चलाएं</string>
+    <string name="chat_preview_view_once_sent_photo">एक फ़ोटो भेजी</string>
+    <string name="chat_preview_view_once_sent_video">एक वीडियो भेजा</string>
+    <string name="chat_message_undecryptable">यह मैसेज नहीं दिखाया जा सकता</string>
+    <string name="chat_error_conversation_key_missing">इस चैट की एन्क्रिप्शन कुंजी अभी इस डिवाइस पर उपलब्ध नहीं है। बाद में फिर से कोशिश करें या अपनी चैट रीस्टोर करें।</string>
+    <string name="chat_outbox_channel_name">मैसेज भेजे जा रहे हैं</string>
+    <string name="chat_outbox_sending">मैसेज भेजे जा रहे हैं…</string>
 </resources>

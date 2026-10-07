@@ -1107,7 +1107,7 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="chat_buzz_cooldown">Attendi un po\' prima di inviare un altro trillo</string>
     <string name="conversation_settings_starred">Messaggi contrassegnati</string>
     <string name="conversation_settings_vanish_desc">Scegli quanto tempo rimangono visibili i tuoi messaggi e le tue reazioni nella chat. Puoi fare in modo che scompaiano subito dopo essere stati letti e aver chiuso la conversazione, oppure conservarli fino a 7 giorni. Per la tua privacy, verrà inviata una notifica nella chat se qualcuno fa uno screenshot o registra lo schermo.</string>
-    <string name="conversation_settings_vanish">Messaggi temporanei</string>
+    <string name="conversation_settings_vanish">Messaggi effimeri</string>
     <string name="conversation_settings_preferences">Preferenze chat</string>
     <string name="conversation_settings_privacy_and_security">Privacy e sicurezza</string>
     <string name="conversation_settings_hide">Nascondi</string>
@@ -1226,11 +1226,11 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="chat_read_and_more">e altre %1$d</string>
     <string name="chat_seen">Visto</string>
     <string name="chat_recovery_six_digits">6 cifre</string>
-    <string name="chat_vanish_swipe_release">Rilascia per attivare i messaggi che scompaiono</string>
-    <string name="chat_vanish_swipe_release_off">Rilascia per disattivare i messaggi che scompaiono</string>
+    <string name="chat_vanish_swipe_release">Rilascia per attivare i messaggi effimeri</string>
+    <string name="chat_vanish_swipe_release_off">Rilascia per disattivare i messaggi effimeri</string>
     <string name="chat_vanish_notice_turn_on">Attiva</string>
     <string name="chat_vanish_duration_24h">24 ore dopo che tutti li avranno visti</string>
-    <string name="chat_vanish_timer_sheet_title">Messaggi temporanei</string>
+    <string name="chat_vanish_timer_sheet_title">Messaggi effimeri</string>
     <string name="chat_vanish_timer_24h">24 ore</string>
     <string name="chat_vanish_timer_off">Disattivato</string>
     <string name="messaging_menu_mark_unread">Segna come non letto</string>
@@ -1900,13 +1900,10 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="question_responses_prompt_label">Sticker</string>
     <string name="question_responses_question_label">Domanda</string>
     <string name="chat_a11y_spoiler_hint">Contenuto nascosto. Tocca per mostrare.</string>
-    <string name="chat_vanish_notice_enabled_self">Hai attivato i messaggi che scompaiono. I nuovi messaggi e le reazioni scompariranno</string>
-    <string name="chat_vanish_notice_enabled_other">%1$s ha attivato i messaggi che scompaiono. I nuovi messaggi e le reazioni scompariranno</string>
     <string name="chat_vanish_duration_once_seen">quando tutti li avranno visti</string>
     <string name="chat_vanish_duration_7d">7 giorni dopo che tutti li avranno visti</string>
-    <string name="chat_vanish_notice_enabled_suffix">.</string>
-    <string name="chat_vanish_notice_disabled_self">Hai disattivato i messaggi che scompaiono.</string>
-    <string name="chat_vanish_notice_disabled_other">%1$s ha disattivato i messaggi che scompaiono.</string>
+    <string name="chat_vanish_notice_disabled_self">Hai disattivato i messaggi effimeri.</string>
+    <string name="chat_vanish_notice_disabled_other">%1$s ha disattivato i messaggi effimeri.</string>
     <string name="messaging_compose_title">Nuovo messaggio</string>
     <string name="chat_loading">Caricamento...</string>
     <string name="chat_voice_record_locked">Registrazione bloccata</string>
@@ -2118,7 +2115,6 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="chat_shared_moment">Ha condiviso un moment</string>
     <string name="chat_shared_story">Ha condiviso una storia</string>
     <string name="chat_toolbar_profile">Apri profilo</string>
-    <string name="chat_vanish_notice_enabled">%1$s per %2$s</string>
     <string name="chat_view_once_media">Media</string>
     <string name="chat_view_once_video">Video</string>
     <string name="chat_voice_duration">%1$d:%2$02d</string>
@@ -2411,4 +2407,17 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="maps_chrome_recenter">La mia posizione</string>
     <string name="settings_group_profile_content">Profilo e contenuti</string>
     <string name="settings_group_messaging_privacy">Messaggi e interazioni</string>
+    <string name="chat_vanish_notice_enabled_self_format">Hai attivato i messaggi effimeri. I nuovi messaggi e le reazioni scompariranno %1$s.</string>
+    <string name="chat_vanish_notice_enabled_other_format">%1$s ha attivato i messaggi effimeri. I nuovi messaggi e le reazioni scompariranno %2$s.</string>
+    <string name="notification_message_view_once_photo">Ti ha inviato una foto</string>
+    <string name="notification_message_view_once_video">Ti ha inviato un video</string>
+    <string name="chat_preview_view_once_tap_photo">Vedi foto</string>
+    <string name="chat_preview_view_once_tap_video">Vedi video</string>
+    <string name="chat_view_once_inbox_action">Riproduci</string>
+    <string name="chat_preview_view_once_sent_photo">Ha inviato una foto</string>
+    <string name="chat_preview_view_once_sent_video">Ha inviato un video</string>
+    <string name="chat_message_undecryptable">Impossibile visualizzare questo messaggio</string>
+    <string name="chat_error_conversation_key_missing">La chiave di crittografia di questa chat non è ancora disponibile su questo dispositivo. Riprova più tardi o ripristina le tue chat.</string>
+    <string name="chat_outbox_channel_name">Invio dei messaggi</string>
+    <string name="chat_outbox_sending">Invio dei messaggi…</string>
 </resources>

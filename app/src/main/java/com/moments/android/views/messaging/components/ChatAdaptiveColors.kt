@@ -1,12 +1,18 @@
 package com.moments.android.views.messaging.components
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import com.moments.android.views.feed.AdaptiveColors
 
 /** Port de `Views/Messaging/Components/ChatAdaptiveColors.swift`. */
 val LocalChatOutgoingBubbleColor = staticCompositionLocalOf { Color(0xFF3F6F8F) }
+/** Color de textos sueltos sobre fondo personalizado; `null` con el fondo por defecto (≡ iOS `chatFloatingTextColor`). */
+val LocalChatFloatingTextColor = staticCompositionLocalOf<Color?> { null }
 val LocalChatMessageRowFrame = staticCompositionLocalOf { Rect.Zero }
 val LocalChatMessageBubbleFrame = staticCompositionLocalOf { Rect.Zero }
 val LocalChatMessageBubbleCornerRadius = staticCompositionLocalOf { 16f }
@@ -29,8 +35,16 @@ val AdaptiveColors.recordingIndicator: Color
 val AdaptiveColors.messageBubbleBackground: Color
     get() = if (isDark) Color(0xFF2C3235) else Color(0xFFE9E9E6)
 
+/** ≡ iOS: borde casi imperceptible; en claro el relleno ya contrasta con el fondo. */
 val AdaptiveColors.messageBubbleStroke: Color
-    get() = if (isDark) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.15f)
+    get() = if (isDark) Color.White.copy(alpha = 0.06f) else Color.Transparent
+
+/** ≡ iOS `mediaBubbleStroke`: borde fino de miniaturas de foto/vídeo (sustituye a la sombra). */
+val AdaptiveColors.mediaBubbleStroke: Color
+    get() = if (isDark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.08f)
+
+/** ≡ iOS `Color.blue` / systemBlue (no Material `Color.Blue`). */
+fun chatSystemBlue(isDark: Boolean): Color = if (isDark) Color(0xFF0A84FF) else Color(0xFF007AFF)
 
 val AdaptiveColors.messageTextColor: Color
     get() = if (isDark) Color.White else Color.Black
@@ -71,3 +85,16 @@ val AdaptiveColors.messagingBackground: List<Color>
     } else {
         listOf(userAccentColor.copy(alpha = 0.1f), Color(0xFFFAF9F6), Color(0xFFFAF9F6))
     }
+
+/** Legibilidad sobre fondos personalizados (≡ iOS `chatFloatingText`): más opaco; con fondo por defecto, `fallback`. */
+@Composable
+@ReadOnlyComposable
+fun chatFloatingTextColor(fallback: Color): Color =
+    LocalChatFloatingTextColor.current?.copy(alpha = 0.9f) ?: fallback
+
+/** Sombra suave para textos sueltos sobre fondos personalizados; `null` con el fondo por defecto. */
+@Composable
+@ReadOnlyComposable
+fun chatFloatingTextShadow(): Shadow? = LocalChatFloatingTextColor.current?.let {
+    Shadow(color = (if (it == Color.White) Color.Black else Color.White).copy(alpha = 0.45f), offset = Offset(0f, 1f), blurRadius = 4f)
+}

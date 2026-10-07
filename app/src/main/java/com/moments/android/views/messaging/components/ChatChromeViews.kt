@@ -391,8 +391,10 @@ fun PendingRequestMessageRow(
     modifier: Modifier = Modifier,
 ) {
     Row(modifier.fillMaxWidth(), horizontalArrangement = if (message.isOutgoing) Arrangement.End else Arrangement.Start) {
-        val background = if (message.isOutgoing) Color.Blue.copy(alpha = .92f) else adaptiveColors.messageBubbleBackground
-        val contentColor = if (message.isOutgoing) Color.White else adaptiveColors.primary
+        val outgoingFill = LocalChatOutgoingBubbleColor.current
+        // ≡ iOS: saliente con el color de burbuja elegido (no Material Color.Blue)
+        val background = if (message.isOutgoing) outgoingFill else adaptiveColors.messageBubbleBackground
+        val contentColor = if (message.isOutgoing) chatBubbleTextColor(outgoingFill) else adaptiveColors.primary
         when (message.messageType) {
             MessageType.TEXT -> ChatTextBubbleView(
                 text = message.text,
@@ -452,16 +454,19 @@ private fun Modifier.glassmorphicChrome(circle: Boolean): Modifier {
 
 @Composable
 fun GlassmorphicDateHeader(date: Date, modifier: Modifier = Modifier) {
-    val colors = com.moments.android.views.feed.AdaptiveColors(isSystemInDarkTheme())
-    // Opaque date surface remains readable over personal wallpapers.
+    val isDark = isSystemInDarkTheme()
+    val colors = com.moments.android.views.feed.AdaptiveColors(isDark)
+    // ≡ iOS `.ultraThinMaterial` en cápsula: translúcido, legible sobre cualquier fondo de pantalla.
+    val material = if (isDark) Color(0xFF1C2124).copy(alpha = 0.72f) else Color.White.copy(alpha = 0.72f)
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         Text(
             MomentsFormat.smartDate(date, MomentsFormat.DateContext.CHAT_SEPARATOR),
             color = colors.dateHeaderColor,
             fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
-                .background(colors.messageBubbleBackground)
+                .background(material)
                 .padding(horizontal = 16.dp, vertical = 6.dp),
         )
     }

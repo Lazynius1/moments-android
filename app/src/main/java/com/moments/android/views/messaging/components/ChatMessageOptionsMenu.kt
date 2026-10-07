@@ -102,6 +102,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
@@ -255,12 +256,19 @@ fun ChatMessageRowChrome(
     content()
 }
 
+/** Resaltado del salto a mensaje citado; lo pinta `MessageReactionOverlayBox` sobre la burbuja. */
+data class ChatBubbleFlashHighlight(val shape: Shape, val tint: Color)
+
+val LocalChatBubbleFlashHighlight = compositionLocalOf<ChatBubbleFlashHighlight?> { null }
+
 @Composable
 fun ChatMessageBubbleChrome(
     isMenuSelected: Boolean,
     isOutgoing: Boolean,
     cornerRadius: Float = 16f,
     isFlashing: Boolean = false,
+    /** Forma real de la burbuja: el flash se pinta dentro de ella y no sobre el hueco de reacciones. */
+    flashShape: Shape? = null,
     onTap: (() -> Unit)? = null,
     onLongPress: ((ChatMessageLiftSnapshot) -> Unit)? = null,
     childHandlesTap: Boolean = false,
@@ -327,10 +335,15 @@ fun ChatMessageBubbleChrome(
                 )
             },
     ) {
-        CompositionLocalProvider(LocalChatMenuBadgesHidden provides isMenuSelected) {
+        val highlight = if (isFlashing && flashShape != null) ChatBubbleFlashHighlight(flashShape, highlightTint) else null
+        CompositionLocalProvider(
+            LocalChatMenuBadgesHidden provides isMenuSelected,
+            LocalChatBubbleFlashHighlight provides highlight,
+        ) {
             content()
         }
-        if (isFlashing) {
+        // Sin forma (ráfagas): resaltado del contenedor completo, como antes.
+        if (isFlashing && flashShape == null) {
             Box(
                 Modifier
                     .matchParentSize()
@@ -1058,10 +1071,12 @@ private fun MessageInfoRow(
 
 private const val MaxVisibleGroupReaders = 7
 
+/** Solo quien tiene acuses activos: `readAtBy` (`readBy` incluye también a quien los desactivó). */
 private fun groupReaderIds(message: EnhancedMessage): List<String> {
     val distantPast = Date(0)
-    return message.readBy
+    return message.readAtBy
         .orEmpty()
+        .keys
         .filter { it != message.senderId }
         .sortedWith(
             compareByDescending<String> { message.readAtBy?.get(it) ?: distantPast }

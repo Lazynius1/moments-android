@@ -1258,8 +1258,8 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="chat_read_and_more">i %1$d més</string>
     <string name="chat_seen">Vist</string>
     <string name="chat_recovery_six_digits">6 dígits</string>
-    <string name="chat_vanish_swipe_release">Deixa anar per activar missatges que desapareixen</string>
-    <string name="chat_vanish_swipe_release_off">Deixa anar per desactivar missatges que desapareixen</string>
+    <string name="chat_vanish_swipe_release">Deixa anar per activar missatges temporals</string>
+    <string name="chat_vanish_swipe_release_off">Deixa anar per desactivar missatges temporals</string>
     <string name="chat_vanish_notice_turn_on">Activar</string>
     <string name="chat_vanish_duration_24h">24 hores després que tothom els hagi vist</string>
     <string name="chat_vanish_timer_sheet_title">Missatges temporals</string>
@@ -1924,13 +1924,10 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="question_responses_prompt_label">Sticker</string>
     <string name="question_responses_question_label">Pregunta</string>
     <string name="chat_a11y_spoiler_hint">Contingut ocult. Toca per mostrar.</string>
-    <string name="chat_vanish_notice_enabled_self">Has activat els missatges que desapareixen. Els missatges i reaccions nous desapareixeran</string>
-    <string name="chat_vanish_notice_enabled_other">%1$s ha activat els missatges que desapareixen. Els missatges i reaccions nous desapareixeran</string>
     <string name="chat_vanish_duration_once_seen">quan tothom els hagi vist</string>
     <string name="chat_vanish_duration_7d">7 dies després que tothom els hagi vist</string>
-    <string name="chat_vanish_notice_enabled_suffix">.</string>
-    <string name="chat_vanish_notice_disabled_self">Has desactivat els missatges que desapareixen.</string>
-    <string name="chat_vanish_notice_disabled_other">%1$s ha desactivat els missatges que desapareixen.</string>
+    <string name="chat_vanish_notice_disabled_self">Has desactivat els missatges temporals.</string>
+    <string name="chat_vanish_notice_disabled_other">%1$s ha desactivat els missatges temporals.</string>
     <string name="messaging_compose_title">Missatge nou</string>
     <string name="chat_loading">Carregant...</string>
     <string name="chat_voice_record_locked">Enregistrament bloquejat</string>
@@ -2133,7 +2130,6 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="chat_shared_moment">Ha compartit un Moment</string>
     <string name="chat_shared_story">Ha compartit una història</string>
     <string name="chat_toolbar_profile">Obre el perfil</string>
-    <string name="chat_vanish_notice_enabled">%1$s durant %2$s</string>
     <string name="chat_voice_duration">%1$d:%2$02d</string>
     <string name="chat_voice_speed">%1$.1fx</string>
     <string name="context_menu_moment_meta">Moment • %1$s</string>
@@ -2441,4 +2437,17 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="story_audio_unsaved_confirmation">Àudio eliminat dels preferits</string>
     <string name="settings_group_profile_content">Perfil i contingut</string>
     <string name="settings_group_messaging_privacy">Missatges i interaccions</string>
+    <string name="chat_vanish_notice_enabled_self_format">Has activat els missatges temporals. Els missatges i reaccions nous desapareixeran %1$s.</string>
+    <string name="chat_vanish_notice_enabled_other_format">%1$s ha activat els missatges temporals. Els missatges i reaccions nous desapareixeran %2$s.</string>
+    <string name="notification_message_view_once_photo">T\'ha enviat una foto</string>
+    <string name="notification_message_view_once_video">T\'ha enviat un vídeo</string>
+    <string name="chat_preview_view_once_tap_photo">Veure la foto</string>
+    <string name="chat_preview_view_once_tap_video">Veure el vídeo</string>
+    <string name="chat_view_once_inbox_action">Reprodueix</string>
+    <string name="chat_preview_view_once_sent_photo">Ha enviat una foto</string>
+    <string name="chat_preview_view_once_sent_video">Ha enviat un vídeo</string>
+    <string name="chat_message_undecryptable">No es pot mostrar aquest missatge</string>
+    <string name="chat_error_conversation_key_missing">La clau de xifratge d\'aquest xat encara no està disponible en aquest dispositiu. Torna-ho a provar més tard o restaura els teus xats.</string>
+    <string name="chat_outbox_channel_name">Enviament de missatges</string>
+    <string name="chat_outbox_sending">Enviant missatges…</string>
 </resources>

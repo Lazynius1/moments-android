@@ -53,6 +53,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import com.moments.android.views.messaging.core.EnhancedMessage
+import com.moments.android.views.messaging.services.InboxViewOncePlayback
+import com.moments.android.views.messaging.services.InboxViewOncePreparation
+import com.moments.android.views.messaging.services.InboxViewOncePresentation
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -221,6 +227,86 @@ fun MessagingView(
         profileUserId = trimmed
     }
 
+    // ≡ iOS playInboxViewOnce: "▶ Reproducir" muestra el ver una vez sobre la lista sin entrar al chat
+    // (sin marcar la conversación como leída). Sin pendiente, fallo o timeout → abre el chat.
+    var viewOncePreparation by remember { mutableStateOf<InboxViewOncePreparation?>(null) }
+    var inboxViewOncePresentation by remember { mutableStateOf<InboxViewOncePresentation?>(null) }
+    var pendingViewOnceCameraConversation by remember { mutableStateOf<Conversation?>(null) }
+
+    fun inboxViewOnceAuthorName(message: EnhancedMessage, conversation: Conversation): String {
+        val fallback = context.getString(R.string.messaging_user_default)
+        if (conversation.isGroup) {
+            return com.moments.android.services.cache.UserCacheService.getCachedUser(message.senderId)
+                ?.username?.trim()?.takeIf { it.isNotEmpty() }
+                ?: com.moments.android.views.messaging.groups.GroupDirectory.groups.value[conversation.id]
+                    ?.allMemberNames?.get(message.senderId)
+                ?: conversation.groupMemberNames[message.senderId]
+                ?: fallback
+        }
+        val live = viewModel.participantStates[conversation.otherParticipantId]?.username?.trim().orEmpty()
+        if (live.isNotEmpty()) return live
+        return conversation.otherParticipantUsername ?: fallback
+    }
+
+    fun playInboxViewOnce(conversation: Conversation, openFallback: (Conversation) -> Unit) {
+        if (viewOncePreparation != null || inboxViewOncePresentation != null) return
+        val conversationId = conversation.id?.takeIf { it.isNotBlank() } ?: return
+        val preparation = InboxViewOncePreparation(conversationId)
+        val selectedAtStart = viewModel.selectedConversation?.id
+        viewOncePreparation = preparation
+        scope.launch {
+            val message = kotlinx.coroutines.withTimeoutOrNull(InboxViewOncePlayback.PREPARATION_TIMEOUT_MS) {
+                InboxViewOncePlayback.prepare(conversationId)
+            }
+            // Cancelada (el usuario abrió otro chat mientras tanto): se descarta el resultado.
+            if (viewOncePreparation != preparation) return@launch
+            viewOncePreparation = null
+            if (viewModel.selectedConversation?.id != selectedAtStart || pendingChatContext != null) return@launch
+            if (message == null) {
+                openFallback(conversation)
+                return@launch
+            }
+            inboxViewOncePresentation = InboxViewOncePresentation(
+                conversation = conversation,
+                message = message,
+                authorName = inboxViewOnceAuthorName(message, conversation),
+            )
+        }
+    }
+
+    @Composable
+    fun InboxViewOnceLayer() {
+        val presentation = inboxViewOncePresentation ?: return
+        // Al cerrar (o si la lista desaparece) termina la sesión: replay no usado → ABANDON_REPLAY.
+        DisposableEffect(presentation.id) {
+            onDispose { InboxViewOncePlayback.finishSession(presentation.message) }
+        }
+        // Bloquea los toques hacia la lista que queda debajo.
+        Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { } }) {
+            com.moments.android.views.messaging.media.ViewOnceImmersiveViewer(
+                message = presentation.message,
+                authorName = presentation.authorName,
+                onViewed = {
+                    InboxViewOncePlayback.markViewed(presentation.message)
+                    presentation.conversation.id?.let(viewModel::clearViewOncePending)
+                },
+                onSendReply = { InboxViewOncePlayback.sendReply(it, presentation) },
+                onSendReaction = { InboxViewOncePlayback.sendReply(it, presentation) },
+                // La cámara de respuesta vive en el chat: al cerrar el visor se abre la conversación.
+                onOpenCameraReply = { pendingViewOnceCameraConversation = presentation.conversation },
+                onDismiss = {
+                    inboxViewOncePresentation = null
+                    pendingViewOnceCameraConversation?.let { conversation ->
+                        pendingViewOnceCameraConversation = null
+                        showingArchived = false
+                        viewModel.openConversation(conversation)
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+
     val pendingRequests by requestService.pendingRequests.collectAsState()
     val outgoingPending by requestService.outgoingPendingRequests.collectAsState()
     val currentStatus by onlineStatusService.currentUserStatus.collectAsState()
@@ -230,7 +316,8 @@ fun MessagingView(
     val suppressTabBar =
         (viewModel.selectedConversation != null && !adaptiveWindow.supportsTwoPanes) ||
             pendingChatContext != null ||
-            inboxStory != null || showingGroupRequests
+            inboxStory != null || showingGroupRequests ||
+            inboxViewOncePresentation != null
     LaunchedEffect(suppressTabBar) {
         onSuppressTabBarChange(suppressTabBar)
     }
@@ -461,6 +548,13 @@ fun MessagingView(
                     showingArchived = false
                     viewModel.openConversation(it)
                 },
+                onPlayViewOnce = { conversation ->
+                    playInboxViewOnce(conversation) {
+                        showingArchived = false
+                        viewModel.openConversation(it)
+                    }
+                },
+                preparingViewOnceConversationId = viewOncePreparation?.conversationId,
                 onOpenProfile = { openConversationProfile(it) },
                 onOpenStory = { inboxStory = it },
                 onMarkUnread = { viewModel.markConversationAsUnread(it) },
@@ -469,6 +563,7 @@ fun MessagingView(
                 onUnarchive = { viewModel.unarchiveConversation(it) },
                 onDelete = { viewModel.deleteConversation(it) },
             )
+            InboxViewOnceLayer()
             return
         }
         pendingChatContext != null -> {
@@ -561,6 +656,10 @@ fun MessagingView(
                     searchText = searchText,
                     conversationMenuSelection = conversationMenuSelection,
                     onOpenConversation = { viewModel.openConversation(it) },
+                    onPlayViewOnce = { conversation ->
+                        playInboxViewOnce(conversation) { viewModel.openConversation(it) }
+                    },
+                    preparingViewOnceConversationId = viewOncePreparation?.conversationId,
                     onOpenOutgoing = { user ->
                         scope.launch {
                             val current = uid ?: return@launch
@@ -726,6 +825,8 @@ fun MessagingView(
             onDismiss = { showingStatusSelector = false },
         )
     }
+
+    InboxViewOnceLayer()
 }
 
 @Composable
@@ -1005,6 +1106,8 @@ private fun MessagingConversationList(
     onRowFrame: (String, Rect) -> Unit,
     onOpenSearchMessage: (GlobalMessageSearchResult) -> Unit,
     onStartDraftWithUser: (AppUser) -> Unit,
+    onPlayViewOnce: (Conversation) -> Unit = {},
+    preparingViewOnceConversationId: String? = null,
 ) {
     val colors = rememberAdaptiveColors()
     val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
@@ -1038,6 +1141,8 @@ private fun MessagingConversationList(
             onOpenStory = onOpenStory,
             onOpenSearchMessage = onOpenSearchMessage,
             onStartDraftWithUser = onStartDraftWithUser,
+            onPlayViewOnce = onPlayViewOnce,
+            preparingViewOnceConversationId = preparingViewOnceConversationId,
         )
         else -> {
             val merged = remember(viewModel.conversations, outgoingPending) {
@@ -1085,6 +1190,8 @@ private fun MessagingConversationList(
                                     if (id.isNotBlank()) onRowFrame(id, coords.boundsInRoot())
                                 },
                                 onNeedsParticipantState = { viewModel.loadParticipantState(conv) },
+                                onPlayViewOnce = { onPlayViewOnce(conv) },
+                                isPreparingViewOnce = preparingViewOnceConversationId == id,
                             )
                         }
                         is MergedListRow.OutgoingRequestItem -> {
@@ -1247,6 +1354,8 @@ private fun MessagingSearchResults(
     onOpenStory: (InboxStoryLaunch) -> Unit,
     onOpenSearchMessage: (GlobalMessageSearchResult) -> Unit,
     onStartDraftWithUser: (AppUser) -> Unit,
+    onPlayViewOnce: (Conversation) -> Unit = {},
+    preparingViewOnceConversationId: String? = null,
 ) {
     val colors = rememberAdaptiveColors()
     val groups by com.moments.android.views.messaging.groups.GroupDirectory.groups.collectAsState()
@@ -1280,6 +1389,8 @@ private fun MessagingSearchResults(
                     onTap = { onOpenConversation(conversation) },
                     onOpenStory = onOpenStory,
                     onNeedsParticipantState = { viewModel.loadParticipantState(conversation) },
+                    onPlayViewOnce = { onPlayViewOnce(conversation) },
+                    isPreparingViewOnce = preparingViewOnceConversationId == conversation.id,
                 )
             }
         }

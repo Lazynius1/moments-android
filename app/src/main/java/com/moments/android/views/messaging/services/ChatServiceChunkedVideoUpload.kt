@@ -10,7 +10,6 @@ import com.moments.android.services.storage.StoragePathBuilder
 import com.moments.android.services.storage.StorageUploadDomain
 import com.moments.android.utilities.AppLog
 import java.io.File
-import java.util.UUID
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -85,7 +84,7 @@ suspend fun ChatService.uploadChunkedEncryptedVideo(
             val thumbnailData = ChatServiceMediaPipeline.generateVideoThumbnailData(preparedFile)
             if (thumbnailData != null) {
                 try {
-                    val thumbId = UUID.randomUUID().toString()
+                    val thumbId = ChatServiceMediaPipeline.deterministicChatFileId(conversationId, "thumbnail")
                     val thumbBase = StoragePathBuilder.build(
                         senderId,
                         StorageUploadDomain.ChatThumbnail(

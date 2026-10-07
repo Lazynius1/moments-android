@@ -60,6 +60,10 @@ fun ChatService.listenToMessageReactions(
         }
 }
 
+/** Hay listener de reacciones vivo: el snapshot de mensajes no necesita `fetchReactionMap`. */
+fun ChatService.hasMessageReactionsListener(conversationId: String): Boolean =
+    reactionListeners["reactions_$conversationId"] != null
+
 /** ≡ parte reactions de `ChatService.removeListener(for:)` iOS. */
 fun ChatService.removeMessageReactionsListener(conversationId: String) {
     val listenerKey = "reactions_$conversationId"

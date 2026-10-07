@@ -3,6 +3,7 @@ package com.moments.android.views.messaging.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -52,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
+import com.moments.android.views.feed.AdaptiveColors
 import com.moments.android.views.shared.MomentsVideoGravity
 import com.moments.android.views.shared.MomentsVideoPlaybackTimeline
 import com.moments.android.views.shared.MomentsVideoPlayer
@@ -101,16 +104,19 @@ fun GlassmorphicImageMessage(
     onTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     downsamplingSize: DpSize? = ChatMediaBubbleDownsample,
+    /** Forma de la burbuja (une esquinas en ráfagas); manda sobre cualquier radio interno. ≡ iOS `bubbleShape`. */
+    shape: Shape = mediaCorner,
 ) {
+    val hairline = AdaptiveColors(isSystemInDarkTheme()).mediaBubbleStroke
     val a11yPhoto = stringResource(R.string.chat_a11y_photo)
     val a11yHint = stringResource(R.string.chat_a11y_open_media)
     val preview = previewThumbnailUrl?.takeIf { it.isNotBlank() }
 
     Box(
         modifier
-            .clip(mediaCorner)
-            .border(0.5.dp, Color.White.copy(alpha = 0.2f), mediaCorner)
-            .shadow(10.dp, mediaCorner, ambientColor = Color.Black.copy(0.3f), spotColor = Color.Black.copy(0.3f))
+            .clip(shape)
+            // Sin sombra (≡ iOS): el recorte externo la ocultaba y penalizaba el scroll.
+            .border(0.5.dp, hairline, shape)
             .semantics { contentDescription = "$a11yPhoto. $a11yHint" }
             .then(if (onTap != null) Modifier.clickable(onClick = onTap) else Modifier),
     ) {
@@ -149,7 +155,6 @@ fun GlassmorphicImageMessage(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .clip(mediaCorner)
                     .background(Color.Black.copy(0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -171,17 +176,20 @@ fun GlassmorphicVideoMessage(
     onTap: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     downsamplingSize: DpSize? = ChatMediaBubbleDownsample,
+    /** Forma de la burbuja (une esquinas en ráfagas); manda sobre cualquier radio interno. ≡ iOS `bubbleShape`. */
+    shape: Shape = mediaCorner,
 ) {
+    val hairline = AdaptiveColors(isSystemInDarkTheme()).mediaBubbleStroke
     val a11yVideo = stringResource(R.string.chat_a11y_video)
     val a11yHint = stringResource(R.string.chat_a11y_open_media)
     val preview = thumbnailUrl?.takeIf { it.isNotBlank() }
-    val showPlayBadge = !isDownloadingMedia
+    val showPlayButton = !isDownloadingMedia && !isSending && !(isResolvingMedia && preview.isNullOrBlank())
 
     Box(
         modifier
-            .clip(mediaCorner)
-            .border(0.5.dp, Color.White.copy(alpha = 0.2f), mediaCorner)
-            .shadow(10.dp, mediaCorner, ambientColor = Color.Black.copy(0.3f), spotColor = Color.Black.copy(0.3f))
+            .clip(shape)
+            // Sin sombra (≡ iOS): el recorte externo la ocultaba y penalizaba el scroll.
+            .border(0.5.dp, hairline, shape)
             .semantics { contentDescription = "$a11yVideo. $a11yHint" }
             .then(if (onTap != null) Modifier.clickable(onClick = onTap) else Modifier),
     ) {
@@ -209,20 +217,39 @@ fun GlassmorphicVideoMessage(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .clip(mediaCorner)
                     .background(Color.Black.copy(0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
                 MediaProgressRing(progress = max(progress ?: 0.03, 0.03), size = 60.dp, lineWidth = 4.dp)
             }
         }
-        if (showPlayBadge) {
-            ChatVideoPlayBadge(
-                size = 22.dp,
-                padding = 12.dp,
-                modifier = Modifier.align(Alignment.BottomStart),
-            )
+        if (showPlayButton) {
+            ChatVideoCenterPlayButton(Modifier.align(Alignment.Center))
         }
+    }
+}
+
+/** Play grande y centrado para vídeos sueltos (≡ iOS `ChatVideoCenterPlayButton`). */
+@Composable
+fun ChatVideoCenterPlayButton(
+    modifier: Modifier = Modifier,
+    diameter: Dp = 52.dp,
+) {
+    Box(
+        modifier
+            .shadow(6.dp, CircleShape, ambientColor = Color.Black.copy(0.25f), spotColor = Color.Black.copy(0.25f))
+            .size(diameter)
+            .clip(CircleShape)
+            .background(Color.Black.copy(alpha = 0.42f))
+            .border(0.5.dp, Color.White.copy(alpha = 0.35f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Default.PlayArrow,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(diameter * 0.58f).offset(x = diameter * 0.03f),
+        )
     }
 }
 

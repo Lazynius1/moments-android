@@ -85,6 +85,14 @@ object ViewOnceReplaySessionStore {
         pending
     }
 
+    /** Repeticiones disponibles de todas las conversaciones salvo [excludingConversationId] (≡ iOS). */
+    fun drainAvailableExcluding(excludingConversationId: String?): List<PendingReplay> = lock.withLock {
+        val excludedPrefix = excludingConversationId?.let { "$it|" }
+        val drained = availableKeys.filter { key -> excludedPrefix == null || !key.startsWith(excludedPrefix) }
+        availableKeys.removeAll(drained.toSet())
+        drained.mapNotNull(::pendingReplay)
+    }
+
     private fun key(message: EnhancedMessage, viewerId: String): String? =
         if (
             message.isViewOnce &&
@@ -194,12 +202,16 @@ suspend fun ChatService.buildEnhancedMessage(
     val senderId = data["senderId"] as? String ?: ""
     val type = MessageType.from(data["type"] as? String)
     val rawContent = data["content"] as? String
-    // ≡ decryptMessageContent → decrypt ?? content
+    // Fallo de descifrado: nunca exponer el ciphertext → aviso localizado + flag para reintentar.
+    var isUndecryptable = false
     val decryptedContent = when {
         type == MessageType.CHAT_NOTICE -> rawContent
         decryptedContentOverride != null -> decryptedContentOverride
         rawContent.isNullOrEmpty() -> null
-        else -> EncryptionService.decryptChatMessage(rawContent, conversationId) ?: rawContent
+        else -> EncryptionService.decryptChatMessage(rawContent, conversationId) ?: run {
+            isUndecryptable = true
+            null
+        }
     }
     var locationLatitude = (data["latitude"] as? Number)?.toDouble()
     var locationLongitude = (data["longitude"] as? Number)?.toDouble()
@@ -216,7 +228,7 @@ suspend fun ChatService.buildEnhancedMessage(
             }
             null
         }
-        else -> decryptedContent
+        else -> if (isUndecryptable) undecryptableMessagePlaceholder() else decryptedContent
     }
     @Suppress("UNCHECKED_CAST")
     val mediaEncryption = (data["mediaEncryption"] as? Map<String, Any?>)?.let {
@@ -360,12 +372,19 @@ suspend fun ChatService.buildEnhancedMessage(
         isVanishModeMessage = data["isVanishModeMessage"] as? Boolean ?: false,
         vanishedFor = vanishedForList,
         vanishExpiresAt = (data["vanishExpiresAt"] as? Timestamp)?.toDate(),
+        isUndecryptable = isUndecryptable,
     )
     return ViewOnceReplaySessionStore.apply(
         parsed,
         FirebaseAuth.getInstance().currentUser?.uid,
     )
 }
+
+/** Texto localizado para un mensaje que no se pudo descifrar (≡ iOS placeholder de E2E). */
+fun undecryptableMessagePlaceholder(): String =
+    com.moments.android.MomentsApplication.instance
+        ?.getString(com.moments.android.R.string.chat_message_undecryptable)
+        ?: "This message can't be displayed"
 
 /** Acepta Timestamp / Date / epoch ms — serverTimestamp pendiente a veces no llega como Timestamp. */
 private fun parseFirestoreDate(value: Any?): Date? = when (value) {

@@ -1226,8 +1226,8 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="chat_read_and_more">e mais %1$d</string>
     <string name="chat_seen">Visto</string>
     <string name="chat_recovery_six_digits">6 dígitos</string>
-    <string name="chat_vanish_swipe_release">Solta para ativar mensagens que desaparecem</string>
-    <string name="chat_vanish_swipe_release_off">Solta para desativar mensagens que desaparecem</string>
+    <string name="chat_vanish_swipe_release">Solta para ativar as mensagens temporárias</string>
+    <string name="chat_vanish_swipe_release_off">Solta para desativar as mensagens temporárias</string>
     <string name="chat_vanish_notice_turn_on">Ativar</string>
     <string name="chat_vanish_duration_24h">24 horas depois de todos as terem visto</string>
     <string name="chat_vanish_timer_sheet_title">Mensagens temporárias</string>
@@ -1900,13 +1900,10 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="question_responses_prompt_label">Sticker</string>
     <string name="question_responses_question_label">Pergunta</string>
     <string name="chat_a11y_spoiler_hint">Conteúdo oculto. Toca para revelar.</string>
-    <string name="chat_vanish_notice_enabled_self">Ativaste mensagens que desaparecem. As novas mensagens e reações desaparecerão</string>
-    <string name="chat_vanish_notice_enabled_other">%1$s ativou mensagens que desaparecem. As novas mensagens e reações desaparecerão</string>
     <string name="chat_vanish_duration_once_seen">quando todos as tiverem visto</string>
     <string name="chat_vanish_duration_7d">7 dias depois de todos as terem visto</string>
-    <string name="chat_vanish_notice_enabled_suffix">.</string>
-    <string name="chat_vanish_notice_disabled_self">Desativaste mensagens que desaparecem.</string>
-    <string name="chat_vanish_notice_disabled_other">%1$s desativou mensagens que desaparecem.</string>
+    <string name="chat_vanish_notice_disabled_self">Desativaste as mensagens temporárias.</string>
+    <string name="chat_vanish_notice_disabled_other">%1$s desativou as mensagens temporárias.</string>
     <string name="messaging_compose_title">Nova mensagem</string>
     <string name="chat_loading">A carregar...</string>
     <string name="chat_voice_record_locked">Gravação bloqueada</string>
@@ -2118,7 +2115,6 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="chat_shared_moment">Partilhou um Moment</string>
     <string name="chat_shared_story">Partilhou uma história</string>
     <string name="chat_toolbar_profile">Abrir perfil</string>
-    <string name="chat_vanish_notice_enabled">%1$s durante %2$s</string>
     <string name="chat_voice_duration">%1$d:%2$02d</string>
     <string name="chat_voice_speed">%1$.1fx</string>
     <string name="context_menu_moment_meta">Momento • %1$s</string>
@@ -2403,4 +2399,17 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="maps_chrome_recenter">A minha localização</string>
     <string name="settings_group_profile_content">Perfil e conteúdo</string>
     <string name="settings_group_messaging_privacy">Mensagens e interações</string>
+    <string name="chat_vanish_notice_enabled_self_format">Ativaste as mensagens temporárias. As novas mensagens e reações desaparecerão %1$s.</string>
+    <string name="chat_vanish_notice_enabled_other_format">%1$s ativou as mensagens temporárias. As novas mensagens e reações desaparecerão %2$s.</string>
+    <string name="notification_message_view_once_photo">Enviou-te uma fotografia</string>
+    <string name="notification_message_view_once_video">Enviou-te um vídeo</string>
+    <string name="chat_preview_view_once_tap_photo">Ver fotografia</string>
+    <string name="chat_preview_view_once_tap_video">Ver vídeo</string>
+    <string name="chat_view_once_inbox_action">Reproduzir</string>
+    <string name="chat_preview_view_once_sent_photo">Enviou uma fotografia</string>
+    <string name="chat_preview_view_once_sent_video">Enviou um vídeo</string>
+    <string name="chat_message_undecryptable">Não é possível mostrar esta mensagem</string>
+    <string name="chat_error_conversation_key_missing">A chave de encriptação deste chat ainda não está disponível neste dispositivo. Tenta novamente mais tarde ou restaura os teus chats.</string>
+    <string name="chat_outbox_channel_name">Envio de mensagens</string>
+    <string name="chat_outbox_sending">A enviar mensagens…</string>
 </resources>

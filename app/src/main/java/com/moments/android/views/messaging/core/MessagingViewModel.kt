@@ -678,6 +678,16 @@ class MessagingViewModel(
         }
     }
 
+    /** ≡ iOS `clearViewOncePending`: tras ver el ver una vez desde la lista, quita el botón al instante. */
+    fun clearViewOncePending(conversationId: String) {
+        fun patch(list: List<Conversation>) = list.map {
+            if (it.id == conversationId && it.lastMessageViewOncePending) it.copy(lastMessageViewOncePending = false) else it
+        }
+        conversations = patch(conversations)
+        archivedConversations = patch(archivedConversations)
+        filteredConversations = patch(filteredConversations)
+    }
+
     /** Port de `applyLocalConversationState` para fijar: actualiza local y reordena la bandeja. */
     fun togglePinned(conversation: Conversation) {
         val userId = currentUserId ?: return

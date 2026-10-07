@@ -28,7 +28,8 @@ object ChatRowHeightEstimator {
     private val textHorizontalPadding = ChatTextBubbleMetrics.horizontalPadding * 2
     private val textVerticalPadding = ChatTextBubbleMetrics.verticalPadding * 2
     private const val BASE_FONT_SIZE = 15f
-    private val replyBlockHeight = 46.dp
+    /** Media entre cita de texto (~2 líneas) y miniatura de 80, menos el solape (`StackedReplyQuote`). */
+    private val replyBlockHeight = 60.dp
     private val reactionsRowHeight = 28.dp
 
     private const val MEDIA_DEFAULT_ASPECT = 4f / 5f

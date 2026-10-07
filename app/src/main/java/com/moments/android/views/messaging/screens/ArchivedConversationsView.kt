@@ -67,6 +67,9 @@ fun ArchivedConversationsView(
     onUnarchive: (Conversation) -> Unit = { viewModel.unarchiveConversation(it) },
     onDelete: (Conversation) -> Unit = { viewModel.deleteConversation(it) },
     modifier: Modifier = Modifier,
+    /** "▶ Reproducir" del ver una vez pendiente (≡ iOS); null → abre el chat. */
+    onPlayViewOnce: ((Conversation) -> Unit)? = null,
+    preparingViewOnceConversationId: String? = null,
 ) {
     val colors = rememberAdaptiveColors()
     val uid = FirebaseAuth.getInstance().currentUser?.uid
@@ -168,6 +171,8 @@ fun ArchivedConversationsView(
                                 conversationRowFrames = conversationRowFrames + (id to coords.boundsInRoot())
                             },
                             onNeedsParticipantState = { viewModel.loadParticipantState(conversation) },
+                            onPlayViewOnce = onPlayViewOnce?.let { play -> { play(conversation) } },
+                            isPreparingViewOnce = preparingViewOnceConversationId == id,
                         )
                     }
                 }

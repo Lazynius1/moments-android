@@ -84,7 +84,9 @@ object NotificationCopyResolver {
         "image" -> R.string.notification_message_single_photo
         "video" -> R.string.notification_message_single_video
         "audio" -> R.string.notification_message_single_audio
-        "viewOnceImage", "viewOnceVideo", "ephemeral" -> R.string.notification_message_single_view_once
+        "viewOnceImage" -> R.string.notification_message_view_once_photo
+        "viewOnceVideo" -> R.string.notification_message_view_once_video
+        "ephemeral" -> R.string.notification_message_single_view_once
         "moment", "sharedMoment" -> R.string.notification_message_single_moment
         "storyMention" -> R.string.notification_message_single_story_mention
         else -> R.string.notification_message_single_default

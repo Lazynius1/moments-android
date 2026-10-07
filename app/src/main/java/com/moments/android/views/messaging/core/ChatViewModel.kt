@@ -65,6 +65,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Date
@@ -184,6 +185,7 @@ open class EnhancedChatViewModel(
         }
         setupIngestListener()
         setupConversationPreferenceListener()
+        setupUndecryptableRetryListener()
         refreshTypingIndicatorPreference()
         refreshForwardingPreference()
     }
@@ -200,6 +202,34 @@ open class EnhancedChatViewModel(
             ConversationBuzzPreferenceEvents.events.collect { event ->
                 if (event.conversationId != conversationId) return@collect
                 _buzzPreferences.value = _buzzPreferences.value + (event.userId to event.allowsBuzz)
+            }
+        }
+    }
+
+    /**
+     * Clave de conversación disponible (o identidad restaurada): reintentar los mensajes que no se
+     * pudieron descifrar releyéndolos del servidor.
+     */
+    private fun setupUndecryptableRetryListener() {
+        scope.launch {
+            EncryptionService.conversationKeyAvailable.collect { id ->
+                if (conversationId.isBlank() || (id != conversationId && id != "*")) return@collect
+                retryUndecryptableMessages()
+            }
+        }
+    }
+
+    private var undecryptableRetryJob: Job? = null
+
+    private fun retryUndecryptableMessages() {
+        val ids = _messages.value.filter { it.isUndecryptable }.map { it.id }.take(MAX_UNDECRYPTABLE_RETRY)
+        if (ids.isEmpty() || undecryptableRetryJob?.isActive == true) return
+        undecryptableRetryJob = scope.launch {
+            for (id in ids) {
+                val refreshed = chatService.fetchMessage(conversationId, id).getOrNull() ?: continue
+                if (refreshed.isUndecryptable) continue
+                appendOrReplaceMessage(refreshed)
+                LocalPersistenceService.saveMessagesInBackground(listOf(refreshed), conversationId, sync = false)
             }
         }
     }
@@ -277,6 +307,16 @@ open class EnhancedChatViewModel(
     fun stopListening() {
         pauseChatListenersImmediately()
         isChatVisible = false
+    }
+
+    /**
+     * Sesión expulsada/invalidada por [ChatSessionEngine]: además de los listeners se cancela el
+     * scope (antes quedaban vivos jobs y colectores → fuga). Las subidas en curso no se pierden:
+     * corren en el scope de aplicación de ChatService.
+     */
+    fun dispose() {
+        stopListening()
+        scope.cancel()
     }
 
     fun setTyping(typing: Boolean) {
@@ -622,7 +662,8 @@ open class EnhancedChatViewModel(
     }
 
     private fun withPreservedLocalReadState(incoming: EnhancedMessage): EnhancedMessage {
-        if (incoming.isRead || incoming.senderId == currentUserId) return incoming
+        if (incoming.senderId == currentUserId) return withGroupReadStatus(incoming)
+        if (incoming.isRead) return incoming
         if (incoming.id in locallyReadMessageIds || currentUserId in incoming.readBy.orEmpty()) {
             return incoming.copy(isRead = true)
         }
@@ -631,6 +672,21 @@ open class EnhancedChatViewModel(
             return incoming.copy(isRead = true)
         }
         return incoming
+    }
+
+    /**
+     * Grupos: `status` es un único campo y el primer lector lo pone en READ para todos.
+     * El check de leído solo vale si lo leyeron todos los miembros con acuses activos
+     * (`readAtBy` solo se escribe con acuses activos).
+     */
+    private fun withGroupReadStatus(message: EnhancedMessage): EnhancedMessage {
+        if (!conversation.isGroup || message.status != MessageStatus.READ) return message
+        val readers = message.readAtBy.orEmpty().keys
+        val optedOut = conversation.readReceiptPreferences.orEmpty().filterValues { !it }.keys
+        val everyoneRead = conversation.participants
+            .filter { it != message.senderId && it !in optedOut }
+            .all { it in readers }
+        return if (everyoneRead) message else message.copy(status = MessageStatus.DELIVERED)
     }
 
     private fun isReachableLocalFile(url: String?): Boolean {
@@ -670,14 +726,29 @@ open class EnhancedChatViewModel(
         _liveReactionOverlays.value = overlays
     }
 
+    /** Ventana del último snapshot del listener (limitToLast) — ver [ChatService.MessagesSnapshotWindow]. */
+    private var lastSnapshotWindow: ChatService.MessagesSnapshotWindow? = null
+
+    /**
+     * Un mensaje que falta en el snapshot se borró de verdad si la ventana no está llena o si su
+     * timestamp cae dentro de ella (>= el más antiguo). Si es más viejo, solo salió por arriba.
+     */
+    private fun wasRemovedFromServer(message: EnhancedMessage): Boolean {
+        val window = lastSnapshotWindow ?: return false
+        if (!window.isFull) return true
+        val oldest = window.oldestTimestamp ?: return false
+        return !message.timestamp.before(oldest)
+    }
+
     private fun applyFirestoreListenerMessages(incoming: List<EnhancedMessage>) {
         // Mensajes que salen del limitToLast se promueven a histórico (no se pierden).
         val newSet = incoming.map { it.id }.toSet()
         val droppedMessages = realTimeMessages.filter { it.id !in newSet }
         if (droppedMessages.isNotEmpty()) {
-            // Vanish que desaparecen del snapshot = purga server-side → no promover.
+            // Vanish realmente borrados en servidor → purgar. Los que solo salieron de la ventana
+            // limitToLast(50) siguen existiendo: se promueven a histórico como el resto.
             val droppedVanishIds = droppedMessages
-                .filter { it.isVanishModeMessage && it.type != MessageType.CHAT_NOTICE }
+                .filter { it.isVanishModeMessage && it.type != MessageType.CHAT_NOTICE && wasRemovedFromServer(it) }
                 .map { it.id }
             if (droppedVanishIds.isNotEmpty()) {
                 optimisticallyHiddenVanishIds += droppedVanishIds
@@ -716,9 +787,27 @@ open class EnhancedChatViewModel(
         }
         val realtimeIds = realTimeMessages.map { it.id }.toSet()
         historicalMessages.removeAll { it.id in realtimeIds }
+        pruneLocalStatesConfirmedByServer(incoming)
         rebuildMessagesList()
         prefetchUnresolvedMediaIfNeeded()
         scope.launch { LocalPersistenceService.reconcileMessagesInBackground(realTimeMessages, conversationId) }
+    }
+
+    /**
+     * El documento existe en el listener con estado de servidor (sent/delivered/read): un
+     * FAILED/PENDING local ya no aplica (p. ej. ack tardío del SDK). Antes FAILED nunca se podaba.
+     */
+    private fun pruneLocalStatesConfirmedByServer(incoming: List<EnhancedMessage>) {
+        for (message in incoming) {
+            val local = localMessageStates[message.id] ?: continue
+            if (local != MessageStatus.FAILED && local != MessageStatus.PENDING) continue
+            if (message.status == MessageStatus.SENT || message.status == MessageStatus.DELIVERED ||
+                message.status == MessageStatus.READ
+            ) {
+                localMessageStates.remove(message.id)
+                outgoingTempMessages.remove(message.id)
+            }
+        }
     }
 
     fun attachChatListenersIfNeeded() {
@@ -733,6 +822,7 @@ open class EnhancedChatViewModel(
             conversationId,
             cutoffDate = effectiveDeletedAtCutoff(),
             replaceExisting = false,
+            onSnapshotWindow = { lastSnapshotWindow = it },
         ) { result ->
             result.onSuccess(::applyFirestoreListenerMessages).onFailure { _error.value = it.message }
         }
@@ -1589,11 +1679,17 @@ open class EnhancedChatViewModel(
                 isVanishModeMessage = _vanishModeActive.value,
             ),
         )
-        scope.launch {
+        val isVanish = _vanishModeActive.value
+        val targetConversationId = conversationId
+        // Subida en el scope de aplicación: sobrevive a salir del chat / expulsar la sesión.
+        val upload = chatService.runDetached {
             chatService.sendMediaMessage(
-                conversationId, currentUserId, type, data, fileName, messageId, mediaBatchId,
-                _vanishModeActive.value, null, replyTo, stickers, textOverlays,
+                targetConversationId, currentUserId, type, data, fileName, messageId, mediaBatchId,
+                isVanish, null, replyTo, stickers, textOverlays,
             )
+        }
+        scope.launch {
+            upload.await()
                 .onSuccess {
                     finalizeOutgoingMediaMessage(messageId, it, fallbackMediaUrl = localPreview)
                     trackSuccessfulDirectMessage()
@@ -1639,8 +1735,14 @@ open class EnhancedChatViewModel(
             fileName = "audio_$messageId.m4a", fileSize = data.size.toLong(), timestamp = Date(),
             status = MessageStatus.SENDING, isVanishModeMessage = _vanishModeActive.value,
         ))
+        val isVanish = _vanishModeActive.value
+        val targetConversationId = conversationId
+        // Subida en el scope de aplicación: sobrevive a salir del chat / expulsar la sesión.
+        val upload = chatService.runDetached {
+            chatService.sendAudioMessage(targetConversationId, currentUserId, data, duration, waveform, messageId, isVanish)
+        }
         scope.launch {
-            chatService.sendAudioMessage(conversationId, currentUserId, data, duration, waveform, messageId, _vanishModeActive.value)
+            upload.await()
                 .onSuccess {
                     finalizeOutgoingMediaMessage(messageId, it, fallbackMediaUrl = localPreview)
                     trackSuccessfulDirectMessage()
@@ -1733,6 +1835,7 @@ open class EnhancedChatViewModel(
         completion: (List<com.moments.android.views.messaging.services.MessageRecipientDeliveryResult>) -> Unit = {},
     ) {
         if (conversationId.isBlank() || !ChatMessagePolicy.canForward(message, currentUserId, _forwardingPreferences.value) || toUserIds.isEmpty()) return
+        if (message.isUndecryptable) return
         val encryptedContent = message.content ?: return
         scope.launch {
             runCatching {
@@ -1829,10 +1932,17 @@ open class EnhancedChatViewModel(
         val isVanish = message.isVanishModeMessage
         updateMessageStatus(messageId, MessageStatus.SENDING)
         scope.launch {
+            // Si el servidor ya lo tiene (el SDK persistió el set), no se reenvía: solo se confirma.
+            if (chatService.serverMessageExists(conversationId, messageId).getOrNull() == true) {
+                chatService.confirmMessageAlreadyOnServer(conversationId, messageId)
+                applyOutgoingMessageUpdate(messageId, MessageStatus.SENT)
+                return@launch
+            }
             val result: Result<EnhancedMessage> = when (message.type) {
                 MessageType.TEXT -> chatService.sendTextMessage(
                     conversationId, currentUserId, message.content.orEmpty(),
                     message.replyTo, messageId, isVanish, message.vanishExpiresAt,
+                    isRetry = true,
                 )
                 MessageType.LOCATION -> chatService.sendStaticLocationMessage(
                     conversationId = conversationId,
@@ -1843,6 +1953,7 @@ open class EnhancedChatViewModel(
                     address = message.locationAddress,
                     messageId = messageId,
                     isVanishModeMessage = isVanish,
+                    isRetry = true,
                 )
                 MessageType.GIF, MessageType.STICKER -> chatService.sendGiphyReferenceMessage(
                     conversationId = conversationId,
@@ -1855,6 +1966,7 @@ open class EnhancedChatViewModel(
                     messageId = messageId,
                     isVanishModeMessage = isVanish,
                     replyTo = message.replyTo,
+                    isRetry = true,
                 )
                 MessageType.IMAGE, MessageType.VIDEO, MessageType.AUDIO -> {
                     val file = retryMediaFile(message)
@@ -1865,11 +1977,15 @@ open class EnhancedChatViewModel(
                         return@launch
                     }
                     val fallbackUrl = Uri.fromFile(file).toString()
+                    val targetConversationId = conversationId
                     if (message.type == MessageType.AUDIO) {
-                        chatService.sendAudioMessage(
-                            conversationId, currentUserId, bytes,
-                            message.duration ?: 0.0, message.audioWaveform, messageId, isVanish,
-                        ).onSuccess {
+                        chatService.runDetached {
+                            chatService.sendAudioMessage(
+                                targetConversationId, currentUserId, bytes,
+                                message.duration ?: 0.0, message.audioWaveform, messageId, isVanish,
+                                isRetry = true,
+                            )
+                        }.await().onSuccess {
                             finalizeOutgoingMediaMessage(messageId, it, fallbackMediaUrl = fallbackUrl)
                             trackSuccessfulDirectMessage()
                         }
@@ -1879,10 +1995,13 @@ open class EnhancedChatViewModel(
                             }
                         return@launch
                     }
-                    chatService.sendMediaMessage(
-                        conversationId, currentUserId, message.type, bytes, message.fileName,
-                        messageId, message.mediaBatchId, isVanish, message.vanishExpiresAt, message.replyTo,
-                    ).onSuccess {
+                    chatService.runDetached {
+                        chatService.sendMediaMessage(
+                            targetConversationId, currentUserId, message.type, bytes, message.fileName,
+                            messageId, message.mediaBatchId, isVanish, message.vanishExpiresAt, message.replyTo,
+                            isRetry = true,
+                        )
+                    }.await().onSuccess {
                         finalizeOutgoingMediaMessage(messageId, it, fallbackMediaUrl = fallbackUrl)
                         trackSuccessfulDirectMessage()
                     }
@@ -2465,6 +2584,8 @@ open class EnhancedChatViewModel(
         return ChatTimelineMutation(ChatListUpdateKind.REPLACE_ALL, ChatTimelineUpdateReason.LAYOUT)
     }
     companion object {
+        /** Tope de relecturas de servidor por evento de clave disponible. */
+        private const val MAX_UNDECRYPTABLE_RETRY = 50
         const val recentChatWindowSize = 20
         const val staleChatWindowSize = 6
         const val staleChatThresholdDays = 45

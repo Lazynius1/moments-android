@@ -19,8 +19,11 @@ import com.moments.android.views.shared.ChatPreviewPrivacy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Port de push FCM ≈ `AppDelegate` + **NSE** `MomentsNotificationService/NotificationService.swift`.
@@ -38,35 +41,55 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
         } ?: FCMTokenService.updateFCMToken()
     }
 
+    /**
+     * ≡ NSE: el trabajo se hace DENTRO del callback. `onMessageReceived` corre en un hilo de fondo
+     * de FCM y el proceso puede morir en cuanto retorna, así que antes las coroutines lanzadas
+     * (delivered, ingesta, notificación) podían perderse. Se bloquea con tope de ~8s (FCM da ~10s).
+     */
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
         val userInfo = message.data.mapValues { it.value as Any? }
         if (userInfo.isEmpty()) return
-        if (userInfo["type"] == "group_invitation") {
-            val isOpen = isAppInForeground() && userInfo["type"] == "group_message" && userInfo["groupId"] == com.moments.android.views.messaging.services.ChatSessionEngine.activeConversationId
-            if (!isOpen) scope.launch { showSystemNotificationIfNeeded(message, userInfo) }
-            NotificationBadgeService.setupListeners()
-            return
+        runBlocking {
+            val finished = withTimeoutOrNull(PUSH_WORK_TIMEOUT_MS) {
+                handlePush(message, userInfo)
+                true
+            }
+            if (finished == null) Log.w(TAG, "Push work timed out (${userInfo["type"]})")
         }
-        if ((userInfo["type"] as? String)?.lowercase() == "message_request_v2") {
-            scope.launch { handleMessageRequestPush(message, userInfo) }
-            return
+    }
+
+    private suspend fun handlePush(message: RemoteMessage, userInfo: Map<String, Any?>) = coroutineScope {
+        val type = (userInfo["type"] as? String)?.lowercase()
+        if (type == "group_invitation") {
+            // Antes: `type == "group_invitation" && type == "group_message"` → siempre false.
+            // Se suprime solo si el usuario ya está dentro de ese grupo en primer plano.
+            val isOpen = isAppInForeground() &&
+                userInfo["groupId"] != null &&
+                userInfo["groupId"] == com.moments.android.views.messaging.services.ChatSessionEngine.activeConversationId
+            NotificationBadgeService.setupListeners()
+            if (!isOpen) showSystemNotificationIfNeeded(message, userInfo)
+            return@coroutineScope
+        }
+        if (type == "message_request_v2") {
+            handleMessageRequestPush(message, userInfo)
+            return@coroutineScope
         }
 
-        scope.launch { handleBackgroundSideEffects(userInfo) }
-        // Banner in-app en Main (FCM llega en hilo de servicio).
+        // Banner in-app en Main (no se espera: no bloquear el hilo de FCM con la UI).
         scope.launch(Dispatchers.Main.immediate) {
             NotificationPresentationCoordinator.present(userInfo, NotificationPresentationSource.PUSH)
         }
+        launch { handleBackgroundSideEffects(userInfo) }
 
         if (NotificationPresentationCoordinator.isSilentPush(userInfo)) {
             NotificationBadgeService.refreshAllCounts()
             NotificationBadgeService.setupListeners()
-            return
+            return@coroutineScope
         }
 
         if (!isAppInForeground()) {
-            scope.launch { showSystemNotificationIfNeeded(message, userInfo) }
+            launch { showSystemNotificationIfNeeded(message, userInfo) }
         }
         NotificationBadgeService.setupListeners()
     }
@@ -99,7 +122,7 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
         val conversationId = ChatNotificationThread.conversationId(userInfo)
         val messageId = userInfo["messageId"] as? String
         if (!conversationId.isNullOrBlank() && !messageId.isNullOrBlank()) {
-            ChatService.markMessageAsDeliveredFromNotification(conversationId, messageId)
+            ChatService.markMessageAsDeliveredFromNotificationNow(conversationId, messageId)
             MessageIngestService.ingest(userInfo)
         }
         if (!handledByServer &&
@@ -354,6 +377,8 @@ class MomentsFirebaseMessagingService : FirebaseMessagingService() {
         const val CHANNEL_ID = "moments_default"
         const val EXTRA_FROM_PUSH = "from_push"
         private const val TAG = "MomentsFCM"
+        /** Tope del trabajo síncrono en `onMessageReceived` (FCM concede ~10s). */
+        private const val PUSH_WORK_TIMEOUT_MS = 8_000L
     }
 }
 

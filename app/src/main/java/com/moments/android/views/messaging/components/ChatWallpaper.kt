@@ -62,12 +62,31 @@ data class ChatWallpaper(
 ) {
     fun fields(): Map<String, Any> = mapOf("kind" to kind, "colorHex" to colorHex,
         "storagePath" to storagePath, "dimming" to dimming, "bubbleColorHex" to bubbleColorHex, "presetId" to presetId, "updatedAt" to FieldValue.serverTimestamp())
+    /** Fotos y presets: blanco con sombra; color liso: el que contraste (≡ iOS). */
+    val floatingTextColor: Color?
+        get() = when (kind) {
+            "photo", "preset" -> Color.White
+            "color" -> runCatching { chatBubbleTextColor(Color(android.graphics.Color.parseColor("#$colorHex"))) }.getOrNull()
+            else -> null
+        }
+
     companion object {
         fun from(data: Map<String, Any>?) = ChatWallpaper(
             data?.get("kind") as? String ?: "default", data?.get("colorHex") as? String ?: "DCE8E4",
             data?.get("storagePath") as? String ?: "", (data?.get("dimming") as? Number)?.toDouble()?.coerceIn(0.0, 0.75) ?: 0.2, data?.get("bubbleColorHex") as? String ?: "3F6F8F", data?.get("presetId") as? String ?: "",
         )
     }
+}
+
+/** Color de burbuja guardado en este dispositivo para un chat (sin lecturas de red); por defecto si nunca se abrió (≡ iOS). */
+fun cachedChatBubbleColor(context: Context, uid: String, conversationId: String): Color {
+    val fallback = ChatWallpaper().bubbleColorHex
+    val hex = if (uid.isEmpty() || conversationId.isEmpty()) fallback else runCatching {
+        JSONObject(
+            context.getSharedPreferences("chat_wallpapers", Context.MODE_PRIVATE).getString("$uid:$conversationId", "{}")!!,
+        ).optString("bubbleColorHex", fallback)
+    }.getOrDefault(fallback)
+    return runCatching { Color(android.graphics.Color.parseColor("#$hex")) }.getOrDefault(Color(0xFF3F6F8F))
 }
 
 internal class ChatWallpaperState(context: Context, val uid: String, val conversationId: String) {

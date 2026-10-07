@@ -221,7 +221,8 @@ fun GlassmorphicChatRootContent(
     val appearance = com.moments.android.views.messaging.components.rememberWallpaper(viewModel.conversation.id.orEmpty())
     val outgoing = runCatching { Color(android.graphics.Color.parseColor("#${appearance.wallpaper.bubbleColorHex}")) }.getOrDefault(Color(0xFF3F6F8F))
     CompositionLocalProvider(LocalChatFailedMessageRetryAction provides failedRetry,
-        com.moments.android.views.messaging.components.LocalChatOutgoingBubbleColor provides outgoing) {
+        com.moments.android.views.messaging.components.LocalChatOutgoingBubbleColor provides outgoing,
+        com.moments.android.views.messaging.components.LocalChatFloatingTextColor provides appearance.wallpaper.floatingTextColor) {
         Box(modifier.fillMaxSize().background(adaptiveColors.chatBackground.first())) {
             com.moments.android.views.messaging.components.WallpaperCanvas(
                 value = appearance.wallpaper, image = appearance.image,

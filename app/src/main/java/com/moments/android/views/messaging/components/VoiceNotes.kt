@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
@@ -512,7 +513,7 @@ fun GlassmorphicAudioMessage(
         side = if (isCurrentUser) ChatBubbleSide.TRAILING else ChatBubbleSide.LEADING,
         position = groupPosition,
         cornerRadius = 18.dp,
-        joinedRadius = 6.dp,
+        joinedRadius = ChatTextBubbleMetrics.joinedRadius,
     )
 
     val player = remember { ExoPlayer.Builder(context).build().withMomentsAudioFocus(context) }
@@ -777,11 +778,15 @@ fun GlassmorphicAudioMessage(
                         color = contentColor,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        // Ancho fijo (≡ VoiceMessageLayout.speedControlWidth): 1×/1.5×/2× no mueven la onda.
                         modifier = Modifier
+                            .width(VoiceMessageLayout.speedControlWidth.dp)
                             .clip(RoundedCornerShape(50))
                             .background(contentColor.copy(alpha = if (dark) 0.15f else 0.12f))
                             .clickable { cycleRate() }
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                            .padding(vertical = 4.dp),
                     )
                 }
             }

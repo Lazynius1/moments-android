@@ -430,7 +430,8 @@ fun Modifier.chatMessagePressClassifier(
                 }
             } == null
             if (timedOut && !cancelled && !liftedEarly) {
-                HapticManager.shared.heavyImpact()
+                // Medio, no fuerte (≡ iOS menú contextual).
+                HapticManager.shared.mediumImpact()
                 onLongPressUpdated.value()
                 while (true) {
                     val event = awaitPointerEvent(PointerEventPass.Main)

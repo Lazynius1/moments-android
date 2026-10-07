@@ -1739,10 +1739,6 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="chat_vanish_swipe_hint_off">Veeg omhoog om verdwijnende berichten uit te schakelen</string>
     <string name="chat_vanish_active_accessibility">Verdwijnende berichten zijn ingeschakeld</string>
     <string name="chat_vanish_inactive_accessibility">Verdwijnende berichten zijn uitgeschakeld</string>
-    <string name="chat_vanish_notice_enabled_self">Je hebt verdwijnende berichten ingeschakeld. Nieuwe berichten en reacties verdwijnen</string>
-    <string name="chat_vanish_notice_enabled_other">%1$s heeft verdwijnende berichten ingeschakeld. Nieuwe berichten en reacties verdwijnen</string>
-    <string name="chat_vanish_notice_enabled">%1$s voor %2$s</string>
-    <string name="chat_vanish_notice_enabled_suffix">.</string>
     <string name="chat_vanish_notice_change">Wijzigen</string>
     <string name="chat_vanish_notice_disabled_self">Je hebt verdwijnende berichten uitgezet.</string>
     <string name="chat_vanish_notice_disabled_other">%1$s heeft verdwijnende berichten uitgezet.</string>
@@ -3019,4 +3015,17 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="maps_chrome_recenter">Mijn locatie</string>
     <string name="settings_group_profile_content">Profiel en inhoud</string>
     <string name="settings_group_messaging_privacy">Berichten en interacties</string>
+    <string name="chat_vanish_notice_enabled_self_format">Je hebt verdwijnende berichten ingeschakeld. Nieuwe berichten en reacties verdwijnen %1$s.</string>
+    <string name="chat_vanish_notice_enabled_other_format">%1$s heeft verdwijnende berichten ingeschakeld. Nieuwe berichten en reacties verdwijnen %2$s.</string>
+    <string name="notification_message_view_once_photo">Heeft je een foto gestuurd</string>
+    <string name="notification_message_view_once_video">Heeft je een video gestuurd</string>
+    <string name="chat_preview_view_once_tap_photo">Foto bekijken</string>
+    <string name="chat_preview_view_once_tap_video">Video bekijken</string>
+    <string name="chat_view_once_inbox_action">Afspelen</string>
+    <string name="chat_preview_view_once_sent_photo">Heeft een foto gestuurd</string>
+    <string name="chat_preview_view_once_sent_video">Heeft een video gestuurd</string>
+    <string name="chat_message_undecryptable">Dit bericht kan niet worden weergegeven</string>
+    <string name="chat_error_conversation_key_missing">De versleutelingssleutel van deze chat is nog niet beschikbaar op dit apparaat. Probeer het later opnieuw of herstel je chats.</string>
+    <string name="chat_outbox_channel_name">Berichten verzenden</string>
+    <string name="chat_outbox_sending">Berichten verzenden…</string>
 </resources>

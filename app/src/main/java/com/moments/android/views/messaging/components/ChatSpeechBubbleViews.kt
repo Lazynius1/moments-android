@@ -74,7 +74,8 @@ object ChatTextBubbleMetrics {
     val verticalPadding = 12.dp
     val lineSpacing = 2.dp
     val cornerRadius = 20.dp
-    val joinedRadius = 4.dp
+    /** Esquina unida en ráfagas; común a texto, media, audio y borrados. */
+    val joinedRadius = 5.dp
     /** ≡ iOS `maxWidthScreenFraction` (fracción del contenedor del chat). */
     const val maxWidthScreenFraction = 0.78f
     const val maxWidthFraction = maxWidthScreenFraction
@@ -146,39 +147,40 @@ fun rememberChatMediaDimensions(message: com.moments.android.views.messaging.cor
 
 object ChatMediaCardLayout {
     val standaloneMaxWidth = 240.dp
-    val standaloneMaxHeight = 272.dp
+    val standaloneMaxHeight = 240.dp
+    val landscapeMaxWidth = 260.dp
     val clusterMaxWidth = 220.dp
     val clusterMaxHeight = 244.dp
 
+    /** Verticales recortadas a 4:5 y horizontales enteras hasta 16:9. */
     fun standaloneSize(width: Int?, height: Int?, bubbleMaxWidth: Dp): DpSize {
         val isLandscape = width != null && height != null && width > 0 && height > 0 && width > height
         return fittedSize(
             width, height,
-            if (isLandscape) bubbleMaxWidth else minOf(standaloneMaxWidth, bubbleMaxWidth),
-            maximumAspect = if (isLandscape) 1.5f else null,
+            minOf(if (isLandscape) landscapeMaxWidth else standaloneMaxWidth, bubbleMaxWidth),
+            minimumAspect = 4f / 5f,
+            maximumAspect = if (isLandscape) 16f / 9f else null,
         )
     }
 
-    fun fittedSize(width: Int?, height: Int?, maxWidth: Dp, maxHeight: Dp = standaloneMaxHeight, maximumAspect: Float? = null): DpSize {
+    fun fittedSize(width: Int?, height: Int?, maxWidth: Dp, maxHeight: Dp = standaloneMaxHeight, minimumAspect: Float = 3f / 4f, maximumAspect: Float? = null): DpSize {
         val sourceWidth = width?.takeIf { it > 0 }?.toFloat() ?: 208f
         val sourceHeight = height?.takeIf { it > 0 }?.toFloat() ?: 272f
-        // Las miniaturas muy verticales se recortan a 3:4; el visor conserva el archivo completo.
-        val previewAspect = minOf(maxOf(sourceWidth / sourceHeight, 3f / 4f), maximumAspect ?: Float.MAX_VALUE)
+        // Las miniaturas muy verticales se recortan (3:4 en ráfagas, 4:5 sueltas); el visor conserva el archivo completo.
+        val previewAspect = minOf(maxOf(sourceWidth / sourceHeight, minimumAspect), maximumAspect ?: Float.MAX_VALUE)
         val fittedWidth = minOf(maxWidth.value, maxHeight.value * previewAspect)
         return DpSize(fittedWidth.dp, (fittedWidth / previewAspect).dp)
     }
 }
 
-/** ≡ iOS `ChatMessageFont.bubble` (~16pt escalado con tamaño de texto del sistema). */
+/**
+ * ≡ iOS `ChatMessageFont.bubble` (16pt + lineSpacing 2).
+ * Valores en sp sin multiplicar por fontScale: `.sp` ya escala con el tamaño de texto del sistema.
+ */
 object ChatMessageFont {
-    @Composable
-    fun bubbleSizeSp(): Float {
-        val scale = LocalConfiguration.current.fontScale.coerceIn(0.85f, 1.6f)
-        return 16f * scale
-    }
+    fun bubbleSizeSp(): Float = 16f
 
-    @Composable
-    fun bubbleLineHeightSp(): Float = bubbleSizeSp() + 4f
+    fun bubbleLineHeightSp(): Float = 21f
 }
 
 /** ≡ iOS `EnvironmentValues.chatSearchHighlightTerm`. */
@@ -262,7 +264,8 @@ fun ChatTextBubbleView(
     )
     val bubbleFill = if (isOutgoing) outgoingFill else colors.messageBubbleBackground
     val textColor = if (isOutgoing) chatBubbleTextColor(outgoingFill) else colors.messageTextColor
-    val linkColor = if (isOutgoing) chatBubbleTextColor(outgoingFill).copy(alpha = 0.92f) else Color.Blue
+    // ≡ iOS systemBlue (no Material Color.Blue)
+    val linkColor = if (isOutgoing) chatBubbleTextColor(outgoingFill).copy(alpha = 0.92f) else chatSystemBlue(colors.isDark)
     val isActiveSearchMatch = messageId != null && messageId == activeSearchId
     val highlightBg = Color(1f, 0.82f, 0.25f).copy(alpha = if (isActiveSearchMatch) 0.92f else 0.45f)
     val fontSizeSp = ChatMessageFont.bubbleSizeSp()
@@ -297,7 +300,8 @@ fun ChatTextBubbleView(
     ) {
         Column(
             modifier
-                .widthIn(max = maxBubbleWidth)
+                // Con enlace la burbuja no se estira más allá de la tarjeta (≡ iOS).
+                .widthIn(max = if (hasLink) minOf(maxBubbleWidth, LinkPreviewMetrics.embeddedMaxWidth) else maxBubbleWidth)
                 .clip(shape)
                 .background(bubbleFill)
                 .border(
@@ -328,9 +332,9 @@ fun ChatTextBubbleView(
                     ),
                 )
                 .padding(
-                    start = if (hasReply) 6.dp else ChatTextBubbleMetrics.horizontalPadding,
-                    top = if (hasReply) 6.dp else ChatTextBubbleMetrics.verticalPadding,
-                    end = if (hasReply) 6.dp else ChatTextBubbleMetrics.horizontalPadding,
+                    start = when { hasReply -> 6.dp; hasLink -> LinkPreviewMetrics.embeddedInset; else -> ChatTextBubbleMetrics.horizontalPadding },
+                    top = when { hasReply -> 6.dp; hasLink -> LinkPreviewMetrics.embeddedInset; else -> ChatTextBubbleMetrics.verticalPadding },
+                    end = when { hasReply -> 6.dp; hasLink -> LinkPreviewMetrics.embeddedInset; else -> ChatTextBubbleMetrics.horizontalPadding },
                     bottom = if (hasReply) 8.dp else ChatTextBubbleMetrics.verticalPadding,
                 ),
             horizontalAlignment = Alignment.Start,
@@ -346,7 +350,13 @@ fun ChatTextBubbleView(
                 Column(
                     Modifier
                         .then(if (hasReply || hasLink) Modifier.fillMaxWidth() else Modifier)
-                        .padding(horizontal = if (hasReply) 4.dp else 0.dp),
+                        .padding(
+                            horizontal = when {
+                                hasReply -> 4.dp
+                                hasLink -> ChatTextBubbleMetrics.horizontalPadding - LinkPreviewMetrics.embeddedInset
+                                else -> 0.dp
+                            },
+                        ),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     annotatedBlocks.forEach { (block, annotated) ->

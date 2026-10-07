@@ -223,12 +223,6 @@
     <string name="chat_sending">Sending</string>
     <string name="chat_unpin_action">Unpin message</string>
     <string name="chat_vanish_notice_disabled">You turned off disappearing messages.</string>
-    <string name="chat_vanish_notice_duration_24h">24 hours after everyone has seen them</string>
-    <string name="chat_vanish_notice_duration_7d">7 days after everyone has seen them</string>
-    <string name="chat_vanish_notice_duration_once_seen">once everyone has seen them</string>
-    <string name="chat_vanish_notice_enabled_prefix">You turned on disappearing messages. New messages and reactions will disappear</string>
-    <string name="chat_vanish_notice_enabled_prefix_other">%1$s turned on disappearing messages. New messages and reactions will disappear</string>
-    <string name="chat_vanish_notice_enabled_prefix_self">You turned on disappearing messages. New messages and reactions will disappear</string>
     <string name="chat_view_once_auto_delete">Will be deleted on close</string>
     <string name="chat_view_once_media_opened">Media viewed</string>
     <string name="chat_view_once_photo_opened">Photo viewed</string>

@@ -46,9 +46,12 @@ object MessageCatchUpService {
             .take(MAX_CONVERSATIONS_PER_SYNC)
 
         scope.launch {
-            preloadKeys(batch.mapNotNull { it.id })
+            // Saltar chats sin novedades: ni red ni descifrado si la caché local ya está al día.
+            val withNews = batch.filter { hasPotentialNews(it, userId) }
+            if (withNews.isEmpty()) return@launch
+            preloadKeys(withNews.mapNotNull { it.id })
             coroutineScope {
-                batch.mapNotNull { it.id }.map { conversationId ->
+                withNews.mapNotNull { it.id }.map { conversationId ->
                     async { sync(conversationId) }
                 }.awaitAll()
             }
@@ -82,6 +85,20 @@ object MessageCatchUpService {
             inFlightConversationIds.remove(conversationId)
         }
     }
+
+    /**
+     * Hay posibles mensajes nuevos si el chat está sin leer, no hay caché local o el `timestamp`
+     * de la conversación supera al último mensaje cacheado. Margen: el doc se actualiza con un
+     * serverTimestamp posterior al del propio mensaje (escritura separada).
+     */
+    private suspend fun hasPotentialNews(conversation: Conversation, userId: String): Boolean {
+        val conversationId = conversation.id ?: return false
+        if (!(conversation.readStatus[userId] ?: true)) return true
+        val cursor = LocalPersistenceService.lastMessageSyncCursorInBackground(conversationId) ?: return true
+        return conversation.timestamp.time - cursor.timestamp.time > NO_NEWS_TOLERANCE_MS
+    }
+
+    private const val NO_NEWS_TOLERANCE_MS = 3_000L
 
     fun resetOnSignOut() {
         lastFullSyncAt = null

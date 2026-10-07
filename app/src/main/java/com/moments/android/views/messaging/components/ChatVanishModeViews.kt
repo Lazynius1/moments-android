@@ -1,5 +1,9 @@
 package com.moments.android.views.messaging.components
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Videocam
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -444,7 +448,7 @@ private fun ChatVanishPullRevealContent(progress: Float, isActive: Boolean, isDr
         Text(
             text = stringResource(hintRes),
             color = colors.secondary.copy(alpha = 0.62f),
-            fontSize = 10.sp,
+            fontSize = vanishNoticeFontSize(),
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 28.dp),
         )
@@ -486,27 +490,31 @@ fun ChatDisappearingNoticeRow(
     val isSelfActor = actorUserId.isNullOrBlank() || actorUserId == currentUserId
     val actorName = otherParticipantName.trim().ifBlank { stringResource(R.string.messaging_user_default) }
     val isDark = isSystemInDarkTheme()
-    val bodyColor = if (isDark) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.42f)
+    // Sobre el fondo, sin píldora; con fondo personalizado gana contraste (≡ iOS).
+    val bodyColor = chatFloatingTextColor(if (isDark) Color.White.copy(alpha = 0.85f) else Color.Black.copy(alpha = 0.72f))
+    val bodyShadow = chatFloatingTextShadow()
     val actionColor = LocalChatOutgoingBubbleColor.current
+    // Token legacy "chat.vanish.enabled" ≡ 24 h (como iOS).
     val timer = VanishMessageTimer.parseEnabledNotice(noticeToken)
+        ?: VanishMessageTimer.HOURS_24.takeIf { noticeToken == "chat.vanish.enabled" }
 
     val content: @Composable () -> Unit = when {
         timer != null -> {
             {
-                val prefix = if (isSelfActor) {
-                    stringResource(R.string.chat_vanish_notice_enabled_self)
+                // Frase completa con la duración como argumento: cada idioma decide el orden.
+                val duration = stringResource(timer.noticeDurationRes)
+                val body = if (isSelfActor) {
+                    stringResource(R.string.chat_vanish_notice_enabled_self_format, duration)
                 } else {
-                    stringResource(R.string.chat_vanish_notice_enabled_other, actorName)
+                    stringResource(R.string.chat_vanish_notice_enabled_other_format, actorName, duration)
                 }
-                val body = prefix +
-                    stringResource(timer.noticeDurationRes) +
-                    stringResource(R.string.chat_vanish_notice_enabled_suffix)
                 ChatVanishNoticeAction(
                     body = body,
                     action = stringResource(R.string.chat_vanish_notice_change),
                     bodyColor = bodyColor,
                     actionColor = actionColor,
                     onClick = onChangeTimer,
+                    shadow = bodyShadow,
                 )
             }
         }
@@ -523,6 +531,7 @@ fun ChatDisappearingNoticeRow(
                     bodyColor = bodyColor,
                     actionColor = actionColor,
                     onClick = onTurnOn,
+                    shadow = bodyShadow,
                 )
             }
         }
@@ -531,21 +540,6 @@ fun ChatDisappearingNoticeRow(
         }
         noticeToken == VanishMessageTimer.SCREEN_RECORDING_NOTICE_TOKEN -> {
             { ChatVanishPlainNotice(R.string.chat_vanish_screen_recording, bodyColor) }
-        }
-        noticeToken == "chat.vanish.enabled" -> {
-            {
-                val prefix = stringResource(R.string.chat_vanish_notice_enabled_self)
-                val body = prefix +
-                    stringResource(R.string.chat_vanish_duration_24h) +
-                    stringResource(R.string.chat_vanish_notice_enabled_suffix)
-                ChatVanishNoticeAction(
-                    body = body,
-                    action = stringResource(R.string.chat_vanish_notice_change),
-                    bodyColor = bodyColor,
-                    actionColor = actionColor,
-                    onClick = onChangeTimer,
-                )
-            }
         }
         noticeToken.startsWith("chat.vanish.") -> {
             { ChatVanishPlainNotice(noticeToken, bodyColor) }
@@ -571,14 +565,15 @@ private fun ChatVanishNoticeAction(
     bodyColor: Color,
     actionColor: Color,
     onClick: (() -> Unit)?,
+    shadow: androidx.compose.ui.graphics.Shadow? = null,
 ) {
     // ≡ iOS Text concatenation: body + " " + action inline (no Row — evita “Change” vertical).
     val annotated = buildAnnotatedString {
-        withStyle(SpanStyle(color = bodyColor, fontSize = 10.sp, fontWeight = FontWeight.Normal)) {
+        withStyle(SpanStyle(color = bodyColor, fontSize = vanishNoticeFontSize(), fontWeight = FontWeight.Normal, shadow = shadow)) {
             append(body)
             if (!body.endsWith(" ")) append(" ")
         }
-        withStyle(SpanStyle(color = actionColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)) {
+        withStyle(SpanStyle(color = actionColor, fontSize = vanishNoticeFontSize(), fontWeight = FontWeight.SemiBold, shadow = shadow)) {
             append(action)
         }
     }
@@ -593,12 +588,12 @@ private fun ChatVanishNoticeAction(
 
 @Composable
 private fun ChatVanishPlainNotice(@StringRes noticeRes: Int, color: Color) {
-    Text(stringResource(noticeRes), color = color, fontSize = 10.sp, textAlign = TextAlign.Center)
+    Text(stringResource(noticeRes), color = color, fontSize = vanishNoticeFontSize(), textAlign = TextAlign.Center, style = androidx.compose.ui.text.TextStyle(shadow = chatFloatingTextShadow()))
 }
 
 @Composable
 private fun ChatVanishPlainNotice(notice: String, color: Color) {
-    Text(notice, color = color, fontSize = 10.sp, textAlign = TextAlign.Center)
+    Text(notice, color = color, fontSize = vanishNoticeFontSize(), textAlign = TextAlign.Center, style = androidx.compose.ui.text.TextStyle(shadow = chatFloatingTextShadow()))
 }
 
 /**
@@ -684,20 +679,44 @@ fun ChatVanishTimerSheet(
     }
 }
 
+/** Ver una vez recibido sin abrir, en la lista de chats: botón cápsula "▶ Reproducir" que abre directamente el visor (≡ iOS `ChatViewOnceInboxAction`). */
 @Composable
-fun ChatViewOnceInboxIndicator(modifier: Modifier = Modifier) {
-    // iOS liquidGlass → círculo sólido (sin material/blur).
-    Box(
+fun ChatViewOnceInboxAction(
+    isVideo: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = Color(0xFF3F6F8F),
+    isLoading: Boolean = false,
+) {
+    val onTint = chatBubbleTextColor(tint)
+    val label = stringResource(if (isVideo) R.string.chat_preview_view_once_tap_video else R.string.chat_preview_view_once_tap_photo)
+    Row(
         modifier
-            .size(22.dp)
-            .background(Color(0xFF007AFF), CircleShape),
-        contentAlignment = Alignment.Center,
+            .height(34.dp)
+            .clip(RoundedCornerShape(50))
+            .background(tint)
+            // Mientras abre el visor no admite otra pulsación.
+            .clickable(enabled = !isLoading, onClick = onClick)
+            .padding(horizontal = 14.dp)
+            .semantics(mergeDescendants = true) { contentDescription = label },
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            Icons.Default.PlayArrow,
-            contentDescription = stringResource(R.string.chat_view_once_tap_to_view),
-            tint = Color.White,
-            modifier = Modifier.size(13.dp),
+        if (isLoading) {
+            androidx.compose.material3.CircularProgressIndicator(
+                color = onTint,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(16.dp),
+            )
+        } else {
+            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = onTint, modifier = Modifier.size(16.dp))
+        }
+        Text(
+            stringResource(R.string.chat_view_once_inbox_action),
+            color = onTint,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
         )
     }
 }
@@ -768,3 +787,8 @@ private val VanishMessageTimer.noticeDurationRes: Int
         VanishMessageTimer.HOURS_24 -> R.string.chat_vanish_duration_24h
         VanishMessageTimer.DAYS_7 -> R.string.chat_vanish_duration_7d
     }
+
+/** Tamaño fijo (no sigue el tamaño de letra del sistema), ≡ iOS `noticeFont`. */
+@Composable
+private fun vanishNoticeFontSize(): androidx.compose.ui.unit.TextUnit =
+    with(androidx.compose.ui.platform.LocalDensity.current) { 10.dp.toSp() }

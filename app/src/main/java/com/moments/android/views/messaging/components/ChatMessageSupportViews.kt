@@ -1,6 +1,11 @@
 package com.moments.android.views.messaging.components
 
 import androidx.compose.foundation.background
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -75,6 +80,12 @@ import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageStatus
 import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.shared.ScreenshotProtectionMode
+import com.moments.android.views.messaging.core.MessageType
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.draw.alpha
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.IntrinsicSize
 
 data class ChatFailedMessageRetryAction(
     val canRetry: (EnhancedMessage) -> Boolean,
@@ -131,9 +142,11 @@ fun ChatComposerReplyHeader(
     val colors = AdaptiveColors(isDark)
     val currentUserId = remember { FirebaseAuth.getInstance().currentUser?.uid.orEmpty() }
     val fromSelf = message.senderId == currentUserId
+    // Acento propio = color de burbuja saliente elegido por el usuario (≡ iOS chatOutgoingBubbleColor).
+    val ownAccent = LocalChatOutgoingBubbleColor.current
     val accent = when {
-        mode == ChatComposerContextMode.Edit -> colors.userAccentColor
-        fromSelf -> colors.userAccentColor
+        mode == ChatComposerContextMode.Edit -> ownAccent
+        fromSelf -> ownAccent
         else -> colors.receivedAccentColor
     }
     val surface = if (isDark) Color(0xFF151C1D) else Color(0xFFE8EEF0)
@@ -214,6 +227,13 @@ fun ChatComposerReplyHeader(
 }
 
 object MessageReactionMetrics {
+    /** Píldora "❤️ 2" cuando una reacción tiene contador (≡ iOS). Cabe en el badge: no altera el estimador. */
+    val pillHeight = 22.dp
+    val pillHorizontalPadding = 7.dp
+    val pillBorderWidth = 2.dp
+    const val pillEmojiSize = 15f
+    const val pillCountSize = 12f
+
     fun emojiSize(compact: Boolean, cluster: Boolean = false): Float =
         when {
             cluster -> 12f
@@ -356,12 +376,21 @@ fun GlassmorphicReplyPreview(
     }
 }
 
+object StackedReplyQuoteMetrics {
+    val textOverlap = 10.dp
+    val mediaOverlap = 12.dp
+    val mediaThumbWidth = 60.dp
+    val mediaThumbHeight = 80.dp
+    val mediaTypes = setOf(MessageType.IMAGE, MessageType.VIDEO, MessageType.GIF, MessageType.SHARED_MOMENT, MessageType.SHARED_STORY)
+}
+
 @Composable
 fun StackedReplyQuote(
     repliedMessage: EnhancedMessage,
     isOutgoingRow: Boolean,
     otherParticipantName: String,
     onTap: ((String) -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val colors = AdaptiveColors(isSystemInDarkTheme())
@@ -374,10 +403,20 @@ fun StackedReplyQuote(
         stringResource(R.string.chat_reply_replied_to, otherParticipantName)
     }
     val preview = repliedMessage.preview(context)
+    val mediaThumbUrl = repliedMessage.replyPreviewThumbnailURL
+        ?.takeIf { it.isNotBlank() && !repliedMessage.isViewOnce && repliedMessage.type in StackedReplyQuoteMetrics.mediaTypes }
+    val overlap = if (mediaThumbUrl != null) StackedReplyQuoteMetrics.mediaOverlap else StackedReplyQuoteMetrics.textOverlap
     // Cita tappable: hit-test propio (scroll + highlight del mensaje citado).
+    // La respuesta se superpone sobre el borde inferior de la cita (≡ iOS `StackedReplyQuote`).
     val body: @Composable () -> Unit = {
         Column(
-            Modifier
+            modifier
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    layout(placeable.width, (placeable.height - overlap.roundToPx()).coerceAtLeast(0)) {
+                        placeable.place(0, 0)
+                    }
+                }
                 .widthIn(max = 240.dp)
                 .clip(RoundedCornerShape(13.dp))
                 .clickable(
@@ -397,19 +436,56 @@ fun StackedReplyQuote(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.AutoMirrored.Filled.Reply, null, tint = colors.messageTextColor.copy(0.5f), modifier = Modifier.size(11.dp))
-                Text(caption, color = colors.messageTextColor.copy(0.5f), fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                Text(
+                    caption,
+                    color = chatFloatingTextColor(colors.messageTextColor.copy(0.5f)),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    style = TextStyle(shadow = chatFloatingTextShadow()),
+                )
             }
             Row(
-                Modifier
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(colors.messageBubbleBackground)
-                    .border(0.5.dp, colors.messageBubbleStroke.copy(alpha = 0.4f), RoundedCornerShape(13.dp))
-                    .padding(horizontal = 9.dp, vertical = 6.dp),
+                Modifier.height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
-                verticalAlignment = Alignment.CenterVertically,
             ) {
-                ReplyThumb(repliedMessage, 26.dp)
-                Text(preview, color = colors.messageTextColor.copy(0.65f), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Box(
+                    Modifier
+                        .width(2.dp)
+                        .fillMaxHeight()
+                        .background(colors.messageTextColor.copy(alpha = 0.22f)),
+                )
+                if (mediaThumbUrl != null) {
+                    Box(
+                        Modifier
+                            .size(StackedReplyQuoteMetrics.mediaThumbWidth, StackedReplyQuoteMetrics.mediaThumbHeight)
+                            .clip(RoundedCornerShape(12.dp))
+                            .alpha(0.75f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AsyncImage(
+                            model = mediaThumbUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.matchParentSize(),
+                        )
+                        if (repliedMessage.type == MessageType.VIDEO) {
+                            Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                } else {
+                    Text(
+                        preview,
+                        color = colors.messageTextColor.copy(0.65f),
+                        fontSize = 13.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(colors.messageBubbleBackground.copy(alpha = 0.7f))
+                            .padding(start = 11.dp, end = 11.dp, top = 7.dp, bottom = 7.dp + StackedReplyQuoteMetrics.textOverlap),
+                    )
+                }
             }
         }
     }
@@ -436,11 +512,14 @@ fun EmbeddedReplyView(
     val colors = AdaptiveColors(dark)
     val currentUserId = remember { FirebaseAuth.getInstance().currentUser?.uid.orEmpty() }
     val repliedToSelf = repliedMessage.senderId == currentUserId
-    val accent = if (repliedToSelf) colors.userAccentColor else colors.receivedAccentColor
-    val tint = if (isOutgoingBubble) Color.White.copy(0.18f) else if (dark) Color.White.copy(0.10f) else Color.Black.copy(0.06f)
-    val barColor = if (isOutgoingBubble) Color.White.copy(0.9f) else accent
-    val titleColor = if (isOutgoingBubble) Color.White.copy(0.95f) else accent
-    val bodyColor = if (isOutgoingBubble) Color.White.copy(0.8f) else colors.messageTextColor.copy(0.7f)
+    val outgoingFill = LocalChatOutgoingBubbleColor.current
+    val accent = if (repliedToSelf) outgoingFill else colors.receivedAccentColor
+    // Dentro de la burbuja saliente: color de texto de esa burbuja (contraste con colores claros).
+    val onOutgoing = chatBubbleTextColor(outgoingFill)
+    val tint = if (isOutgoingBubble) onOutgoing.copy(0.18f) else if (dark) Color.White.copy(0.10f) else Color.Black.copy(0.06f)
+    val barColor = if (isOutgoingBubble) onOutgoing.copy(0.9f) else accent
+    val titleColor = if (isOutgoingBubble) onOutgoing.copy(0.95f) else accent
+    val bodyColor = if (isOutgoingBubble) onOutgoing.copy(0.8f) else colors.messageTextColor.copy(0.7f)
     val title = if (repliedToSelf) stringResource(R.string.chat_reply_you) else otherParticipantName
     val preview = repliedMessage.preview(context)
     Row(
@@ -476,7 +555,7 @@ private fun ReplyBarBody(
     val colors = AdaptiveColors(isSystemInDarkTheme())
     val currentUserId = remember { FirebaseAuth.getInstance().currentUser?.uid.orEmpty() }
     val fromSelf = message.senderId == currentUserId
-    val accent = if (fromSelf) colors.userAccentColor else colors.receivedAccentColor
+    val accent = if (fromSelf) LocalChatOutgoingBubbleColor.current else colors.receivedAccentColor
     val name = if (fromSelf) stringResource(R.string.chat_reply_you) else otherParticipantName
     val preview = message.preview(context)
     val corner = if (large) 12.dp else 10.dp
@@ -605,8 +684,41 @@ fun MessageReactionChip(
     val diameter = MessageReactionMetrics.badgeDiameter(compact, cluster)
     val hit = if (cluster) maxOf(44.dp, diameter) else diameter
     val overlap = MessageReactionMetrics.overlapSpacing(compact, cluster)
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(overlap)) {
+    val colors = AdaptiveColors(dark)
+    Row(
+        modifier,
+        horizontalArrangement = Arrangement.spacedBy(overlap),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         entries.forEach { (emoji, count) ->
+            if (count > 1 && !cluster) {
+                // Píldora horizontal: emoji + contador tabular; borde del fondo del chat la separa de la burbuja.
+                Row(
+                    Modifier
+                        .height(MessageReactionMetrics.pillHeight)
+                        .clip(CircleShape)
+                        .background(colors.messageBubbleBackground)
+                        .border(MessageReactionMetrics.pillBorderWidth, colors.chatBackground.first(), CircleShape)
+                        .clickable { onTap(emoji) }
+                        .semantics { contentDescription = "$emoji $count" }
+                        .padding(horizontal = MessageReactionMetrics.pillHorizontalPadding),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(emoji, fontSize = MessageReactionMetrics.pillEmojiSize.sp, maxLines = 1)
+                    Text(
+                        count.toString(),
+                        maxLines = 1,
+                        style = TextStyle(
+                            fontSize = MessageReactionMetrics.pillCountSize.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            fontFeatureSettings = "tnum",
+                            color = colors.messageTextColor.copy(alpha = if (dark) 0.9f else 0.75f),
+                        ),
+                    )
+                }
+                return@forEach
+            }
             Box(
                 Modifier
                     .size(hit)
@@ -680,6 +792,9 @@ fun MessageReactionOverlayBox(
             .take(5)
     }
     val visibleCount = visibleEntries.size
+    // Ancho medido del chip: con píldoras ya no es n × diámetro.
+    var chipWidthPx by remember { mutableIntStateOf(0) }
+    val flash = LocalChatBubbleFlashHighlight.current
     Box(Modifier.padding(bottom = if ((hasReactions || isStarred) && !anchoredInsideBounds) rowSpacing else 0.dp)) {
         Box(
             Modifier
@@ -696,7 +811,8 @@ fun MessageReactionOverlayBox(
                         val overlapPx = with(density) {
                             MessageReactionMetrics.overlapSpacing(compact).toPx()
                         }
-                        val chipWidth = diameterPx + (visibleCount - 1) * (diameterPx + overlapPx)
+                        val chipWidth = chipWidthPx.takeIf { it > 0 }?.toFloat()
+                            ?: (diameterPx + (visibleCount - 1) * (diameterPx + overlapPx))
                         val cutoutW = chipWidth + gapPx * 2f
                         val cutoutH = diameterPx + gapPx * 2f
                         val cutoutX = if (isOutgoing) horizontalPx - gapPx else -horizontalPx + gapPx
@@ -737,7 +853,18 @@ fun MessageReactionOverlayBox(
                     }
                 },
         ) {
-            content()
+            CompositionLocalProvider(LocalChatBubbleFlashHighlight provides null) {
+                content()
+            }
+            // Flash dentro de la burbuja (su forma real), sin cubrir el hueco inferior de reacciones.
+            flash?.let {
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .clip(it.shape)
+                        .background(it.tint),
+                )
+            }
         }
         reactions?.takeIf { !badgesHidden && it.isNotEmpty() }?.let { nonEmpty ->
             MessageReactionChip(
@@ -745,6 +872,7 @@ fun MessageReactionOverlayBox(
                 onTap = onTap,
                 compact = compact,
                 modifier = Modifier
+                    .onSizeChanged { chipWidthPx = it.width }
                     .align(if (isOutgoing) Alignment.BottomStart else Alignment.BottomEnd)
                     .offset(
                         x = if (isOutgoing) horizontal else -horizontal,
@@ -792,15 +920,17 @@ fun MessageTimestamp(
             Text(
                 time,
                 fontSize = 11.sp,
-                color = colors.timestampColor,
+                color = chatFloatingTextColor(colors.timestampColor),
                 maxLines = 1,
                 softWrap = false,
+                style = TextStyle(shadow = chatFloatingTextShadow()),
             )
             Text(
                 stringResource(R.string.chat_seen),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
-                color = colors.timestampColor.copy(0.9f),
+                color = chatFloatingTextColor(colors.timestampColor.copy(0.9f)),
+                style = TextStyle(shadow = chatFloatingTextShadow()),
                 maxLines = 1,
                 softWrap = false,
             )
@@ -814,9 +944,10 @@ fun MessageTimestamp(
             Text(
                 time,
                 fontSize = 11.sp,
-                color = colors.timestampColor,
+                color = chatFloatingTextColor(colors.timestampColor),
                 maxLines = 1,
                 softWrap = false,
+                style = TextStyle(shadow = chatFloatingTextShadow()),
             )
             if (isCurrentUser) {
                 MessageStatusIcon(status)
@@ -836,9 +967,10 @@ fun MessageStatusIcon(status: MessageStatus) {
             Icon(Icons.Default.Check, null, tint = colors.timestampColor, modifier = Modifier.size(10.dp))
             Icon(Icons.Default.Check, null, tint = colors.timestampColor, modifier = Modifier.size(10.dp))
         }
+        // Leído con el color de burbuja saliente elegido (≡ iOS chatOutgoingBubbleColor).
         MessageStatus.READ -> Row(horizontalArrangement = Arrangement.spacedBy((-3).dp)) {
-            Icon(Icons.Default.Check, null, tint = colors.userAccentColor, modifier = Modifier.size(10.dp))
-            Icon(Icons.Default.Check, null, tint = colors.userAccentColor, modifier = Modifier.size(10.dp))
+            Icon(Icons.Default.Check, null, tint = LocalChatOutgoingBubbleColor.current, modifier = Modifier.size(10.dp))
+            Icon(Icons.Default.Check, null, tint = LocalChatOutgoingBubbleColor.current, modifier = Modifier.size(10.dp))
         }
         MessageStatus.FAILED -> Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Warning, null, tint = Color.Red, modifier = Modifier.size(10.dp))

@@ -1139,7 +1139,7 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="chat_buzz_cooldown">Warte kurz, bevor du noch einen Anstupser sendest</string>
     <string name="conversation_settings_starred">Markierte Nachrichten</string>
     <string name="conversation_settings_vanish_desc">Bestimme, wie lange deine Nachrichten und Reaktionen im Chat sichtbar bleiben. Du kannst festlegen, dass sie direkt nach dem Lesen und Schließen des Chats verschwinden, oder sie bis zu 7 Tage lang behalten. Zum Schutz deiner Privatsphäre wird eine Benachrichtigung im Chat gesendet, wenn jemand einen Screenshot oder eine Bildschirmaufnahme macht.</string>
-    <string name="conversation_settings_vanish">Verschwindende Nachrichten</string>
+    <string name="conversation_settings_vanish">Selbstlöschende Nachrichten</string>
     <string name="conversation_settings_preferences">Chat-Einstellungen</string>
     <string name="conversation_settings_privacy_and_security">Privatsphäre und Sicherheit</string>
     <string name="conversation_settings_hide">Ausblenden</string>
@@ -1259,11 +1259,11 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="chat_read_and_more">und %1$d weitere</string>
     <string name="chat_seen">Gesehen</string>
     <string name="chat_recovery_six_digits">6 Ziffern</string>
-    <string name="chat_vanish_swipe_release">Loslassen, um verschwindende Nachrichten zu aktivieren</string>
-    <string name="chat_vanish_swipe_release_off">Loslassen, um verschwindende Nachrichten zu deaktivieren</string>
+    <string name="chat_vanish_swipe_release">Loslassen, um selbstlöschende Nachrichten zu aktivieren</string>
+    <string name="chat_vanish_swipe_release_off">Loslassen, um selbstlöschende Nachrichten zu deaktivieren</string>
     <string name="chat_vanish_notice_turn_on">Aktivieren</string>
     <string name="chat_vanish_duration_24h">24 Stunden, nachdem alle sie gesehen haben</string>
-    <string name="chat_vanish_timer_sheet_title">Verschwindende Nachrichten</string>
+    <string name="chat_vanish_timer_sheet_title">Selbstlöschende Nachrichten</string>
     <string name="chat_vanish_timer_24h">24 Stunden</string>
     <string name="chat_vanish_timer_off">Aus</string>
     <string name="messaging_menu_mark_unread">Als ungelesen markieren</string>
@@ -1925,13 +1925,10 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="question_responses_prompt_label">Sticker</string>
     <string name="question_responses_question_label">Frage</string>
     <string name="chat_a11y_spoiler_hint">Verborgener Inhalt. Zum Anzeigen tippen.</string>
-    <string name="chat_vanish_notice_enabled_self">Du hast verschwindende Nachrichten aktiviert. Neue Nachrichten und Reaktionen verschwinden</string>
-    <string name="chat_vanish_notice_enabled_other">%1$s hat verschwindende Nachrichten aktiviert. Neue Nachrichten und Reaktionen verschwinden</string>
-    <string name="chat_vanish_duration_once_seen">sobald alle sie gesehen haben</string>
+    <string name="chat_vanish_duration_once_seen">direkt, nachdem alle sie gesehen haben</string>
     <string name="chat_vanish_duration_7d">7 Tage, nachdem alle sie gesehen haben</string>
-    <string name="chat_vanish_notice_enabled_suffix">.</string>
-    <string name="chat_vanish_notice_disabled_self">Du hast verschwindende Nachrichten deaktiviert.</string>
-    <string name="chat_vanish_notice_disabled_other">%1$s hat verschwindende Nachrichten deaktiviert.</string>
+    <string name="chat_vanish_notice_disabled_self">Du hast selbstlöschende Nachrichten deaktiviert.</string>
+    <string name="chat_vanish_notice_disabled_other">%1$s hat selbstlöschende Nachrichten deaktiviert.</string>
     <string name="messaging_compose_title">Neue Nachricht</string>
     <string name="chat_loading">Wird geladen...</string>
     <string name="chat_voice_record_locked">Aufnahme gesperrt</string>
@@ -2136,7 +2133,6 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="chat_shared_moment">Hat einen Moment geteilt</string>
     <string name="chat_shared_story">Hat eine Story geteilt</string>
     <string name="chat_toolbar_profile">Profil öffnen</string>
-    <string name="chat_vanish_notice_enabled">%1$s für %2$s</string>
     <string name="chat_view_once_video">Video</string>
     <string name="chat_voice_duration">%1$d:%2$02d</string>
     <string name="chat_voice_speed">%1$.1fx</string>
@@ -2428,4 +2424,17 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="maps_chrome_recenter">Mein Standort</string>
     <string name="settings_group_profile_content">Profil und Inhalte</string>
     <string name="settings_group_messaging_privacy">Nachrichten und Interaktionen</string>
+    <string name="chat_vanish_notice_enabled_self_format">Du hast selbstlöschende Nachrichten aktiviert. Neue Nachrichten und Reaktionen verschwinden %1$s.</string>
+    <string name="chat_vanish_notice_enabled_other_format">%1$s hat selbstlöschende Nachrichten aktiviert. Neue Nachrichten und Reaktionen verschwinden %2$s.</string>
+    <string name="notification_message_view_once_photo">Hat dir ein Foto gesendet</string>
+    <string name="notification_message_view_once_video">Hat dir ein Video gesendet</string>
+    <string name="chat_preview_view_once_tap_photo">Foto ansehen</string>
+    <string name="chat_preview_view_once_tap_video">Video ansehen</string>
+    <string name="chat_view_once_inbox_action">Abspielen</string>
+    <string name="chat_preview_view_once_sent_photo">Hat ein Foto gesendet</string>
+    <string name="chat_preview_view_once_sent_video">Hat ein Video gesendet</string>
+    <string name="chat_message_undecryptable">Diese Nachricht kann nicht angezeigt werden</string>
+    <string name="chat_error_conversation_key_missing">Der Verschlüsselungsschlüssel dieses Chats ist auf diesem Gerät noch nicht verfügbar. Versuche es später erneut oder stelle deine Chats wieder her.</string>
+    <string name="chat_outbox_channel_name">Nachrichtenversand</string>
+    <string name="chat_outbox_sending">Nachrichten werden gesendet …</string>
 </resources>

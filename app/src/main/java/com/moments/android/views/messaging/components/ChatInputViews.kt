@@ -289,7 +289,8 @@ fun GlassmorphicInputBar(
     val colors = rememberAdaptiveColors()
     val isDark = isSystemInDarkTheme()
     val showingDraft = voiceRecordingDraft != null || isPreparingVoiceRecordingPreview
-    val composerAccent = colors.userAccentColor
+    // Enviar/aplicar con el color de burbuja saliente elegido por el usuario (≡ iOS chatOutgoingBubbleColor).
+    val composerAccent = LocalChatOutgoingBubbleColor.current
     val composerInputStyle = remember(colors.primary) { composerInputTextStyle(colors.primary) }
     val composerPlaceholderStyle = remember(colors.secondary) { composerPlaceholderTextStyle(colors.secondary) }
     val composerMarkupTransformation = remember(colors.primary, colors.secondary, composerAccent) {
@@ -707,7 +708,7 @@ private fun ComposerFlatSendButton(
             Icon(
                 Icons.AutoMirrored.Filled.Send,
                 contentDescription = null,
-                tint = Color.White,
+                tint = chatBubbleTextColor(accent),
                 modifier = Modifier.size(ComposerInlineSendIconSize),
             )
         }
@@ -739,7 +740,7 @@ private fun ComposerFlatApplyButton(
             Icon(
                 Icons.Default.Check,
                 contentDescription = null,
-                tint = Color.White,
+                tint = chatBubbleTextColor(accent),
                 modifier = Modifier.size(ComposerInlineApplyIconSize),
             )
         }
@@ -925,7 +926,7 @@ private fun VoiceRecordingLockedSendButton(
         Icon(
             Icons.AutoMirrored.Filled.Send,
             contentDescription = null,
-            tint = Color.White,
+            tint = chatBubbleTextColor(accent),
             modifier = Modifier.size(20.dp),
         )
     }

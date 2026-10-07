@@ -10,7 +10,6 @@ import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.MetadataChanges
 import com.moments.android.MomentsApplication
 import com.moments.android.views.messaging.core.ChatMediaPurpose
 import com.moments.android.views.messaging.core.Conversation
@@ -44,7 +43,11 @@ import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.views.messaging.models.ChatLocationPayload
 import com.moments.android.views.messaging.models.LiveLocationDuration
 import com.moments.android.views.shared.ChatPreviewPrivacy
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -115,6 +118,26 @@ object ChatService {
     private val activeListeners =
         mutableMapOf<String, com.google.firebase.firestore.ListenerRegistration>()
     private val listenerGenerations = mutableMapOf<String, Int>()
+
+    /** Consumidor serializado (canal CONFLATED) del listener de mensajes por conversación. */
+    private val messageListenerJobs = ConcurrentHashMap<String, Job>()
+
+    /**
+     * Ventana del último snapshot `limitToLast` del chat abierto. Sirve para distinguir un mensaje
+     * borrado de uno que solo salió por arriba de la ventana.
+     */
+    data class MessagesSnapshotWindow(
+        val documentCount: Int,
+        val limit: Int,
+        val oldestTimestamp: Date?,
+    ) {
+        /** Ventana no llena → todo lo que desaparece se ha borrado de verdad. */
+        val isFull: Boolean get() = documentCount >= limit
+    }
+
+    /** Ids ya marcados como entregados en este proceso (evita reescribir en cada snapshot). */
+    private val deliveredRequestedIds = ConcurrentHashMap.newKeySet<String>()
+    private const val FIRESTORE_BATCH_LIMIT = 500
 
     private val _typingUsers = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
     val typingUsers: StateFlow<Map<String, Set<String>>> = _typingUsers.asStateFlow()
@@ -461,8 +484,13 @@ object ChatService {
         }
     }
 
+    /** Compat (reenvío): si no descifra devuelve la entrada tal cual. */
     suspend fun decryptMessageContent(content: String, conversationId: String): String =
         EncryptionService.decryptChatMessage(content, conversationId) ?: content
+
+    /** `null` si no se puede descifrar: para previews/búsqueda, nunca mostrar ciphertext. */
+    suspend fun decryptMessageContentOrNull(content: String, conversationId: String): String? =
+        EncryptionService.decryptChatMessage(content, conversationId)
 
     // sendBuzz → ChatServiceBuzz.kt (≡ ChatService+Buzz.swift)
 
@@ -474,6 +502,7 @@ object ChatService {
         cutoffDate: Date? = null,
         limit: Int = 50,
         replaceExisting: Boolean = true,
+        onSnapshotWindow: ((MessagesSnapshotWindow) -> Unit)? = null,
         onUpdate: (Result<List<EnhancedMessage>>) -> Unit,
     ) {
         if (conversationId.isBlank()) return
@@ -481,9 +510,45 @@ object ChatService {
 
         val generation = beginListenerGeneration(conversationId)
         activeListeners.remove(conversationId)?.remove()
+        messageListenerJobs.remove(conversationId)?.cancel()
 
         fun attachListener() {
             if (!isCurrentListenerGeneration(generation, conversationId)) return
+            // Snapshots en orden y sin solaparse: un único consumidor; CONFLATED descarta los
+            // snapshots viejos si llega uno nuevo mientras se procesa el anterior.
+            val snapshots = Channel<Pair<com.google.firebase.firestore.QuerySnapshot?, Throwable?>>(Channel.CONFLATED)
+            messageListenerJobs.remove(conversationId)?.cancel()
+            messageListenerJobs[conversationId] = scope.launch {
+                for ((snapshot, error) in snapshots) {
+                    if (!isCurrentListenerGeneration(generation, conversationId)) break
+                    val documents = snapshot?.documents
+                    val result = handleMessagesSnapshot(
+                        documents = documents,
+                        error = error,
+                        conversationId = conversationId,
+                        cutoffDate = cutoffDate,
+                        // Con listener de reacciones activo no se consultan reacciones por snapshot.
+                        hydrateReactions = !hasMessageReactionsListener(conversationId),
+                    )
+                    val window = if (error == null) {
+                        MessagesSnapshotWindow(
+                            documentCount = documents?.size ?: 0,
+                            limit = limit,
+                            oldestTimestamp = documents.orEmpty().mapNotNull {
+                                it.getTimestamp(
+                                    "timestamp",
+                                    com.google.firebase.firestore.DocumentSnapshot.ServerTimestampBehavior.ESTIMATE,
+                                )?.toDate()
+                            }.minOrNull(),
+                        )
+                    } else null
+                    withContext(Dispatchers.Main) {
+                        if (!isCurrentListenerGeneration(generation, conversationId)) return@withContext
+                        window?.let { onSnapshotWindow?.invoke(it) }
+                        onUpdate(result)
+                    }
+                }
+            }
             val listener = db.messagingThread(conversationId)
                 .messagingMessages
                 .applyingHistoryCutoff(resolvedHistoryCutoff(conversationId, cutoffDate))
@@ -491,15 +556,7 @@ object ChatService {
                 .limitToLast(limit.toLong())
                 .addSnapshotListener { snapshot, error ->
                     if (!isCurrentListenerGeneration(generation, conversationId)) return@addSnapshotListener
-                    scope.launch {
-                        val result = handleMessagesSnapshot(
-                            documents = snapshot?.documents,
-                            error = error,
-                            conversationId = conversationId,
-                            cutoffDate = cutoffDate,
-                        )
-                        withContext(Dispatchers.Main) { onUpdate(result) }
-                    }
+                    snapshots.trySend(snapshot to error)
                 }
             activeListeners[conversationId] = listener
         }
@@ -514,6 +571,7 @@ object ChatService {
     fun removeMessagesListener(conversationId: String) {
         bumpListenerGeneration(conversationId)
         activeListeners.remove(conversationId)?.remove()
+        messageListenerJobs.remove(conversationId)?.cancel()
     }
 
     fun listenToTypingIndicators(conversationId: String) {
@@ -585,6 +643,7 @@ object ChatService {
         isVanishModeMessage: Boolean = false,
         vanishExpiresAt: Date? = null,
         mentionedUserIds: List<String>? = null,
+        isRetry: Boolean = false,
     ): Result<EnhancedMessage> = runCatching {
         val encrypted = EncryptionService.encryptChatMessage(content, conversationId)
         val message = EnhancedMessage(
@@ -600,16 +659,23 @@ object ChatService {
             vanishExpiresAt = vanishExpiresAt,
             mentionedUserIds = mentionedUserIds,
         )
-        sendMessage(message, useServerTimestamp = true).getOrThrow()
+        sendMessage(message, useServerTimestamp = true, isRetry = isRetry).getOrThrow()
     }
 
     /**
      * ≡ `sendMessage(_:useServerTimestamp:completion:)` —
-     * offline → pending; ack timeout → pending + cola; error escritura → failed; éxito → sent + preview.
+     * offline → pending; ack timeout → pending + cola; fallo de red → pending + cola;
+     * otro error de escritura → failed (solo local); éxito → sent + preview (sin bloquear).
+     *
+     * [isRetry]: reenvío de un id ya intentado (cola offline o "reintentar"). Primero se comprueba
+     * en servidor si el mensaje ya existe (el SDK persiste el `set` de 1:1 aunque hubiera timeout);
+     * si existe se retira de la cola y se marca enviado. Si no, se crea solo-si-no-existe
+     * (transacción): nunca se reescribe con `set()` completo un mensaje existente.
      */
     suspend fun sendMessage(
         message: EnhancedMessage,
         useServerTimestamp: Boolean = true,
+        isRetry: Boolean = false,
     ): Result<EnhancedMessage> {
         if (shouldQueueFirestoreOutbox()) {
             val pending = message.copy(status = MessageStatus.PENDING)
@@ -618,15 +684,29 @@ object ChatService {
         }
         val conversationId = message.conversationId
         val messageId = message.id
+        val isGroup = com.moments.android.services.messaging.GroupChatScope.isGroup(conversationId)
         val messageRef = db.messagingThread(conversationId)
             .messagingMessages.document(messageId)
+
+        if (isRetry) {
+            val exists = serverMessageExists(conversationId, messageId)
+            if (exists.getOrNull() == true) {
+                confirmMessageAlreadyOnServer(conversationId, messageId)
+                return Result.success(message.copy(status = MessageStatus.SENT))
+            }
+            exists.exceptionOrNull()?.takeIf(::isNetworkError)?.let {
+                return Result.success(queuePendingAfterNetworkFailure(message, useServerTimestamp))
+            }
+        }
         val messageData = messageToFirestoreData(message, useServerTimestamp)
 
         // Escritura no cancelada al timeout (≡ setData callback iOS sigue vivo tras el sleep).
         val writeJob = scope.async {
             runCatching {
-                if (com.moments.android.services.messaging.GroupChatScope.isGroup(conversationId)) {
+                if (isGroup) {
                     com.moments.android.services.messaging.GroupChatAPI.request("sendGroupMessage", mapOf("groupId" to conversationId, "messageId" to messageId, "message" to messageData))
+                } else if (isRetry) {
+                    createMessageIfAbsent(messageRef, messageData)
                 } else messageRef.set(messageData).await()
             }
         }
@@ -652,24 +732,94 @@ object ChatService {
         }
 
         writeResult.onFailure { error ->
-            updateLocalMessageStatus(conversationId, messageId, MessageStatus.FAILED)
-            runCatching {
-                updateMessageStatus(conversationId, messageId, MessageStatus.FAILED)
+            if (isNetworkError(error)) {
+                // Fallo de red en un envío online: a la cola persistente (WorkManager reintenta).
+                return Result.success(queuePendingAfterNetworkFailure(message, useServerTimestamp))
             }
+            // Solo estado local: no se escribe "failed" en Firestore (el doc puede no existir
+            // o haber llegado ya y estar delivered/read).
+            updateLocalMessageStatus(conversationId, messageId, MessageStatus.FAILED)
             return Result.failure(error)
         }
 
         LocalPersistenceService.deleteActionAsync(messageId)
-        updateConversation(
-            conversationId = conversationId,
-            lastMessage = neutralConversationPreview(message.type),
-            senderId = message.senderId,
-            messageType = message.type,
-        )
+        // Preview de la bandeja sin bloquear la confirmación del envío. El doc ya se escribió con
+        // status "sent": no se vuelve a escribir (pisaría delivered/read del receptor).
+        scope.launch {
+            updateConversation(
+                conversationId = conversationId,
+                lastMessage = neutralConversationPreview(message.type),
+                senderId = message.senderId,
+                messageType = message.type,
+            ).onFailure { Log.w(TAG, "updateConversation failed for $conversationId", it) }
+        }
         LocalPersistenceService.upsertConversationPreviewAsync(message)
-        updateMessageStatus(conversationId, messageId, MessageStatus.SENT)
         return Result.success(message.copy(status = MessageStatus.SENT))
     }
+
+    private const val TAG = "ChatService"
+
+    /** Encola tras fallo de red y deja el mensaje en PENDING (local + Room). */
+    private suspend fun queuePendingAfterNetworkFailure(
+        message: EnhancedMessage,
+        useServerTimestamp: Boolean,
+    ): EnhancedMessage {
+        val pending = message.copy(status = MessageStatus.PENDING)
+        queueOfflineMessage(pending, useServerTimestamp)
+        LocalPersistenceService.saveMessagesInBackground(listOf(pending), message.conversationId, sync = false)
+        updateLocalMessageStatus(message.conversationId, message.id, MessageStatus.PENDING)
+        return pending
+    }
+
+    /** Lectura de servidor: ¿existe ya el mensaje? Failure si no se pudo comprobar. */
+    suspend fun serverMessageExists(conversationId: String, messageId: String): Result<Boolean> = runCatching {
+        db.messagingThread(conversationId).messagingMessages.document(messageId)
+            .get(com.google.firebase.firestore.Source.SERVER).await().exists()
+    }
+
+    /** El servidor ya tiene el mensaje: fuera de la cola y enviado (local + Room). */
+    suspend fun confirmMessageAlreadyOnServer(conversationId: String, messageId: String) {
+        LocalPersistenceService.deleteActionAsync(messageId)
+        LocalPersistenceService.updateCachedMessageStatusAsync(conversationId, messageId, MessageStatus.SENT)
+        updateLocalMessageStatus(conversationId, messageId, MessageStatus.SENT)
+    }
+
+    /** Crea el mensaje solo si no existe (transacción, lectura de servidor). */
+    private suspend fun createMessageIfAbsent(
+        ref: com.google.firebase.firestore.DocumentReference,
+        data: Map<String, Any?>,
+    ) {
+        db.runTransaction { tx ->
+            if (!tx.get(ref).exists()) tx.set(ref, data)
+            null
+        }.await()
+    }
+
+    /** Errores transitorios de red (Firestore/Storage/HTTP) o sin conectividad. */
+    fun isNetworkError(error: Throwable): Boolean {
+        var current: Throwable? = error
+        var depth = 0
+        while (current != null && depth < 8) {
+            when (current) {
+                is com.google.firebase.firestore.FirebaseFirestoreException ->
+                    if (current.code == com.google.firebase.firestore.FirebaseFirestoreException.Code.UNAVAILABLE ||
+                        current.code == com.google.firebase.firestore.FirebaseFirestoreException.Code.DEADLINE_EXCEEDED
+                    ) return true
+                is com.google.firebase.storage.StorageException ->
+                    if (current.errorCode == com.google.firebase.storage.StorageException.ERROR_RETRY_LIMIT_EXCEEDED) return true
+                is java.io.IOException -> return true
+            }
+            current = current.cause
+            depth++
+        }
+        return !com.moments.android.services.network.NetworkMonitor.isConnected
+    }
+
+    /**
+     * Ejecuta [block] en el scope de aplicación de ChatService: sobrevive a la cancelación del
+     * scope del ViewModel (p. ej. subidas de media al salir del chat o expulsar la sesión).
+     */
+    fun <T> runDetached(block: suspend () -> T): Deferred<T> = scope.async { block() }
 
     /**
      * Map EnhancedMessage → Firestore (cuerpo de `sendMessage` en ChatService.swift).
@@ -766,6 +916,7 @@ object ChatService {
         if (conversationId.isBlank()) return
         bumpListenerGeneration(conversationId)
         activeListeners.remove(conversationId)?.remove()
+        messageListenerJobs.remove(conversationId)?.cancel()
 
         val reactionsKey = "reactions_$conversationId"
         bumpListenerGeneration(reactionsKey)
@@ -789,6 +940,9 @@ object ChatService {
         com.moments.android.views.messaging.groups.GroupDirectory.groups.value = emptyMap()
         activeListeners.values.forEach { it.remove() }
         activeListeners.clear()
+        messageListenerJobs.values.forEach { it.cancel() }
+        messageListenerJobs.clear()
+        deliveredRequestedIds.clear()
         listenerGenerations.clear()
         _typingUsers.value = emptyMap()
         conversationCutoffs.clear()
@@ -1045,11 +1199,23 @@ object ChatService {
                 .get()
                 .await()
                 .documents
-            for (messageDoc in messages) {
-                runCatching {
-                    updateMessageStatus(conversationId, messageDoc.id, MessageStatus.DELIVERED)
-                }
-            }
+            // En batch (troceado a 500) en vez de una escritura por mensaje.
+            commitStatusInBatches(
+                messages.map { it.reference },
+                MessageStatus.DELIVERED,
+            )
+        }
+    }
+
+    /** `status` en lotes de ≤500 escrituras (límite de Firestore por batch). */
+    private suspend fun commitStatusInBatches(
+        refs: List<com.google.firebase.firestore.DocumentReference>,
+        status: MessageStatus,
+    ) {
+        for (chunk in refs.chunked(FIRESTORE_BATCH_LIMIT)) {
+            val batch = db.batch()
+            chunk.forEach { batch.update(it, "status", status.raw) }
+            batch.commit().await()
         }
     }
 
@@ -1063,14 +1229,10 @@ object ChatService {
             .whereEqualTo("status", MessageStatus.SENT.raw)
             .get()
             .await()
-        val batch = db.batch()
-        var pending = 0
-        snapshot.documents.forEach { doc ->
-            if ((doc.data?.get("senderId") as? String) == currentUserId) return@forEach
-            batch.update(doc.reference, "status", MessageStatus.DELIVERED.raw)
-            pending++
-        }
-        if (pending > 0) batch.commit().await()
+        val refs = snapshot.documents
+            .filter { (it.data?.get("senderId") as? String) != currentUserId }
+            .map { it.reference }
+        commitStatusInBatches(refs, MessageStatus.DELIVERED)
     }
 
     suspend fun stopLiveLocationMessage(conversationId: String, messageId: String) {
@@ -1095,54 +1257,67 @@ object ChatService {
         LiveLocationStatus(exists = true, senderId = senderId, isStopped = isStopped, expiresAt = expiresAt)
     }.getOrNull()
 
+    /**
+     * Marca entregados los entrantes en estado SENT: un único batch por snapshot (no una escritura
+     * por mensaje) y sin repetir ids ya pedidos en este proceso.
+     */
     fun markMessagesAsDelivered(
         messages: List<EnhancedMessage>,
         conversationId: String,
         currentUserId: String,
     ) {
-        messages.filter {
+        val pending = messages.filter {
             it.senderId != currentUserId &&
                 it.status == MessageStatus.SENT &&
-                !it.isRead
-        }.forEach { message ->
-            scope.launch {
-                runCatching {
-                    updateMessageStatus(conversationId, message.id, MessageStatus.DELIVERED)
+                !it.isRead &&
+                deliveredRequestedIds.add("$conversationId/${it.id}")
+        }
+        if (pending.isEmpty()) return
+        scope.launch {
+            val refs = pending.map { db.messagingThread(conversationId).messagingMessages.document(it.id) }
+            runCatching { commitStatusInBatches(refs, MessageStatus.DELIVERED) }
+                .onFailure { error ->
+                    // Permitir reintento en el próximo snapshot.
+                    pending.forEach { deliveredRequestedIds.remove("$conversationId/${it.id}") }
+                    Log.w(TAG, "markMessagesAsDelivered failed for $conversationId", error)
                 }
-            }
         }
     }
 
     fun markMessageAsDeliveredFromNotification(conversationId: String, messageId: String) {
+        scope.launch { markMessageAsDeliveredFromNotificationNow(conversationId, messageId) }
+    }
+
+    /** Variante suspendida para el servicio FCM (trabajo dentro de `onMessageReceived`). */
+    suspend fun markMessageAsDeliveredFromNotificationNow(conversationId: String, messageId: String) {
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        scope.launch {
-            runCatching {
-                val snap = db.messagingThread(conversationId)
-                    .messagingMessages.document(messageId).get().await()
-                val data = snap.data ?: return@runCatching
-                val senderId = data["senderId"] as? String ?: return@runCatching
-                val status = data["status"] as? String ?: return@runCatching
-                if (senderId == currentUserId || status != MessageStatus.SENT.raw) return@runCatching
-                updateMessageStatus(conversationId, messageId, MessageStatus.DELIVERED)
-            }
-        }
+        runCatching {
+            val snap = db.messagingThread(conversationId)
+                .messagingMessages.document(messageId).get().await()
+            val data = snap.data ?: return@runCatching
+            val senderId = data["senderId"] as? String ?: return@runCatching
+            val status = data["status"] as? String ?: return@runCatching
+            if (senderId == currentUserId || status != MessageStatus.SENT.raw) return@runCatching
+            updateMessageStatus(conversationId, messageId, MessageStatus.DELIVERED)
+        }.onFailure { Log.w(TAG, "markMessageAsDeliveredFromNotification failed", it) }
     }
 
     /**
      * Mirrors iOS' `markMessagesAsRead`: all reads are recorded in `readBy`,
      * while externally visible read status remains subject to user and chat
      * privacy settings. Incognito must leave no server-side read trace.
-     * Errors are swallowed like iOS' completion handler (e.g. pending `dmr_` threads).
+     * Lotes de ≤500 escrituras (límite Firestore); el último lleva el update de la conversación.
+     * Un lote fallido no aborta el resto y el error se devuelve/loguea (antes se tragaba).
      */
     suspend fun markMessagesAsRead(
         conversationId: String,
         messageIds: List<String>,
         readerId: String,
         marksLastMessageSeen: Boolean = false,
-    ) {
-        if (IncognitoModeService.isActiveSnapshot || messageIds.isEmpty()) return
+    ): Result<Unit> {
+        if (IncognitoModeService.isActiveSnapshot || messageIds.isEmpty()) return Result.success(Unit)
 
-        runCatching {
+        return runCatching {
             val userSettings = db.collection("users").document(readerId).get().await().data
             val globalEnabled = userSettings?.get("showReadReceipts") as? Boolean ?: true
             val conversationRef = db.messagingThread(conversationId)
@@ -1151,16 +1326,6 @@ object ChatService {
             val preferences = conversation?.get("readReceiptPreferences") as? Map<String, Boolean> ?: emptyMap()
             val finalEnabled = ChatReadReceiptPolicy.isEnabled(globalEnabled, preferences[readerId])
 
-            val batch = db.batch()
-            messageIds.distinct().forEach { messageId ->
-                val update = mutableMapOf<String, Any>("readBy" to FieldValue.arrayUnion(readerId))
-                if (finalEnabled) {
-                    update["isRead"] = true
-                    update["status"] = MessageStatus.READ.raw
-                    update["readAtBy.$readerId"] = FieldValue.serverTimestamp()
-                }
-                batch.update(conversationRef.messagingMessages.document(messageId), update)
-            }
             val conversationUpdate = mutableMapOf<String, Any>(
                 "readStatus.$readerId" to true,
                 "lastReadAt.$readerId" to FieldValue.serverTimestamp(),
@@ -1168,9 +1333,29 @@ object ChatService {
             if (marksLastMessageSeen && finalEnabled) {
                 conversationUpdate["lastMessageSeenAt.$readerId"] = FieldValue.serverTimestamp()
             }
-            batch.update(conversationRef, conversationUpdate)
-            batch.commit().await()
-        }
+            // Reservar 1 escritura del último lote para la conversación.
+            val chunks = messageIds.distinct().chunked(FIRESTORE_BATCH_LIMIT - 1)
+            var firstError: Throwable? = null
+            chunks.forEachIndexed { index, chunk ->
+                val batch = db.batch()
+                chunk.forEach { messageId ->
+                    val update = mutableMapOf<String, Any>("readBy" to FieldValue.arrayUnion(readerId))
+                    if (finalEnabled) {
+                        update["isRead"] = true
+                        update["status"] = MessageStatus.READ.raw
+                        update["readAtBy.$readerId"] = FieldValue.serverTimestamp()
+                    }
+                    batch.update(conversationRef.messagingMessages.document(messageId), update)
+                }
+                if (index == chunks.lastIndex) batch.update(conversationRef, conversationUpdate)
+                runCatching { batch.commit().await() }.onFailure { error ->
+                    Log.w(TAG, "markMessagesAsRead batch ${index + 1}/${chunks.size} failed for $conversationId", error)
+                    if (firstError == null) firstError = error
+                }
+            }
+            firstError?.let { throw it }
+            Unit
+        }.onFailure { Log.w(TAG, "markMessagesAsRead failed for $conversationId", it) }
     }
 
     /** ≡ `markConversationAsRead` — iOS no corta por incógnito aquí (sí en `markMessagesAsRead`). */
@@ -1272,6 +1457,7 @@ object ChatService {
         waveform: List<Float>?,
         messageId: String,
         isVanishModeMessage: Boolean,
+        isRetry: Boolean = false,
     ): Result<EnhancedMessage> = runCatching {
         if (shouldQueueFirestoreOutbox()) {
             return@runCatching queueOfflineMediaMessage(
@@ -1289,12 +1475,33 @@ object ChatService {
                 replyTo = null,
             )
         }
+        if (isRetry && serverMessageExists(conversationId, messageId).getOrNull() == true) {
+            confirmMessageAlreadyOnServer(conversationId, messageId)
+            return@runCatching alreadySentMessage(conversationId, senderId, MessageType.AUDIO, messageId)
+        }
         val uploadResult = ChatServiceMediaPipeline.uploadMedia(
             data = audioData,
             type = MessageType.AUDIO,
             conversationId = conversationId,
             messageId = messageId,
-        ).getOrThrow()
+        ).getOrElse { error ->
+            // Fallo de red subiendo: a la cola persistente en vez de FAILED.
+            if (!isNetworkError(error)) throw error
+            return@runCatching queueOfflineMediaMessage(
+                conversationId = conversationId,
+                senderId = senderId,
+                type = MessageType.AUDIO,
+                mediaData = audioData,
+                messageId = messageId,
+                fileName = "audio_$messageId.m4a",
+                duration = duration,
+                audioWaveform = waveform,
+                mediaBatchId = null,
+                isVanishModeMessage = isVanishModeMessage,
+                vanishExpiresAt = null,
+                replyTo = null,
+            )
+        }
         val message = EnhancedMessage(
             id = messageId,
             conversationId = conversationId,
@@ -1315,8 +1522,23 @@ object ChatService {
             status = MessageStatus.SENDING,
             isVanishModeMessage = isVanishModeMessage,
         )
-        sendMessage(message, useServerTimestamp = true).getOrThrow()
+        sendMessage(message, useServerTimestamp = true, isRetry = isRetry).getOrThrow()
     }
+
+    /** Respuesta mínima cuando el reintento descubre que el servidor ya tenía el mensaje. */
+    private fun alreadySentMessage(
+        conversationId: String,
+        senderId: String,
+        type: MessageType,
+        messageId: String,
+    ) = EnhancedMessage(
+        id = messageId,
+        conversationId = conversationId,
+        senderId = senderId,
+        type = type,
+        timestamp = Date(),
+        status = MessageStatus.SENT,
+    )
 
     suspend fun sendMediaMessage(
         conversationId: String,
@@ -1331,6 +1553,7 @@ object ChatService {
         replyTo: String?,
         stickers: List<com.moments.android.models.StickerData>? = null,
         textOverlays: List<com.moments.android.models.StoryTextOverlayMetadata>? = null,
+        isRetry: Boolean = false,
     ): Result<EnhancedMessage> = runCatching {
         if (shouldQueueFirestoreOutbox()) {
             return@runCatching queueOfflineMediaMessage(
@@ -1350,12 +1573,35 @@ object ChatService {
                 textOverlays = textOverlays,
             )
         }
+        if (isRetry && serverMessageExists(conversationId, messageId).getOrNull() == true) {
+            confirmMessageAlreadyOnServer(conversationId, messageId)
+            return@runCatching alreadySentMessage(conversationId, senderId, type, messageId)
+        }
         val uploadResult = ChatServiceMediaPipeline.uploadMedia(
             data = mediaData,
             type = type,
             conversationId = conversationId,
             messageId = messageId,
-        ).getOrThrow()
+        ).getOrElse { error ->
+            // Fallo de red subiendo: a la cola persistente en vez de FAILED.
+            if (!isNetworkError(error)) throw error
+            return@runCatching queueOfflineMediaMessage(
+                conversationId = conversationId,
+                senderId = senderId,
+                type = type,
+                mediaData = mediaData,
+                messageId = messageId,
+                fileName = fileName,
+                duration = null,
+                audioWaveform = null,
+                mediaBatchId = mediaBatchId,
+                isVanishModeMessage = isVanishModeMessage,
+                vanishExpiresAt = vanishExpiresAt,
+                replyTo = replyTo,
+                stickers = stickers,
+                textOverlays = textOverlays,
+            )
+        }
         val dimensions = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             ChatMediaFileDimensions.read(uploadResult.mediaUrl)
         }
@@ -1384,7 +1630,7 @@ object ChatService {
                 stickers = stickers,
                 textOverlays = textOverlays,
         )
-        sendMessage(message, useServerTimestamp = true).getOrThrow()
+        sendMessage(message, useServerTimestamp = true, isRetry = isRetry).getOrThrow()
     }
 
     // sendViewOnceMessage → ChatServiceSharingAndViewOnce.kt (≡ ChatService+SharingAndViewOnce.swift)
@@ -1400,6 +1646,7 @@ object ChatService {
         messageId: String,
         isVanishModeMessage: Boolean,
         replyTo: String?,
+        isRetry: Boolean = false,
     ): Result<EnhancedMessage> = sendMessage(
         EnhancedMessage(
             id = messageId,
@@ -1416,6 +1663,7 @@ object ChatService {
             isVanishModeMessage = isVanishModeMessage,
         ),
         useServerTimestamp = true,
+        isRetry = isRetry,
     )
 
     suspend fun sendStaticLocationMessage(
@@ -1427,8 +1675,9 @@ object ChatService {
         address: String?,
         messageId: String,
         isVanishModeMessage: Boolean,
+        isRetry: Boolean = false,
     ): Result<EnhancedMessage> = sendLocationMessage(
-        conversationId, senderId, latitude, longitude, name, address, false, null, null, null, messageId, isVanishModeMessage,
+        conversationId, senderId, latitude, longitude, name, address, false, null, null, null, messageId, isVanishModeMessage, isRetry,
     )
 
     suspend fun sendLiveLocationMessage(
@@ -1465,6 +1714,7 @@ object ChatService {
         expiresAt: Date?,
         messageId: String,
         isVanishModeMessage: Boolean,
+        isRetry: Boolean = false,
     ): Result<EnhancedMessage> = runCatching {
         val payload = ChatLocationPayload(
             lat = latitude,
@@ -1490,6 +1740,7 @@ object ChatService {
                 isVanishModeMessage = isVanishModeMessage,
             ),
             useServerTimestamp = true,
+            isRetry = isRetry,
         ).getOrThrow()
     }
 
@@ -1768,14 +2019,27 @@ object ChatService {
         groupInbox = emptyList()
         lastPublishedInbox = null
         groupInboxRevision = 0
-        groupConversationsListener = db.collection("groupConversations").whereArrayContains("participants", userId)
-            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+        // Sin MetadataChanges.INCLUDE: solo cambios de documentos. La única dependencia real era
+        // el paso caché-vacía → servidor-vacío (sin eventos de doc); se cubre con una lectura de
+        // servidor puntual en [confirmEmptyInboxFromServer].
+        val groupQuery = db.collection("groupConversations").whereArrayContains("participants", userId)
+        groupConversationsListener = groupQuery
+            .addSnapshotListener { snapshot, error ->
                 if (generation != inboxGeneration || FirebaseAuth.getInstance().currentUser?.uid != userId) return@addSnapshotListener
                 if (error != null) {
                     inboxOnUpdate?.invoke(Result.failure(error))
                     return@addSnapshotListener
                 }
-                if (snapshot == null || (snapshot.metadata.isFromCache && snapshot.isEmpty)) return@addSnapshotListener
+                if (snapshot == null) return@addSnapshotListener
+                forgetRemovedInboxPreviews(snapshot)
+                if (snapshot.metadata.isFromCache && snapshot.isEmpty) {
+                    confirmEmptyInboxFromServer(groupQuery, generation, userId) {
+                        groupInbox = emptyList()
+                        hasGroupInbox = true
+                        publishInbox()
+                    }
+                    return@addSnapshotListener
+                }
                 val revision = ++groupInboxRevision
                 com.moments.android.views.messaging.groups.GroupDirectory.groups.value = snapshot?.documents.orEmpty()
                     .map(com.moments.android.views.messaging.groups.GroupConversation::from).associateBy { it.id }
@@ -1804,12 +2068,25 @@ object ChatService {
                     }
                 }
             }
-        val listener = db.collection("conversations")
+        // Límite alto fijo: la bandeja aún no tiene hook de "cargar más". Con 200 se cubren
+        // prácticamente todas las cuentas sin descargar el histórico completo en cada arranque.
+        val directQuery = db.collection("conversations")
             .whereArrayContains("participants", userId)
             .orderBy("timestamp", Query.Direction.DESCENDING)
-            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+            .limit(INBOX_DIRECT_LIMIT)
+        val listener = directQuery
+            .addSnapshotListener { snapshot, error ->
                 if (generation != inboxGeneration || FirebaseAuth.getInstance().currentUser?.uid != userId) return@addSnapshotListener
-                if (error == null && (snapshot == null || (snapshot.metadata.isFromCache && snapshot.isEmpty))) return@addSnapshotListener
+                if (error == null && snapshot == null) return@addSnapshotListener
+                if (snapshot != null) forgetRemovedInboxPreviews(snapshot)
+                if (error == null && snapshot != null && snapshot.metadata.isFromCache && snapshot.isEmpty) {
+                    confirmEmptyInboxFromServer(directQuery, generation, userId) {
+                        directInbox = emptyList()
+                        hasDirectInbox = true
+                        publishInbox()
+                    }
+                    return@addSnapshotListener
+                }
                 val revision = ++directRevision
                 scope.launch {
                     if (error != null) {
@@ -1882,7 +2159,39 @@ object ChatService {
         conversationsListener = listener
     }
 
+    /** Tope de conversaciones 1:1 escuchadas (ver comentario en [fetchConversations]). */
+    private const val INBOX_DIRECT_LIMIT = 200L
+
+    /**
+     * Snapshot de caché vacío: confirmar contra servidor. Sin INCLUDE no llega evento si el
+     * servidor también está vacío, y la bandeja se quedaría esperando.
+     */
+    private fun confirmEmptyInboxFromServer(
+        query: Query,
+        generation: Int,
+        userId: String,
+        onEmpty: () -> Unit,
+    ) {
+        scope.launch {
+            val serverEmpty = runCatching {
+                query.get(com.google.firebase.firestore.Source.SERVER).await().isEmpty
+            }.getOrNull() ?: return@launch
+            if (!serverEmpty) return@launch // llegará como cambio de documentos
+            withContext(Dispatchers.Main) {
+                if (generation == inboxGeneration && FirebaseAuth.getInstance().currentUser?.uid == userId) onEmpty()
+            }
+        }
+    }
+
+    /** documentChanges REMOVED → olvidar su preview cacheada. */
+    private fun forgetRemovedInboxPreviews(snapshot: com.google.firebase.firestore.QuerySnapshot) {
+        snapshot.documentChanges
+            .filter { it.type == com.google.firebase.firestore.DocumentChange.Type.REMOVED }
+            .forEach { inboxPreviewCache.remove(it.document.id) }
+    }
+
     fun stopConversationsListener() {
+        inboxPreviewCache.clear()
         inboxGeneration += 1
         groupConversationsListener?.remove()
         groupConversationsListener = null
@@ -1922,12 +2231,46 @@ object ChatService {
         val viewOncePending: Boolean,
     )
 
+    /**
+     * Preview resuelta por conversación + firma de los campos del documento de los que depende.
+     * Solo se vuelve a resolver (lectura de mensajes + descifrado) cuando la firma cambia, es decir,
+     * cuando cambió el último mensaje: el resto de snapshots de la bandeja no tocan red.
+     */
+    private val inboxPreviewCache = ConcurrentHashMap<String, Pair<String, ConversationLatestSnapshot>>()
+
+    private fun inboxPreviewSignature(conversation: Conversation): String {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        val previewEnabled = MomentsApplication.instance?.let { ctx ->
+            conversation.id?.let { ChatPreviewPrivacy.isUserPreviewEnabled(ctx, it) }
+        } ?: true
+        return listOf(
+            conversation.timestamp.time,
+            conversation.lastMessage,
+            conversation.lastMessageSenderId,
+            conversation.lastMessageType?.raw,
+            conversation.readStatus[uid],
+            conversation.deletedAtCutoff(uid)?.time,
+            previewEnabled,
+        ).joinToString("|")
+    }
+
+    private suspend fun cachedLatestConversationSnapshot(conversation: Conversation): ConversationLatestSnapshot {
+        val id = conversation.id ?: return resolveLatestConversationSnapshot(conversation)
+        val signature = inboxPreviewSignature(conversation)
+        inboxPreviewCache[id]?.let { (cachedSignature, cached) ->
+            if (cachedSignature == signature) return cached
+        }
+        val resolved = resolveLatestConversationSnapshot(conversation)
+        inboxPreviewCache[id] = signature to resolved
+        return resolved
+    }
+
     private suspend fun hydrateConversationPreviews(
         conversations: List<Conversation>,
     ): List<Conversation> {
         if (conversations.isEmpty()) return emptyList()
         return conversations.map { conversation ->
-            val snapshot = resolveLatestConversationSnapshot(conversation)
+            val snapshot = cachedLatestConversationSnapshot(conversation)
             val resolvedTimestamp = resolvedConversationTimestamp(conversation, snapshot.timestamp)
             val resolvedSenderId = resolvedLastMessageSenderId(
                 conversation,
@@ -2040,6 +2383,24 @@ object ChatService {
             )
         }
 
+        // El documento ya trae lastMessageType/lastMessageSenderId: para tipos cuyo preview es
+        // neutro no hace falta leer mensajes. La query de 5 queda como fallback (texto, avisos,
+        // historias compartidas o documento sin esos campos).
+        val docType = conversation.lastMessageType
+        if (docType != null && conversation.lastMessageSenderId != null &&
+            docType != MessageType.TEXT &&
+            docType != MessageType.CHAT_NOTICE &&
+            docType != MessageType.SHARED_STORY
+        ) {
+            return makeConversationSnapshot(
+                preview = neutralConversationPreview(docType),
+                timestamp = null,
+                senderId = conversation.lastMessageSenderId,
+                messageType = docType,
+                fallbackConversation = conversation,
+            )
+        }
+
         return try {
             val snapshot = db.messagingThread(conversationId)
                 .messagingMessages
@@ -2070,7 +2431,8 @@ object ChatService {
                     MessageType.TEXT -> {
                         val encryptedContent = data["content"] as? String
                         if (encryptedContent.isNullOrEmpty()) continue
-                        val decrypted = decryptMessageContent(encryptedContent, conversationId).trim()
+                        val decrypted = decryptMessageContentOrNull(encryptedContent, conversationId)?.trim()
+                            ?: undecryptableMessagePlaceholder()
                         if (decrypted.isEmpty()) continue
                         return makeConversationSnapshot(
                             preview = decrypted,
