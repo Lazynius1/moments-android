@@ -727,7 +727,7 @@ object AuthService {
                 clearRegistrationState()
                 throw authError(R.string.auth_error_userIdNotFound)
             }
-            runCatching { user.sendEmailVerification().await() }
+            runCatching { AccountEmailService.sendVerification(user, username) }
             finalizeRegistration(user, user.uid)
         } catch (e: FirebaseAuthException) {
             if (e.errorCode == "ERROR_EMAIL_ALREADY_IN_USE") {
@@ -1520,8 +1520,8 @@ object AuthService {
     // MARK: - Email / password linking
 
     suspend fun sendEmailVerification() {
-        auth.currentUser?.sendEmailVerification()?.await()
-            ?: error("No authenticated user")
+        val user = auth.currentUser ?: error("No authenticated user")
+        AccountEmailService.sendVerification(user)
     }
 
     suspend fun linkPassword(email: String, password: String) {
@@ -1545,7 +1545,7 @@ object AuthService {
         try {
             user.updateEmail(normalized).await()
             _currentFirebaseUser.value = auth.currentUser
-            runCatching { user.sendEmailVerification().await() }
+            runCatching { AccountEmailService.sendVerification(user) }
             updateUserField("email", normalized)
         } catch (e: Exception) {
             throw mapAuthError(e)
@@ -1602,7 +1602,7 @@ object AuthService {
     }
 
     suspend fun resetPassword(email: String) {
-        auth.sendPasswordResetEmail(email.trim()).await()
+        AccountEmailService.sendPasswordReset(email)
     }
 
     suspend fun fetchAvailableInterests(): List<String> =

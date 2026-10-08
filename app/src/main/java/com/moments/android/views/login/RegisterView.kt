@@ -48,7 +48,7 @@ suspend fun completeEmailRegistration(
             batch.set(firestore.collection("users").document(user.uid), profile)
             batch.set(usernameRef, index)
         }.await()
-        user.sendEmailVerification()
+        runCatching { com.moments.android.services.auth.AccountEmailService.sendVerification(user, usernameLower) }
     } catch (error: Exception) {
         android.util.Log.e("MomentsOnboarding", "Fallo creando perfil en Firestore (uid=${user.uid})", error)
         runCatching { user.delete().await() }

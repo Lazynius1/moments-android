@@ -472,7 +472,7 @@ private fun ResetPasswordSheet(onDismiss: () -> Unit) {
                 isLoading = true
                 scope.launch {
                     try {
-                        FirebaseAuth.getInstance().sendPasswordResetEmail(email.trim()).await()
+                        com.moments.android.services.auth.AccountEmailService.sendPasswordReset(email)
                         resultMessage = successMessage
                         succeeded = true
                     } catch (error: Exception) {
