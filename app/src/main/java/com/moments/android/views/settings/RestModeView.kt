@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.utilities.HapticManager
+import com.moments.android.utilities.MomentsFormat
 import kotlinx.coroutines.delay
 import java.util.Calendar
 import java.util.Date
@@ -210,7 +211,7 @@ fun RestModeView(
                     ) {
                         RestModeTimeRow(
                             label = stringResource(R.string.settings_notifications_schedule_start),
-                            timeLabel = viewModel.dateFormatter.format(startTime),
+                            timeLabel = MomentsFormat.smartDate(startTime, MomentsFormat.DateContext.TIME_ONLY),
                             textColor = textColor,
                             onClick = {
                                 showRestModeTimePicker(context, startTime) { startTime = it }
@@ -222,7 +223,7 @@ fun RestModeView(
                         )
                         RestModeTimeRow(
                             label = stringResource(R.string.settings_notifications_schedule_end),
-                            timeLabel = viewModel.dateFormatter.format(endTime),
+                            timeLabel = MomentsFormat.smartDate(endTime, MomentsFormat.DateContext.TIME_ONLY),
                             textColor = textColor,
                             onClick = {
                                 showRestModeTimePicker(context, endTime) { endTime = it }

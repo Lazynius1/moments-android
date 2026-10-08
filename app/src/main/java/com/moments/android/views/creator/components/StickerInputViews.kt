@@ -78,10 +78,10 @@ import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchMutuals
 import com.moments.android.services.firestore.searchUsers
 import com.moments.android.utilities.HapticManager
+import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.components.StickerEmojiSliderCardView
 import com.moments.android.views.creator.StickerEmojiPalettePicker
 import com.moments.android.views.creator.normalizeStickerUrl
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -605,7 +605,6 @@ fun ModernCountdownInputView(
     var focused by remember { mutableStateOf(false) }
     var showDate by remember { mutableStateOf(false) }
     val valid = title.trim().isNotEmpty() && targetMs > System.currentTimeMillis()
-    val fmt = remember { SimpleDateFormat("d MMM · HH:mm", Locale.getDefault()) }
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         InputTitleBlock(
@@ -632,7 +631,11 @@ fun ModernCountdownInputView(
                 letterSpacing = 1.sp,
             )
             Text(
-                fmt.format(Date(targetMs)),
+                // Fecha y hora localizadas; 12/24 h del sistema.
+                Date(targetMs).let { target ->
+                    "${MomentsFormat.smartDate(target, MomentsFormat.DateContext.DAY_MONTH_LABEL)} · " +
+                        MomentsFormat.smartDate(target, MomentsFormat.DateContext.TIME_ONLY)
+                },
                 color = palette.primaryText,
                 fontWeight = FontWeight.Medium,
                 fontSize = 16.sp,

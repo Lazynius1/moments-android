@@ -167,7 +167,10 @@ fun ChatLocationMessageBubble(
     var nowMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val isDark = isSystemInDarkTheme()
     val canStopLive = isCurrentUser && isLive && isLiveActive && onStopLive != null
-    val cardBackground = if (isDark) Color(0xFF151C1D) else Color(0xFFE8EEF0)
+    val neutralBackground = if (isDark) Color(0xFF151C1D) else Color(0xFFE8EEF0)
+    // Saliente: panel con el color de burbuja del chat (mapa intacto); recibida neutra.
+    val outgoingPalette = chatOutgoingCardPalette()
+    val cardBackground = outgoingPalette?.background ?: neutralBackground
     val bubbleWidth = ChatBubbleLayoutWidth.capped(designBubbleWidth)
     val reservedMinHeight = mapHeight + cardInset + 56.dp + if (canStopLive) 40.dp else 0.dp
 
@@ -194,6 +197,7 @@ fun ChatLocationMessageBubble(
         else -> null
     }
     val iconTint = when {
+        outgoingPalette != null -> outgoingPalette.primary
         isLive && isLiveActive -> Color(0xFF34C759)
         !isLive -> Color(0xFFFF3B30)
         isDark -> Color.White.copy(alpha = 0.7f)
@@ -208,7 +212,7 @@ fun ChatLocationMessageBubble(
             .background(cardBackground)
             .border(
                 0.5.dp,
-                if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.08f),
+                outgoingPalette?.stroke ?: if (isDark) Color.White.copy(alpha = 0.1f) else Color.Black.copy(alpha = 0.08f),
                 bubbleShape,
             ),
     ) {
@@ -262,7 +266,7 @@ fun ChatLocationMessageBubble(
                 Column(Modifier.weight(1f)) {
                     Text(
                         title,
-                        color = if (isDark) Color.White else Color.Black,
+                        color = outgoingPalette?.primary ?: if (isDark) Color.White else Color.Black,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = if (isLive) 2 else 1,
@@ -271,7 +275,7 @@ fun ChatLocationMessageBubble(
                     subtitle?.let {
                         Text(
                             it,
-                            color = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.5f),
+                            color = outgoingPalette?.secondary ?: if (isDark) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.5f),
                             fontSize = 12.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -285,6 +289,8 @@ fun ChatLocationMessageBubble(
             Row(
                 Modifier
                     .fillMaxWidth()
+                    // Base neutra: el rojo destructivo no pierde contraste sobre el color del chat.
+                    .background(neutralBackground)
                     .background(Color.Red.copy(alpha = if (isDark) 0.12f else 0.08f))
                     .clickable { onStopLive?.invoke() }
                     .padding(vertical = 10.dp),
@@ -384,6 +390,14 @@ private suspend fun captureMapboxSnapshot(
         .size(Size(widthPx.toFloat(), heightPx.toFloat()))
         .build()
     val snapshotter = Snapshotter(context, options)
+    // `destroy()` cancela por dentro y la cancelación vuelve a invocar el callback de `start`:
+    // sin esta guarda, callback → destroy → callback… desborda la pila (scroll rápido).
+    val released = java.util.concurrent.atomic.AtomicBoolean(false)
+    fun release(cancelFirst: Boolean) {
+        if (!released.compareAndSet(false, true)) return
+        if (cancelFirst) runCatching { snapshotter.cancel() }
+        runCatching { snapshotter.destroy() }
+    }
     try {
         snapshotter.setStyleUri(if (dark) Style.DARK else Style.MAPBOX_STREETS)
         snapshotter.setCamera(
@@ -395,17 +409,15 @@ private suspend fun captureMapboxSnapshot(
                 .build(),
         )
         suspendCancellableCoroutine { cont ->
-            cont.invokeOnCancellation {
-                runCatching { snapshotter.cancel() }
-                runCatching { snapshotter.destroy() }
-            }
+            cont.invokeOnCancellation { release(cancelFirst = true) }
             snapshotter.start { bitmap, _ ->
+                if (released.get()) return@start
                 if (cont.isActive) cont.resume(bitmap)
-                runCatching { snapshotter.destroy() }
+                release(cancelFirst = false)
             }
         }
     } catch (_: Exception) {
-        runCatching { snapshotter.destroy() }
+        release(cancelFirst = false)
         null
     }
 }

@@ -116,14 +116,29 @@ fun GlassmorphicConversationRow(
         !isUnread &&
         (isOwnLast || conversation.lastMessageSenderId == null)
 
+    val seenAt = if (isOwnLast) conversation.lastMessageSeenAt?.get(conversation.otherParticipantId) else null
+    // ≡ iOS: tu último mensaje visto se lee como una frase («Visto hace 5 min») sin hora suelta.
+    val showsSeenPhrase = !showsUnavailablePreview &&
+        !showsDraftPreview &&
+        !(conversation.lastMessageReaction != null && isOwnLast) &&
+        unreadCount < 2 &&
+        seenAt != null
+
     val resolvedPreview = when {
         showsUnavailablePreview -> stringResource(R.string.messaging_profile_unavailable_preview)
         showsDraftPreview -> stringResource(R.string.chat_draft_preview, cleanDraft)
         conversation.lastMessageReaction != null && isOwnLast ->
             "${conversation.lastMessageReaction!!.emoji} " + stringResource(R.string.chat_preview_reacted)
         unreadCount >= 2 -> stringResource(R.string.chat_unread_count_preview, unreadCount)
-        isOwnLast && conversation.lastMessageSeenAt?.get(conversation.otherParticipantId) != null ->
-            stringResource(R.string.chat_seen)
+        showsSeenPhrase && seenAt != null ->
+            if (MomentsFormat.isCompactNow(seenAt)) {
+                stringResource(R.string.chat_seen_just_now)
+            } else {
+                stringResource(
+                    R.string.chat_seen_ago,
+                    MomentsFormat.relativeTime(seenAt, MomentsFormat.RelativeTimeStyle.COMPACT),
+                )
+            }
         isOwnLast -> stringResource(R.string.chat_status_sent)
         else -> conversation.inboxMessagePreview(context, uid)
     }
@@ -136,15 +151,11 @@ fun GlassmorphicConversationRow(
         else -> if (isDark) Color.White.copy(0.6f) else Color.Black.copy(0.5f)
     }
     val secondaryColor = if (isDark) Color.White.copy(0.45f) else Color.Black.copy(0.38f)
-    val relativeSource =
-        if (isOwnLast) {
-            conversation.lastMessageSeenAt?.get(conversation.otherParticipantId) ?: conversation.timestamp
-        } else {
-            conversation.timestamp
-        }
+    val relativeSource = seenAt ?: conversation.timestamp
+    // Corto ≡ iOS: «5 min», «3 h», «2 d», «4 sem»; años desde 365 días.
     val relativeTime = MomentsFormat.relativeTime(
         from = relativeSource,
-        style = MomentsFormat.RelativeTimeStyle.COMPACT_BARE,
+        style = MomentsFormat.RelativeTimeStyle.COMPACT,
     )
 
     val rowModifier = modifier
@@ -254,7 +265,9 @@ fun GlassmorphicConversationRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                Text(relativeTime, fontSize = 14.sp, color = secondaryColor, maxLines = 1)
+                if (!showsSeenPhrase) {
+                    Text(relativeTime, fontSize = 14.sp, color = secondaryColor, maxLines = 1)
+                }
             }
         }
 

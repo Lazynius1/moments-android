@@ -43,7 +43,7 @@ class MomentsChatViewModel(
             if (bucket.isEmpty()) return
             val items = bucket.toList()
             grouped += day to items
-            rows += ChatRenderRow.Header(day)
+            rows += ChatRenderRow.Header(day, displayDate = items.first().timestamp)
             ClusterMessageGrouper.group(items).forEach { groupedItem ->
                 rows += when (groupedItem) {
                     is com.moments.android.views.messaging.components.ClusterMessageItem.Single -> ChatRenderRow.Message(MessageItem.Single(groupedItem.message))

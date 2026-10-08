@@ -51,8 +51,8 @@ import com.moments.android.views.permission.shared.PermissionPhoneFrame
 import com.moments.android.views.permission.shared.PermissionPhoneWallpaper
 import com.moments.android.views.permission.shared.PermissionPrimerScaffold
 import com.moments.android.views.permission.shared.PermissionPrimerStage
+import com.moments.android.utilities.MomentsFormat
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
@@ -155,7 +155,7 @@ private fun NotificationBannerScreen(size: DpSize, isActive: Boolean) {
     }
 
     val dateLabel = remember {
-        SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date())
+        MomentsFormat.smartDate(Date(), MomentsFormat.DateContext.WEEKDAY_DAY_MONTH)
     }
 
     Box(Modifier.fillMaxSize().clipToBounds()) {

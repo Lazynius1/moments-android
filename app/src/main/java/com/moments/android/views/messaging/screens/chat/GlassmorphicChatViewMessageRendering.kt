@@ -134,7 +134,7 @@ fun GlassmorphicChatRenderRow(
         )
         is ChatRenderRow.OutgoingRequestControls -> Unit
         is ChatRenderRow.Header -> GlassmorphicDateHeader(
-            row.date,
+            row.displayDate,
             modifier.chatMenuDimmedWhenOpen(menuOpen).padding(vertical = 10.dp),
         )
         is ChatRenderRow.Message -> {

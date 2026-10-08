@@ -13,24 +13,25 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Crop
-import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.automirrored.filled.Comment
+import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.filled.AddReaction
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MarkEmailUnread
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.SignalCellularAlt
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,43 +42,35 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.feed.rememberAdaptiveColors
-import com.moments.android.views.messaging.components.AttachmentIcon
-import com.moments.android.views.messaging.components.AttachmentIconMetrics
-import com.moments.android.views.messaging.components.AttachmentIconView
-import com.moments.android.views.messaging.groups.GroupChatAvatar
-import com.moments.android.views.story.StorySegmentedRing
-import com.moments.android.views.story.storyRingGapMask
 import kotlinx.coroutines.delay
 
-/** ≡ WhatsNew 1.1.0 — misma extensión title+description que iOS 2.30. */
-private sealed class WhatsNewIcon {
-    data class Vector(val image: ImageVector) : WhatsNewIcon()
-    data class Attachment(val icon: AttachmentIcon) : WhatsNewIcon()
-    data object PersonalAndGroupStoryRings : WhatsNewIcon()
-}
-
+/** ≡ WhatsNew 1.2.0 — título corto + frase breve, icono de Material Icons. */
 private data class WhatsNewFeature(
     @StringRes val title: Int,
     @StringRes val description: Int,
-    val icon: WhatsNewIcon,
+    val icon: ImageVector,
+)
+
+/** ≡ WhatsNewSection (iOS): cabecera de sección + sus novedades. */
+private data class WhatsNewSection(
+    @StringRes val title: Int,
+    val features: List<WhatsNewFeature>,
 )
 
 @Composable
@@ -85,20 +78,38 @@ fun WhatsNewView(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val colors = rememberAdaptiveColors()
     val isDark = isSystemInDarkTheme()
     val reduceMotion = MotionPolicy.reduceMotion
+    val locale = LocalConfiguration.current.locales[0]
     var appearAnimation by remember { mutableStateOf(reduceMotion) }
 
-    val features = remember {
+    val sections = remember {
         listOf(
-            WhatsNewFeature(R.string.whats_new_groups_title, R.string.whats_new_groups_description, WhatsNewIcon.Attachment(AttachmentIcon.GROUPS)),
-            WhatsNewFeature(R.string.whats_new_for_you_title, R.string.whats_new_for_you_description, WhatsNewIcon.Vector(Icons.Default.Explore)),
-            WhatsNewFeature(R.string.whats_new_chat_230_title, R.string.whats_new_chat_230_description, WhatsNewIcon.Vector(Icons.AutoMirrored.Filled.Chat)),
-            WhatsNewFeature(R.string.whats_new_echoes_title, R.string.whats_new_echoes_description, WhatsNewIcon.Vector(Icons.Default.GraphicEq)),
-            WhatsNewFeature(R.string.whats_new_stories_230_title, R.string.whats_new_stories_230_description, WhatsNewIcon.PersonalAndGroupStoryRings),
-            WhatsNewFeature(R.string.whats_new_create_230_title, R.string.whats_new_create_230_description, WhatsNewIcon.Vector(Icons.Default.Crop)),
-            WhatsNewFeature(R.string.whats_new_feed_reels_title, R.string.whats_new_feed_reels_description, WhatsNewIcon.Vector(Icons.Default.PlayCircle)),
-            WhatsNewFeature(R.string.whats_new_profile_230_title, R.string.whats_new_profile_230_description, WhatsNewIcon.Vector(Icons.Default.Person)),
-            WhatsNewFeature(R.string.whats_new_nova_230_title, R.string.whats_new_nova_230_description, WhatsNewIcon.Vector(Icons.Default.AutoAwesome)),
-            WhatsNewFeature(R.string.whats_new_offline_230_title, R.string.whats_new_offline_230_description, WhatsNewIcon.Vector(Icons.Default.CloudOff)),
+            WhatsNewSection(
+                title = R.string.whats_new_section_chat_120,
+                features = listOf(
+                    WhatsNewFeature(R.string.whats_new_chat_style_120_title, R.string.whats_new_chat_style_120_description, Icons.Default.Palette),
+                    WhatsNewFeature(R.string.whats_new_reactions_120_title, R.string.whats_new_reactions_120_description, Icons.Default.AddReaction),
+                    WhatsNewFeature(R.string.whats_new_replies_120_title, R.string.whats_new_replies_120_description, Icons.AutoMirrored.Filled.Reply),
+                    WhatsNewFeature(R.string.whats_new_view_once_120_title, R.string.whats_new_view_once_120_description, Icons.Default.PlayCircle),
+                    WhatsNewFeature(R.string.whats_new_requests_120_title, R.string.whats_new_requests_120_description, Icons.Default.MarkEmailUnread),
+                    WhatsNewFeature(R.string.whats_new_reliability_120_title, R.string.whats_new_reliability_120_description, Icons.Default.SignalCellularAlt),
+                    WhatsNewFeature(R.string.whats_new_notifications_120_title, R.string.whats_new_notifications_120_description, Icons.Default.NotificationsActive),
+                ),
+            ),
+            WhatsNewSection(
+                title = R.string.whats_new_section_stories_120,
+                features = listOf(
+                    WhatsNewFeature(R.string.whats_new_story_publish_120_title, R.string.whats_new_story_publish_120_description, Icons.Default.Tune),
+                    WhatsNewFeature(R.string.whats_new_original_audio_120_title, R.string.whats_new_original_audio_120_description, Icons.Default.GraphicEq),
+                ),
+            ),
+            WhatsNewSection(
+                title = R.string.whats_new_section_more_120,
+                features = listOf(
+                    WhatsNewFeature(R.string.whats_new_maps_120_title, R.string.whats_new_maps_120_description, Icons.Default.Map),
+                    WhatsNewFeature(R.string.whats_new_banner_120_title, R.string.whats_new_banner_120_description, Icons.Default.Campaign),
+                    WhatsNewFeature(R.string.whats_new_comments_120_title, R.string.whats_new_comments_120_description, Icons.AutoMirrored.Filled.Comment),
+                ),
+            ),
         )
     }
 
@@ -154,13 +165,13 @@ fun WhatsNewView(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(
-                        stringResource(R.string.whats_new_title),
+                        stringResource(R.string.whats_new_title_120),
                         color = colors.primary,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        stringResource(R.string.whats_new_subtitle),
+                        stringResource(R.string.whats_new_subtitle_120),
                         color = colors.secondary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
@@ -168,27 +179,36 @@ fun WhatsNewView(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
                 }
             }
 
-            Text(
-                stringResource(R.string.whats_new_section_title),
-                color = colors.secondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 4.dp),
-            )
-
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                features.forEachIndexed { index, feature ->
-                    WhatsNewFeatureRow(
-                        feature = feature,
-                        delayMs = index * 40L,
-                        reduceMotion = reduceMotion,
-                        appearParent = appearAnimation,
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                sections.forEachIndexed { sectionIndex, section ->
+                    val firstRowIndex = sections.take(sectionIndex).sumOf { it.features.size }
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            stringResource(section.title).uppercase(locale),
+                            color = colors.secondary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.6.sp,
+                            modifier = Modifier
+                                .padding(horizontal = 4.dp)
+                                .padding(top = if (sectionIndex == 0) 0.dp else 8.dp)
+                                .semantics { heading() }
+                                .graphicsLayer { alpha = headerAppear },
+                        )
+                        section.features.forEachIndexed { featureIndex, feature ->
+                            WhatsNewFeatureRow(
+                                feature = feature,
+                                delayMs = (firstRowIndex + featureIndex) * 40L,
+                                reduceMotion = reduceMotion,
+                                appearParent = appearAnimation,
+                            )
+                        }
+                    }
                 }
             }
 
             Text(
-                stringResource(R.string.whats_new_note_closing),
+                stringResource(R.string.whats_new_note_closing_120),
                 color = colors.secondary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
@@ -212,7 +232,7 @@ fun WhatsNewView(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    stringResource(R.string.whats_new_button),
+                    stringResource(R.string.whats_new_button_120),
                     color = colors.primary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -264,20 +284,12 @@ private fun WhatsNewFeatureRow(
                 .momentsChromeGlass(CircleShape, interactive = false),
             contentAlignment = Alignment.Center,
         ) {
-            when (val icon = feature.icon) {
-                is WhatsNewIcon.Vector -> Icon(
-                    imageVector = icon.image,
-                    contentDescription = null,
-                    tint = colors.primary,
-                    modifier = Modifier.size(18.dp),
-                )
-                is WhatsNewIcon.Attachment -> AttachmentIconView(
-                    icon = icon.icon,
-                    size = AttachmentIconMetrics.whatsNew,
-                    tintColor = colors.primary,
-                )
-                WhatsNewIcon.PersonalAndGroupStoryRings -> WhatsNewDualStoryRingsIcon()
-            }
+            Icon(
+                imageVector = feature.icon,
+                contentDescription = null,
+                tint = colors.primary,
+                modifier = Modifier.size(18.dp),
+            )
         }
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(
@@ -291,82 +303,6 @@ private fun WhatsNewFeatureRow(
                 color = colors.secondary,
                 fontSize = 14.sp,
             )
-        }
-    }
-}
-
-/** Personal atrás (3 audiencias) + grupo delante (1 corte con shift) ≡ iOS. */
-@Composable
-private fun WhatsNewDualStoryRingsIcon() {
-    val ringSize = 18.dp
-    val lineWidth = 2.dp
-    val overlap = 6.5.dp
-    val rowWidth = ringSize * 2 - overlap
-    val avatarSize = ringSize - lineWidth * 2 - 1.dp
-    val demoAudiences = listOf<String?>(null, "bestfriends", "mutuals")
-
-    Box(
-        modifier = Modifier
-            .width(rowWidth)
-            .height(ringSize),
-    ) {
-        // Personal (atrás) con cutout donde solapa el de grupo.
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .size(ringSize)
-                .zIndex(0f)
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    val cutCenter = Offset(
-                        x = center.x + (ringSize - overlap).toPx(),
-                        y = center.y,
-                    )
-                    drawCircle(
-                        color = androidx.compose.ui.graphics.Color.Black,
-                        radius = (ringSize + 3.dp).toPx() / 2f,
-                        center = cutCenter,
-                        blendMode = BlendMode.Clear,
-                    )
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            StorySegmentedRing(
-                storyCount = 3,
-                hasStory = true,
-                hasUnseenStory = true,
-                storyViewedStatus = listOf(false, false, false),
-                storyAudiences = demoAudiences,
-                isOwnStory = false,
-                ringSize = ringSize,
-                lineWidth = lineWidth,
-                hapticsEnabled = false,
-            )
-        }
-        // Grupo delante (novedad): 1 corte con shift de las 3 audiencias + avatar.
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .offset(x = ringSize - overlap)
-                .size(ringSize)
-                .zIndex(1f),
-            contentAlignment = Alignment.Center,
-        ) {
-            StorySegmentedRing(
-                storyCount = 1,
-                hasStory = true,
-                hasUnseenStory = true,
-                storyViewedStatus = listOf(false),
-                storyAudiences = listOf(null),
-                nestedStoryAudiences = listOf(demoAudiences),
-                isOwnStory = false,
-                ringSize = ringSize,
-                lineWidth = lineWidth,
-                hapticsEnabled = false,
-                modifier = Modifier.storyRingGapMask(avatarSize = avatarSize),
-            )
-            GroupChatAvatar(image = "", size = avatarSize)
         }
     }
 }

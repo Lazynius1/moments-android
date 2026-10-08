@@ -48,7 +48,8 @@ sealed interface ChatRenderRow {
         override val id: String = "row:synthetic:outgoing-request-controls"
     }
 
-    data class Header(val date: Date) : ChatRenderRow {
+    /** [date] = inicio del día (id estable); [displayDate] = primer mensaje del día (hora del separador). */
+    data class Header(val date: Date, val displayDate: Date = date) : ChatRenderRow {
         // ≡ iOS `date.timeIntervalSince1970` (segundos, no ms).
         override val id: String get() = "row:header:${date.time / 1000.0}"
     }

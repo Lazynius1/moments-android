@@ -75,7 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewModelScope
 import com.moments.android.R
-import com.moments.android.extensions.timeAgoDisplay
+import com.moments.android.extensions.timeAgoLongDisplay
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.utilities.HapticManager
@@ -484,7 +484,7 @@ private fun NovaWelcomeTodaySection(
                 icon = Icons.Default.History,
                 eyebrow = stringResource(R.string.nova_welcome_continue_title),
                 title = it.title,
-                detail = it.lastUpdated.timeAgoDisplay(),
+                detail = it.lastUpdated.timeAgoLongDisplay(),
                 onClick = { onContinueConversation(it.id) },
             )
         }

@@ -1,16 +1,21 @@
 package com.moments.android.utilities
 
 import android.content.Context
+import android.icu.text.DateFormat as IcuDateFormat
+import android.icu.text.DisplayContext
 import android.icu.text.MeasureFormat
 import android.icu.text.RelativeDateTimeFormatter
 import android.icu.util.Measure
 import android.icu.util.MeasureUnit
+import android.icu.util.TimeZone as IcuTimeZone
+import android.icu.util.ULocale
 import android.text.format.DateFormat
 import com.moments.android.R
 import java.text.NumberFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 
 /**
@@ -30,15 +35,23 @@ object MomentsFormat {
     fun requireContext(): Context = ctx()
 
     enum class RelativeTimeStyle {
-        /** Compact feed style: `5 min ago` / `hace 5 min`. */
+        /**
+         * Corto sin «hace» (comentarios, chats, historias, notificaciones, Echoes, mapas):
+         * `ahora`, `5 min`, `3 h`, `2 d`, `4 sem`, `1 a` (≡ iOS). Unidades y plurales del sistema.
+         * En inglés: `now`, `5m`, `3h`, `2d`, `2w`, `1y` (ver [compactWidth]).
+         */
         COMPACT,
-        COMPACT_BARE,
-        /** Locale-native relative wording, limited to a single unit. */
+        /**
+         * Relativo largo del sistema con una sola unidad (pasado o futuro): `hace 3 horas`.
+         * Sesiones, Nova y pantalla de actividad.
+         */
         CONVERSATIONAL,
     }
 
     enum class DateContext {
+        /** Feed y detalle del post: `ahora` · `hace 5 minutos` · `12 de septiembre` (≡ iOS). */
         FEED_TIMESTAMP,
+        /** Separador del chat: `14:32` · `Ayer, 14:32` · `lun 14:32` · `12 sept 14:32` (≡ iOS). */
         CHAT_SEPARATOR,
         STORY_ARCHIVE,
         DETAIL_HEADER,
@@ -46,6 +59,8 @@ object MomentsFormat {
         MONTH_YEAR_LABEL,
         MONTH_ABBREVIATED,
         DAY_MONTH_LABEL,
+        /** `miércoles, 8 de octubre` (sin año). */
+        WEEKDAY_DAY_MONTH,
         WEEKDAY_NARROW,
         TIME_ONLY,
         INBOX_TIMESTAMP,
@@ -72,8 +87,7 @@ object MomentsFormat {
         relativeTo: Date = Date(),
     ): String {
         return when (style) {
-            RelativeTimeStyle.COMPACT -> compactRelativeTime(from, relativeTo)
-            RelativeTimeStyle.COMPACT_BARE -> compactBareRelativeTime(from, relativeTo)
+            RelativeTimeStyle.COMPACT -> compactElapsed(from, relativeTo)
             RelativeTimeStyle.CONVERSATIONAL -> singleUnitRelativeTime(from, relativeTo)
         }
     }
@@ -83,33 +97,28 @@ object MomentsFormat {
         context: DateContext,
         relativeTo: Date = Date(),
     ): String {
-        val calendar = Calendar.getInstance()
-        calendar.time = relativeTo
-        val refCal = calendar.clone() as Calendar
-        calendar.time = from
-        val dateCal = calendar.clone() as Calendar
+        val sameYear = isSameYear(from, relativeTo)
 
         return when (context) {
-            DateContext.FEED_TIMESTAMP -> {
-                val dayDiff = daysBetween(from, relativeTo)
-                if (dayDiff >= 7 || dateCal.get(Calendar.YEAR) != refCal.get(Calendar.YEAR)) {
-                    if (dateCal.get(Calendar.YEAR) == refCal.get(Calendar.YEAR)) {
-                        formatDate(from, "MMM d")
-                    } else {
-                        formatDate(from, "MMM d, yyyy")
-                    }
-                } else {
-                    compactRelativeTime(from, relativeTo)
-                }
-            }
+            DateContext.FEED_TIMESTAMP -> feedTimestamp(from, relativeTo)
 
             DateContext.CHAT_SEPARATOR -> {
+                // Por días de calendario (no transcurrido): agrupa mensajes por día ≡ iOS.
+                val dayDiff = calendarDaysBetween(from, relativeTo)
                 when {
-                    isToday(from, relativeTo) -> ctx().getString(R.string.chat_date_today)
-                    isYesterday(from, relativeTo) -> ctx().getString(R.string.chat_date_yesterday)
-                    dateCal.get(Calendar.YEAR) == refCal.get(Calendar.YEAR) ->
-                        formatDate(from, "MMM d")
-                    else -> formatDate(from, "MMM d, yyyy")
+                    dayDiff <= 0 -> formatTime(from)
+                    dayDiff == 1 -> relativeFormatter(sentenceStart = true).let { formatter ->
+                        formatter.combineDateAndTime(
+                            formatter.format(
+                                RelativeDateTimeFormatter.Direction.LAST,
+                                RelativeDateTimeFormatter.AbsoluteUnit.DAY,
+                            ),
+                            formatTime(from),
+                        )
+                    }
+                    dayDiff < 7 -> formatSkeleton(from, "EEE", withTime = true)
+                    sameYear -> formatSkeleton(from, "MMMd", withTime = true)
+                    else -> formatSkeleton(from, "yMMMd", withTime = true)
                 }
             }
 
@@ -117,34 +126,32 @@ object MomentsFormat {
                 when {
                     isToday(from, relativeTo) -> ctx().getString(R.string.archived_stories_today)
                     isYesterday(from, relativeTo) -> ctx().getString(R.string.archived_stories_yesterday)
-                    dateCal.get(Calendar.YEAR) == refCal.get(Calendar.YEAR) ->
-                        formatDate(from, "d MMMM")
-                    else -> formatDate(from, "d MMMM yyyy")
+                    sameYear -> formatSkeleton(from, "MMMMd")
+                    else -> formatSkeleton(from, "yMMMMd")
                 }
             }
 
             DateContext.DETAIL_HEADER -> {
                 when {
                     isToday(from, relativeTo) -> formatTime(from)
-                    dateCal.get(Calendar.YEAR) == refCal.get(Calendar.YEAR) ->
-                        formatDateTime(from, "MMM d, HH:mm")
-                    else -> formatDateTime(from, "MMM d, yyyy, HH:mm")
+                    sameYear -> formatSkeleton(from, "MMMd", withTime = true)
+                    else -> formatSkeleton(from, "yMMMd", withTime = true)
                 }
             }
 
             DateContext.MESSAGE_ABSOLUTE -> {
                 when {
                     isToday(from, relativeTo) -> formatTime(from)
-                    isSameWeek(from, relativeTo) -> formatDateTime(from, "EEEE, HH:mm")
-                    dateCal.get(Calendar.YEAR) == refCal.get(Calendar.YEAR) ->
-                        formatDateTime(from, "MMM d, HH:mm")
-                    else -> formatDateTime(from, "M/d/yy, HH:mm")
+                    isSameWeek(from, relativeTo) -> formatSkeleton(from, "EEEE", withTime = true)
+                    sameYear -> formatSkeleton(from, "MMMd", withTime = true)
+                    else -> formatSkeleton(from, "yyMd", withTime = true)
                 }
             }
 
-            DateContext.MONTH_YEAR_LABEL -> localizedDateString(from, "yMMM")
-            DateContext.MONTH_ABBREVIATED -> localizedDateString(from, "MMM")
-            DateContext.DAY_MONTH_LABEL -> localizedDateString(from, "dMMM")
+            DateContext.MONTH_YEAR_LABEL -> formatSkeleton(from, "yMMM")
+            DateContext.MONTH_ABBREVIATED -> formatSkeleton(from, "MMM")
+            DateContext.DAY_MONTH_LABEL -> formatSkeleton(from, "dMMM")
+            DateContext.WEEKDAY_DAY_MONTH -> formatSkeleton(from, "MMMMEEEEd")
             DateContext.WEEKDAY_NARROW -> narrowWeekdaySymbol(from)
             DateContext.TIME_ONLY -> formatTime(from)
             DateContext.INBOX_TIMESTAMP -> {
@@ -152,16 +159,16 @@ object MomentsFormat {
                     isToday(from, relativeTo) -> formatTime(from)
                     isYesterday(from, relativeTo) ->
                         ctx().getString(R.string.notifications_date_yesterday)
-                    else -> formatDate(from, "M/d/yy")
+                    else -> formatSkeleton(from, "yyMd")
                 }
             }
 
-            DateContext.MEDIUM_DATE -> formatDate(from, "MMM d, yyyy")
-            DateContext.MEDIUM_DATE_TIME -> formatDateTime(from, "MMM d, yyyy, HH:mm")
-            DateContext.LONG_DATE -> formatDate(from, "MMMM d, yyyy")
-            DateContext.FULL_DATE_TIME -> formatDateTime(from, "EEEE, MMMM d, yyyy, HH:mm")
-            DateContext.NUMERIC_DATE -> formatDate(from, "M/d/yy")
-            DateContext.NUMERIC_DAY_MONTH -> localizedDateString(from, "Md")
+            DateContext.MEDIUM_DATE -> formatSkeleton(from, "yMMMd")
+            DateContext.MEDIUM_DATE_TIME -> formatSkeleton(from, "yMMMd", withTime = true)
+            DateContext.LONG_DATE -> formatSkeleton(from, "yMMMMd")
+            DateContext.FULL_DATE_TIME -> formatSkeleton(from, "yMMMMEEEEd", withTime = true)
+            DateContext.NUMERIC_DATE -> formatSkeleton(from, "yyMd")
+            DateContext.NUMERIC_DAY_MONTH -> formatSkeleton(from, "Md")
         }
     }
 
@@ -193,114 +200,137 @@ object MomentsFormat {
 
     // MARK: - Private
 
-    private fun compactUnitString(from: Date, relativeTo: Date): String? {
-        val c = Calendar.getInstance()
-        c.time = relativeTo
-        val ref = c.clone() as Calendar
-        c.time = from
-        val start = c.clone() as Calendar
+    // Tiempo transcurrido (no calendario) para min/h/d/sem; años = días / 365 ≡ iOS.
+    private const val SECONDS_PER_MINUTE = 60L
+    private const val SECONDS_PER_HOUR = 3_600L
+    private const val SECONDS_PER_DAY = 86_400L
 
-        val years = fieldDiff(start, ref, Calendar.YEAR)
-        if (years > 0) {
-            val unit = ctx().getString(if (years == 1) R.string.time_unit_yr else R.string.time_unit_yrs)
-            return compactValueAndUnit(years, unit)
+    private fun nowString(): String =
+        relativeFormatter().format(
+            RelativeDateTimeFormatter.Direction.PLAIN,
+            RelativeDateTimeFormatter.AbsoluteUnit.NOW,
+        )
+
+    /** Feed: < 1 min `ahora`; < 7 d relativo largo; después fecha `d MMMM` (+ año si no es el actual). */
+    private fun feedTimestamp(from: Date, relativeTo: Date): String {
+        val seconds = secondsBetween(from, relativeTo)
+        if (seconds < SECONDS_PER_MINUTE) return nowString()
+        val days = seconds / SECONDS_PER_DAY
+        if (days >= 7) {
+            return formatSkeleton(from, if (isSameYear(from, relativeTo)) "MMMMd" else "yMMMMd")
         }
-        val months = monthsBetween(from, relativeTo)
-        if (months > 0) {
-            val unit = ctx().getString(if (months == 1) R.string.time_unit_mo else R.string.time_unit_mos)
-            return compactValueAndUnit(months, unit)
+        val (value, unit) = when {
+            seconds < SECONDS_PER_HOUR ->
+                seconds / SECONDS_PER_MINUTE to RelativeDateTimeFormatter.RelativeUnit.MINUTES
+            seconds < SECONDS_PER_DAY ->
+                seconds / SECONDS_PER_HOUR to RelativeDateTimeFormatter.RelativeUnit.HOURS
+            else -> days to RelativeDateTimeFormatter.RelativeUnit.DAYS
         }
-        val weeks = weeksBetween(from, relativeTo)
-        if (weeks > 0) {
-            val unit = ctx().getString(R.string.time_unit_wk)
-            return compactValueAndUnit(weeks, unit)
-        }
-        val days = daysBetween(from, relativeTo)
-        if (days > 0) {
-            val unit = ctx().getString(R.string.time_unit_d)
-            return compactValueAndUnit(days, unit)
-        }
-        val hours = hoursBetween(from, relativeTo)
-        if (hours > 0) {
-            val unit = ctx().getString(R.string.time_unit_h)
-            return compactValueAndUnit(hours, unit)
-        }
-        val minutes = minutesBetween(from, relativeTo)
-        if (minutes > 0) {
-            val unit = ctx().getString(R.string.time_unit_min)
-            return compactValueAndUnit(minutes, unit)
-        }
-        return null
+        return relativeFormatter().format(
+            value.toDouble(),
+            RelativeDateTimeFormatter.Direction.LAST,
+            unit,
+        )
     }
 
-    private fun compactRelativeTime(from: Date, relativeTo: Date): String {
-        val timeString = compactUnitString(from, relativeTo)
-            ?: return ctx().getString(R.string.time_now)
-        return ctx().getString(R.string.time_ago, timeString)
+    /** Corto sin «hace»: `ahora`, `5 min`, `3 h`, `2 d`, `4 sem`; años solo desde 365 días. */
+    private fun compactElapsed(from: Date, relativeTo: Date): String {
+        val seconds = secondsBetween(from, relativeTo)
+        if (seconds < SECONDS_PER_MINUTE) return nowString()
+        val days = seconds / SECONDS_PER_DAY
+        val measure = when {
+            seconds < SECONDS_PER_HOUR -> Measure(seconds / SECONDS_PER_MINUTE, MeasureUnit.MINUTE)
+            seconds < SECONDS_PER_DAY -> Measure(seconds / SECONDS_PER_HOUR, MeasureUnit.HOUR)
+            days < 7 -> Measure(days, MeasureUnit.DAY)
+            days < 365 -> Measure(days / 7, MeasureUnit.WEEK)
+            else -> Measure(days / 365, MeasureUnit.YEAR)
+        }
+        return MeasureFormat.getInstance(Locale.getDefault(), compactWidth()).format(measure)
     }
 
-    private fun compactBareRelativeTime(from: Date, relativeTo: Date): String {
-        if (weeksBetween(from, relativeTo) >= 1) {
-            val refCal = Calendar.getInstance().apply { time = relativeTo }
-            val dateCal = Calendar.getInstance().apply { time = from }
-            return if (dateCal.get(Calendar.YEAR) == refCal.get(Calendar.YEAR)) {
-                formatDate(from, "MMM d")
-            } else {
-                formatDate(from, "MMM d, yyyy")
+    /**
+     * Ancho del corto ≡ iOS. Inglés usa NARROW (`5m`, `3h`, `2d`, `2w`, `1y`): en SHORT
+     * ICU daría `3 hr`, `2 days`, `2 wks`. El resto usa SHORT, que ya da la forma corta
+     * habitual del idioma (`3 h`, `2 d`, `2 sem`, `3時間`…); NARROW en otros idiomas
+     * pega número y unidad o usa símbolos poco legibles (p. ej. es `3h`, `2sem`).
+     * Japonés, chino y coreano también usan NARROW: es la forma sin espacio (`5分`), ≡ iOS.
+     */
+    private fun compactWidth(): MeasureFormat.FormatWidth =
+        if (Locale.getDefault().language in setOf("en", "ja", "zh", "ko")) {
+            MeasureFormat.FormatWidth.NARROW
+        } else {
+            MeasureFormat.FormatWidth.SHORT
+        }
+
+    /** `true` si el corto de [from] sería `ahora` (< 1 min), para frases como «Visto ahora». */
+    fun isCompactNow(from: Date, relativeTo: Date = Date()): Boolean =
+        secondsBetween(from, relativeTo) < SECONDS_PER_MINUTE
+
+    /**
+     * Recibo de lectura en el menú del mensaje (≡ iOS): `Visto hoy, 14:32` ·
+     * `Visto ayer, 23:00` · `Visto el lun, 14:32` · `Visto el 24 sept, 14:32`
+     * (con año si no es el actual). Días de calendario; hora respetando 12/24 h.
+     */
+    fun seenReceipt(from: Date, relativeTo: Date = Date()): String {
+        val time = formatTime(from)
+        val dayDiff = calendarDaysBetween(from, relativeTo)
+        return when {
+            dayDiff <= 0 -> ctx().getString(R.string.chat_seen_at_today, time)
+            dayDiff == 1 -> ctx().getString(R.string.chat_seen_at_yesterday, time)
+            else -> {
+                val skeleton = when {
+                    dayDiff < 7 -> "EEE"
+                    isSameYear(from, relativeTo) -> "MMMd"
+                    else -> "yMMMd"
+                }
+                ctx().getString(R.string.chat_seen_at_date, formatSkeleton(from, skeleton, withTime = true))
             }
         }
-        return compactUnitString(from, relativeTo) ?: ctx().getString(R.string.time_now)
     }
 
     private fun singleUnitRelativeTime(from: Date, relativeTo: Date): String {
-        val formatter = RelativeDateTimeFormatter.getInstance(Locale.getDefault())
-        val seconds = secondsBetween(from, relativeTo)
-        return when {
-            abs(seconds) < 10 -> formatter.format(
+        val formatter = relativeFormatter()
+        val signed = secondsBetween(from, relativeTo)
+        val seconds = abs(signed)
+        // Menos de un minuto → «ahora» (≡ iOS longElapsedTime).
+        if (seconds < SECONDS_PER_MINUTE) {
+            return formatter.format(
                 RelativeDateTimeFormatter.Direction.PLAIN,
                 RelativeDateTimeFormatter.AbsoluteUnit.NOW,
             )
-            abs(seconds) < 60 -> formatter.format(
-                abs(seconds).toDouble(),
-                RelativeDateTimeFormatter.Direction.LAST,
-                RelativeDateTimeFormatter.RelativeUnit.SECONDS,
-            )
-            abs(minutesBetween(from, relativeTo)) < 60 -> formatter.format(
-                abs(minutesBetween(from, relativeTo)).toDouble(),
-                RelativeDateTimeFormatter.Direction.LAST,
-                RelativeDateTimeFormatter.RelativeUnit.MINUTES,
-            )
-            abs(hoursBetween(from, relativeTo)) < 24 -> formatter.format(
-                hoursBetween(from, relativeTo).toDouble(),
-                RelativeDateTimeFormatter.Direction.LAST,
-                RelativeDateTimeFormatter.RelativeUnit.HOURS,
-            )
-            abs(daysBetween(from, relativeTo)) < 7 -> formatter.format(
-                daysBetween(from, relativeTo).toDouble(),
-                RelativeDateTimeFormatter.Direction.LAST,
-                RelativeDateTimeFormatter.RelativeUnit.DAYS,
-            )
-            abs(weeksBetween(from, relativeTo)) < 5 -> formatter.format(
-                weeksBetween(from, relativeTo).toDouble(),
-                RelativeDateTimeFormatter.Direction.LAST,
-                RelativeDateTimeFormatter.RelativeUnit.WEEKS,
-            )
-            abs(monthsBetween(from, relativeTo)) < 12 -> formatter.format(
-                monthsBetween(from, relativeTo).toDouble(),
-                RelativeDateTimeFormatter.Direction.LAST,
-                RelativeDateTimeFormatter.RelativeUnit.MONTHS,
-            )
-            else -> formatter.format(
-                fieldDiff(
-                    Calendar.getInstance().apply { time = from },
-                    Calendar.getInstance().apply { time = relativeTo },
-                    Calendar.YEAR,
-                ).toDouble(),
-                RelativeDateTimeFormatter.Direction.LAST,
-                RelativeDateTimeFormatter.RelativeUnit.YEARS,
-            )
         }
+        // Pasado → «hace…»; futuro (p. ej. caducidad) → «dentro de…».
+        val direction = if (signed >= 0) {
+            RelativeDateTimeFormatter.Direction.LAST
+        } else {
+            RelativeDateTimeFormatter.Direction.NEXT
+        }
+        val days = seconds / SECONDS_PER_DAY
+        val (value, unit) = when {
+            seconds < SECONDS_PER_MINUTE -> seconds to RelativeDateTimeFormatter.RelativeUnit.SECONDS
+            seconds < SECONDS_PER_HOUR ->
+                seconds / SECONDS_PER_MINUTE to RelativeDateTimeFormatter.RelativeUnit.MINUTES
+            seconds < SECONDS_PER_DAY ->
+                seconds / SECONDS_PER_HOUR to RelativeDateTimeFormatter.RelativeUnit.HOURS
+            days < 7 -> days to RelativeDateTimeFormatter.RelativeUnit.DAYS
+            days < 35 -> days / 7 to RelativeDateTimeFormatter.RelativeUnit.WEEKS
+            days < 365 -> maxOf(1L, days / 30) to RelativeDateTimeFormatter.RelativeUnit.MONTHS
+            else -> days / 365 to RelativeDateTimeFormatter.RelativeUnit.YEARS
+        }
+        return formatter.format(value.toDouble(), direction, unit)
     }
+
+    private fun relativeFormatter(sentenceStart: Boolean = false): RelativeDateTimeFormatter =
+        RelativeDateTimeFormatter.getInstance(
+            ULocale.forLocale(Locale.getDefault()),
+            null,
+            RelativeDateTimeFormatter.Style.LONG,
+            if (sentenceStart) {
+                DisplayContext.CAPITALIZATION_FOR_BEGINNING_OF_SENTENCE
+            } else {
+                DisplayContext.CAPITALIZATION_NONE
+            },
+        )
 
     private fun formattedInteger(value: Int): String {
         return NumberFormat.getIntegerInstance(Locale.getDefault()).format(value)
@@ -341,13 +371,6 @@ object MomentsFormat {
         return result.replace(zeroSuffix, suffix)
     }
 
-    private fun localizedDateString(date: Date, template: String): String {
-        return android.text.format.DateFormat.format(
-            DateFormat.getBestDateTimePattern(Locale.getDefault(), template),
-            date,
-        ).toString()
-    }
-
     private fun narrowWeekdaySymbol(date: Date): String {
         val locale = Locale.getDefault()
         val symbols = java.text.DateFormatSymbols.getInstance(locale)
@@ -357,22 +380,35 @@ object MomentsFormat {
         return weekdays.getOrElse(index) { "" }
     }
 
-    private fun compactValueAndUnit(value: Int, unit: String): String {
-        val separator = if (unit.length == 1) "" else " "
-        return "$value$separator$unit"
+    private val skeletonFormats = ConcurrentHashMap<String, IcuDateFormat>()
+
+    /**
+     * Fecha localizada por esqueleto (orden, separadores y formas del idioma).
+     * [withTime] añade la hora respetando el ajuste 12/24 h del sistema.
+     */
+    private fun formatSkeleton(date: Date, skeleton: String, withTime: Boolean = false): String {
+        val fullSkeleton = if (withTime) skeleton + timeSkeleton() else skeleton
+        val locale = Locale.getDefault()
+        val cached = skeletonFormats.getOrPut("${locale.toLanguageTag()}|$fullSkeleton") {
+            IcuDateFormat.getInstanceForSkeleton(fullSkeleton, locale)
+        }
+        // Copia por llamada: DateFormat no es thread-safe y la zona horaria puede cambiar.
+        val format = cached.clone() as IcuDateFormat
+        format.timeZone = IcuTimeZone.getDefault()
+        return format.format(date)
     }
 
-    private fun formatDate(date: Date, pattern: String): String =
-        android.text.format.DateFormat.format(
-            DateFormat.getBestDateTimePattern(Locale.getDefault(), pattern),
-            date,
-        ).toString()
+    private fun timeSkeleton(): String =
+        if (DateFormat.is24HourFormat(ctx())) "Hmm" else "hmm"
 
     private fun formatTime(date: Date): String =
         DateFormat.getTimeFormat(ctx()).format(date)
 
-    private fun formatDateTime(date: Date, pattern: String): String =
-        formatDate(date, pattern)
+    private fun isSameYear(date: Date, reference: Date): Boolean {
+        val a = Calendar.getInstance().apply { time = date }
+        val b = Calendar.getInstance().apply { time = reference }
+        return a.get(Calendar.YEAR) == b.get(Calendar.YEAR)
+    }
 
     private fun isToday(date: Date, reference: Date): Boolean {
         val a = Calendar.getInstance().apply { time = date }
@@ -399,13 +435,8 @@ object MomentsFormat {
     private fun secondsBetween(from: Date, to: Date): Long =
         (to.time - from.time) / 1000
 
-    private fun minutesBetween(from: Date, to: Date): Int =
-        (secondsBetween(from, to) / 60).toInt()
-
-    private fun hoursBetween(from: Date, to: Date): Int =
-        (secondsBetween(from, to) / 3600).toInt()
-
-    private fun daysBetween(from: Date, to: Date): Int {
+    /** Días de calendario entre medianoches (solo separadores del chat). */
+    private fun calendarDaysBetween(from: Date, to: Date): Int {
         val a = Calendar.getInstance().apply {
             time = from
             set(Calendar.HOUR_OF_DAY, 0)
@@ -420,18 +451,7 @@ object MomentsFormat {
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }
-        return ((b.timeInMillis - a.timeInMillis) / (24 * 60 * 60 * 1000)).toInt()
+        // Redondeo: los días con cambio de hora duran 23 o 25 h.
+        return Math.round((b.timeInMillis - a.timeInMillis) / (24.0 * 60 * 60 * 1000)).toInt()
     }
-
-    private fun weeksBetween(from: Date, to: Date): Int = daysBetween(from, to) / 7
-
-    private fun monthsBetween(from: Date, to: Date): Int {
-        val a = Calendar.getInstance().apply { time = from }
-        val b = Calendar.getInstance().apply { time = to }
-        return (b.get(Calendar.YEAR) - a.get(Calendar.YEAR)) * 12 +
-            (b.get(Calendar.MONTH) - a.get(Calendar.MONTH))
-    }
-
-    private fun fieldDiff(start: Calendar, end: Calendar, field: Int): Int =
-        end.get(field) - start.get(field)
 }

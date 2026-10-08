@@ -1079,7 +1079,8 @@ private fun InputCircleButton(
     }
 }
 
-private fun formatVoiceTime(seconds: Long): String = "%02d:%02d".format(seconds / 60, seconds % 60)
+// «0:05», «1:23» como el resto de duraciones ≡ iOS.
+private fun formatVoiceTime(seconds: Long): String = "%d:%02d".format(seconds / 60, seconds % 60)
 
 @Composable
 fun VoiceRecordingDraftPreview(

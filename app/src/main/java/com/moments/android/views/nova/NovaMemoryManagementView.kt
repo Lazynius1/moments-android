@@ -58,7 +58,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.extensions.momentsScrollEdgeChrome
-import com.moments.android.extensions.timeAgoDisplay
+import com.moments.android.extensions.timeAgoLongDisplay
 import com.moments.android.utilities.momentsEmptyStateAppear
 import com.moments.android.views.nova.memory.NovaContextStore
 import com.moments.android.views.nova.memory.NovaFact
@@ -406,7 +406,7 @@ private fun MemoryFactRow(
                     )
                 }
                 Text(
-                    text = fact.timestamp.timeAgoDisplay(),
+                    text = fact.timestamp.timeAgoLongDisplay(),
                     color = NovaColors.textTertiary,
                     fontSize = 11.sp,
                 )

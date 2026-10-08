@@ -113,7 +113,6 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -129,6 +128,7 @@ import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.utilities.EmojiReactionDefaults
 import com.moments.android.utilities.EmojiUsageTracker
 import com.moments.android.utilities.HapticManager
+import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.creator.emojiPickerCatalog
 import com.moments.android.views.creator.emojiSupportsSkinTone
 import com.moments.android.views.creator.emojiWithoutSkinTone
@@ -138,7 +138,6 @@ import com.moments.android.views.messaging.core.EnhancedMessage
 import com.moments.android.views.messaging.core.MessageStatus
 import com.moments.android.views.messaging.core.MessageType
 import java.util.Date
-import java.text.DateFormat
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -411,7 +410,6 @@ fun ChatMessageContextMenuOverlay(
     val item = selection
     val dark = isSystemInDarkTheme()
     val density = LocalDensity.current
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val emojiTracker = remember { EmojiUsageTracker() }
     val primaryText = com.moments.android.extensions.MomentsChromeGlass.contentColor(dark)
@@ -707,7 +705,7 @@ fun ChatMessageContextMenuOverlay(
                     .clipToBounds(),
             ) {
                 if (showsMessageInfo) {
-                    MessageInfoRow(item.message, primaryText, context)
+                    MessageInfoRow(item.message, primaryText)
                 }
                 if (showsGroupReaders) {
                     GroupReadReceiptsRow(item.message, primaryText)
@@ -1031,7 +1029,6 @@ internal fun reactionConnectorSourceX(
 private fun MessageInfoRow(
     message: EnhancedMessage,
     primaryText: Color,
-    context: android.content.Context,
 ) {
     val receiptTime = readReceiptTime(message)
     Row(
@@ -1046,7 +1043,8 @@ private fun MessageInfoRow(
         MessageStatusIcon(MessageStatus.READ)
         if (receiptTime != null) {
             Text(
-                "${com.moments.android.views.messaging.core.MessageStatus.READ.displayName(context)} ${DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(receiptTime)}",
+                // ≡ iOS: «Visto hoy, 14:32» · «Visto ayer, 23:00» · «Visto el lun, 14:32» · «Visto el 24 sept, 14:32».
+                MomentsFormat.seenReceipt(receiptTime),
                 color = primaryText,
                 fontSize = 13.sp,
                 maxLines = 1,

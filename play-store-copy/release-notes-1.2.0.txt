@@ -1,0 +1,176 @@
+<es-ES>
+• Chats más personalizables — Elige el fondo y el color de las burbujas de cada chat.
+
+• Mejoras en el chat — Reacciones renovadas, respuestas que muestran lo que citas y “Ver una vez” desde la lista.
+
+• Más control en tus historias — Elige quién la ve y si dura 24 o 48 horas, y añade audio original con el sticker de audio.
+
+• Mapas renovados — Momentos e historias agrupados por lugar.
+
+• Chat más fiable — Funciona mejor con mala conexión y avisa aunque la app esté cerrada.
+</es-ES>
+<ca>
+• Xats més personalitzables — Tria el fons i el color de les bombolles de cada xat.
+
+• Millores al xat — Reaccions renovades, respostes que mostren el que cites i «Veure una vegada» des de la llista.
+
+• Més control a les històries — Tria qui la veu i si dura 24 o 48 hores, i afegeix àudio original amb l'adhesiu d'àudio.
+
+• Mapes renovats — Moments i històries agrupats per lloc.
+
+• Xat més fiable — Funciona millor amb mala connexió i avisa encara que l'app estigui tancada.
+</ca>
+<de-DE>
+• Persönlichere Chats — Wähle Hintergrund und Blasenfarbe für jeden Chat.
+
+• Besser chatten — Neue Reaktionen, Antworten zeigen, was du zitierst, und „Einmal ansehen“ aus der Chatliste.
+
+• Mehr Kontrolle über Storys — Wähle, wer sie sieht und ob sie 24 oder 48 Stunden bleibt. Plus Original-Audio per Audio-Sticker.
+
+• Neue Karten — Moments und Storys nach Ort gruppiert.
+
+• Zuverlässigerer Chat — Läuft besser bei schlechtem Netz und meldet sich auch bei geschlossener App.
+</de-DE>
+<en-US>
+• More personal chats — Pick the background and bubble color for each chat.
+
+• Better chat — Refreshed reactions, replies that show what you're quoting, and “View once” from your chat list.
+
+• More control over stories — Choose who sees it and whether it lasts 24 or 48 hours. Plus original audio via the audio sticker.
+
+• Refreshed maps — Moments and stories grouped by place.
+
+• More reliable chat — Works better on a poor connection and notifies you even with the app closed.
+</en-US>
+<fr-FR>
+• Chats plus personnalisables — Choisis le fond et la couleur des bulles de chaque chat.
+
+• Chat amélioré — Nouvelles réactions, réponses qui montrent ta citation et « Voir une fois » depuis la liste.
+
+• Plus de contrôle sur tes stories — Choisis qui la voit et sa durée : 24 ou 48 heures. Et l'audio original avec le sticker audio.
+
+• Cartes repensées — Moments et stories regroupés par lieu.
+
+• Chat plus fiable — Marche mieux avec un réseau faible et notifie même app fermée.
+</fr-FR>
+<hi-IN>
+• चैट को अपने अंदाज़ में सजाएं — हर चैट का बैकग्राउंड और बबल का रंग चुनें। यह सिर्फ़ आपको दिखेगा।
+
+• बेहतर चैट — नए रिएक्शन, जवाब में दिखता है कि आप क्या कोट कर रहे हैं, और चैट लिस्ट से ही “एक बार देखें”।
+
+• स्टोरी पर ज़्यादा कंट्रोल — चुनें कि कौन देखे और स्टोरी 24 या 48 घंटे रहे। साथ ही ऑडियो स्टिकर से ओरिजिनल ऑडियो।
+
+• नए मैप — Moments और स्टोरी जगह के हिसाब से एक साथ।
+
+• ज़्यादा भरोसेमंद चैट — कमज़ोर कनेक्शन में भी मैसेज जाते हैं और ऐप बंद होने पर भी नोटिफ़िकेशन आते हैं।
+</hi-IN>
+<id>
+• Chat yang lebih personal — Pilih latar dan warna gelembung untuk tiap chat.
+
+• Chat makin enak — Reaksi baru, balasan yang menampilkan kutipanmu, dan “Lihat sekali” dari daftar chat.
+
+• Kontrol lebih atas story — Pilih siapa yang melihat dan durasi 24 atau 48 jam. Plus audio asli lewat stiker audio.
+
+• Peta yang diperbarui — Moments dan story dikelompokkan per tempat.
+
+• Chat lebih andal — Pesan tetap terkirim meski koneksi lemah, notifikasi masuk meski aplikasi ditutup.
+</id>
+<it-IT>
+• Chat più personalizzabili — Scegli lo sfondo e il colore delle bolle di ogni chat.
+
+• Chat migliorata — Reazioni rinnovate, risposte che mostrano cosa citi e “Visualizza una volta” dall'elenco chat.
+
+• Più controllo sulle storie — Scegli chi la vede e se dura 24 o 48 ore. E l'audio originale con lo sticker audio.
+
+• Mappe rinnovate — Moments e storie raggruppati per luogo.
+
+• Chat più affidabile — Funziona meglio con connessione scarsa e ti avvisa anche ad app chiusa.
+</it-IT>
+<ja-JP>
+• チャットをもっと自分好みに — チャットごとに背景と吹き出しの色を選べます。設定はあなたにだけ表示されます。
+
+• チャットが使いやすく — リアクションを刷新。返信時は引用元が表示され、「一度だけ表示」もチャット一覧から開けます。
+
+• ストーリー投稿をもっと細かく — 見せる相手、表示時間（24時間か48時間）、受け付ける返信を選べます。音声スタンプでほかのストーリーの音源も使えます。
+
+• マップを刷新 — Momentsとストーリーを場所ごとにまとめて表示します。
+
+• チャットの安定性が向上 — 電波が弱くてもメッセージが届き、アプリを閉じていても通知が届きます。
+</ja-JP>
+<ko-KR>
+• 더 다양하게 꾸미는 채팅 — 채팅마다 배경과 말풍선 색을 고를 수 있어요. 나에게만 보여요.
+
+• 더 좋아진 채팅 — 새로워진 반응, 인용한 내용이 보이는 답장, 채팅 목록에서 바로 여는 ‘한 번만 보기’.
+
+• 더 세밀해진 스토리 설정 — 볼 수 있는 사람, 24시간 또는 48시간 유지, 허용할 답장을 고를 수 있어요. 오디오 스티커로 원본 오디오도 사용해 보세요.
+
+• 새로워진 지도 — Moments와 스토리를 장소별로 모아 보여 줘요.
+
+• 더 안정적인 채팅 — 연결이 약해도 메시지가 전송되고, 앱을 닫아도 알림이 도착해요.
+</ko-KR>
+<nl-NL>
+• Chats naar jouw smaak — Kies de achtergrond en ballonkleur voor elke chat.
+
+• Betere chat — Nieuwe chatreacties, antwoorden die tonen wat je citeert en ‘Eenmalig bekijken’ vanuit de lijst.
+
+• Meer controle over verhalen — Kies wie het ziet en of het 24 of 48 uur blijft. Plus originele audio met de audiosticker.
+
+• Vernieuwde kaarten — Moments en verhalen gegroepeerd per plek.
+
+• Betrouwbaardere chat — Werkt beter bij slecht bereik en meldt zich ook als de app dicht is.
+</nl-NL>
+<pl-PL>
+• Czaty po Twojemu — Wybierz tło i kolor dymków w każdym czacie.
+
+• Lepszy czat — Nowe reakcje, odpowiedzi pokazujące cytowaną treść i „Wyświetl raz” z listy czatów.
+
+• Więcej kontroli nad relacjami — Wybierz, kto je zobaczy i czy znikną po 24 czy 48 godzinach. Plus oryginalny dźwięk z naklejką audio.
+
+• Odświeżone mapy — Momenty i relacje pogrupowane według miejsca.
+
+• Niezawodny czat — Działa przy słabym połączeniu, a powiadomienia przychodzą przy zamkniętej aplikacji.
+</pl-PL>
+<pt-BR>
+• Chats mais personalizáveis — Escolha o fundo e a cor dos balões de cada chat.
+
+• Chat melhor — Reações renovadas, respostas que mostram o que você cita e “Ver uma vez” direto na lista de chats.
+
+• Mais controle nos stories — Escolha quem vê e se fica 24 ou 48 horas. E áudio original com o sticker de áudio.
+
+• Mapas renovados — Moments e stories agrupados por lugar.
+
+• Chat mais confiável — Funciona melhor com conexão ruim e avisa mesmo com o app fechado.
+</pt-BR>
+<pt-PT>
+• Conversas mais personalizáveis — Escolhe o fundo e a cor dos balões de cada conversa.
+
+• Conversas melhores — Reações renovadas, respostas que mostram o que citas e “Ver uma vez” a partir da lista.
+
+• Mais controlo nas histórias — Escolhe quem a vê e se dura 24 ou 48 horas. E áudio original com o adesivo de áudio.
+
+• Mapas renovados — Moments e histórias agrupados por local.
+
+• Conversas mais fiáveis — Funcionam melhor com má ligação e avisam-te mesmo com a app fechada.
+</pt-PT>
+<tr-TR>
+• Daha kişisel sohbetler — Her sohbetin arka planını ve balon rengini seç.
+
+• Daha iyi sohbet — Yenilenen tepkiler, alıntıladığını gösteren yanıtlar ve listeden doğrudan “Bir kez görüntüle”.
+
+• Hikâyelerde daha fazla kontrol — Kimin göreceğini ve 24 mü 48 saat mi kalacağını seç. Ses çıkartmasıyla orijinal ses de var.
+
+• Yenilenen haritalar — Moments ve hikâyeler yere göre gruplanır.
+
+• Daha güvenilir sohbet — Zayıf bağlantıda da çalışır, uygulama kapalıyken de bildirim gelir.
+</tr-TR>
+<zh-TW>
+• 聊天更能自訂 — 為每個聊天選擇背景和對話框顏色，只有你看得到。
+
+• 聊天更好用 — 回應全新改版、回覆時看得到你引用的內容，還能直接從聊天列表「查看一次」。
+
+• 更好掌控限時動態 — 選擇誰能看、保留 24 或 48 小時，以及允許哪些回覆。還能用音訊貼圖使用其他限時動態的原創音訊。
+
+• 全新地圖 — 依地點整理 Moments 與限時動態。
+
+• 聊天更穩定 — 網路不穩也能順利送出訊息，App 關閉時也收得到通知。
+</zh-TW>

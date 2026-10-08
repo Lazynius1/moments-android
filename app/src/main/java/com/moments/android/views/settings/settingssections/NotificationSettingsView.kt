@@ -55,6 +55,7 @@ import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.models.NotificationType
 import com.moments.android.utilities.HapticManager
+import com.moments.android.utilities.MomentsFormat
 import com.moments.android.utilities.MomentsPressDefaults
 import com.moments.android.utilities.momentsPress
 import com.moments.android.views.settings.SettingsProfileColors
@@ -63,10 +64,8 @@ import com.moments.android.views.settings.SettingsViewModel
 import com.moments.android.views.settings.sections.SettingsSubsectionGroup
 import com.moments.android.views.settings.settingsToggleCases
 import kotlinx.coroutines.delay
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
-import java.util.Locale
 
 /**
  * Port de `NotificationSettingsView.swift`.
@@ -85,7 +84,6 @@ fun NotificationSettingsView(
     val isDark = isSystemInDarkTheme()
     val primary = SettingsProfileColors.accent(isDark)
     val context = LocalContext.current
-    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
 
     var isSavingSchedule by remember { mutableStateOf(false) }
     var showSavedSchedule by remember { mutableStateOf(false) }
@@ -130,7 +128,7 @@ fun NotificationSettingsView(
                         )
                         ScheduleTimeRow(
                             label = stringResource(R.string.settings_notifications_schedule_start),
-                            timeLabel = timeFormat.format(startTime),
+                            timeLabel = MomentsFormat.smartDate(startTime, MomentsFormat.DateContext.TIME_ONLY),
                             primary = primary,
                             onClick = {
                                 showTimePicker(context, startTime, onStartTimeChange)
@@ -143,7 +141,7 @@ fun NotificationSettingsView(
                         )
                         ScheduleTimeRow(
                             label = stringResource(R.string.settings_notifications_schedule_end),
-                            timeLabel = timeFormat.format(endTime),
+                            timeLabel = MomentsFormat.smartDate(endTime, MomentsFormat.DateContext.TIME_ONLY),
                             primary = primary,
                             onClick = {
                                 showTimePicker(context, endTime, onEndTimeChange)

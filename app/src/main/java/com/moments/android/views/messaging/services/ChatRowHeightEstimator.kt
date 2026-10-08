@@ -37,7 +37,8 @@ object ChatRowHeightEstimator {
     private val mediaMaxHeight = 420.dp
     private const val GIF_DEFAULT_ASPECT = 200f / 150f
 
-    private val voiceNoteHeight = 68.dp
+    // ≡ iOS VoiceMessageLayout.cardHeight (19 + 24 + 19).
+    private val voiceNoteHeight = 62.dp
     private val locationHeight = 217.dp
     private val liveLocationExtraHeight = 40.dp
     private val fileHeight = 72.dp

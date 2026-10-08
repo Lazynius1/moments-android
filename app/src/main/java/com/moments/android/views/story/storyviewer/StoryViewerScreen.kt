@@ -2107,7 +2107,16 @@ private fun StoryViewerHeaderChrome(
     onMore: () -> Unit,
     onChain: () -> Unit,
 ) {
-    val timeAgo = remember(timestamp) { MomentsFormat.relativeTime(timestamp) }
+    // Tick de 30 s: la hora relativa avanza mientras el visor sigue abierto (≡ iOS).
+    val nowMillis by androidx.compose.runtime.produceState(System.currentTimeMillis(), timestamp) {
+        while (true) {
+            delay(30_000)
+            value = System.currentTimeMillis()
+        }
+    }
+    val timeAgo = remember(timestamp, nowMillis) {
+        MomentsFormat.relativeTime(timestamp, relativeTo = java.util.Date(nowMillis))
+    }
     // Chrome opaco Android: no blanco fijo (iOS glass translúcido sobre media oscura).
     val chromeFg = MomentsChromeGlass.contentColor(isSystemInDarkTheme())
     Row(

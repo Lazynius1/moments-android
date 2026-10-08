@@ -31,7 +31,7 @@ class SettingsViewModel {
     private val firestoreService = FirestoreService()
     private val scope = CoroutineScope(Dispatchers.Main.immediate)
 
-    /** Paridad iOS `dateFormatter` con `HH:mm`. */
+    /** Clave interna `HH:mm` (almacenamiento, Locale.US) ≡ iOS; en pantalla usar `DateContext.TIME_ONLY`. */
     val dateFormatter = SimpleDateFormat("HH:mm", Locale.US)
 
     fun fetchUserSettings(onResult: (Result<AppUser>) -> Unit) {

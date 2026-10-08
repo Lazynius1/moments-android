@@ -347,7 +347,10 @@ fun SharedProfilePreviewCard(
     val profileUserId = sharedProfileData["profileUserId"].orEmpty()
     val viewModel = remember(profileUserId) { UserProfileViewModel(profileUserId) }
     val isDark = isSystemInDarkTheme()
-    val cardBackground = if (isDark) Color(0xFF151C1D) else Color(0xFFE8EEF0)
+    // Saliente en el chat: tarjeta con el color de burbuja (miniaturas intactas); recibida neutra.
+    val outgoingPalette = com.moments.android.views.messaging.components.chatOutgoingCardPalette()
+    val cardBackground = outgoingPalette?.background ?: if (isDark) Color(0xFF151C1D) else Color(0xFFE8EEF0)
+    val spinnerColor = outgoingPalette?.primary ?: UserProfileColors.accent
     val cardShape = RoundedCornerShape(sharedProfileCardCornerRadius)
     val currentUid = FirebaseAuth.getInstance().currentUser?.uid
     val isOwnProfile = profileUserId.isNotEmpty() && profileUserId == currentUid
@@ -396,7 +399,7 @@ fun SharedProfilePreviewCard(
                     CircularProgressIndicator(
                         modifier = Modifier.size(22.dp),
                         strokeWidth = 2.dp,
-                        color = UserProfileColors.accent,
+                        color = spinnerColor,
                     )
                 }
             }
@@ -417,7 +420,7 @@ fun SharedProfilePreviewCard(
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp,
-                            color = UserProfileColors.accent,
+                            color = spinnerColor,
                         )
                     }
                 }
@@ -442,7 +445,8 @@ private fun SharedProfileCardShell(
             .background(cardBackground)
             .border(
                 width = 1.dp,
-                color = UserProfileColors.borderColor.copy(alpha = if (isDark) 0.14f else 0.22f),
+                color = com.moments.android.views.messaging.components.chatOutgoingCardPalette()?.stroke
+                    ?: UserProfileColors.borderColor.copy(alpha = if (isDark) 0.14f else 0.22f),
                 shape = cardShape,
             )
             .clickable(
@@ -483,6 +487,7 @@ private fun SharedProfileHeaderRow(
         sharedProfileData["profileNote"]?.trim()?.takeIf { it.isNotEmpty() }
     }
     val verified = viewModel.userProfile?.isVerified ?: (sharedProfileData["isVerified"] == "true")
+    val outgoingPalette = com.moments.android.views.messaging.components.chatOutgoingCardPalette()
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
         Column(
@@ -518,7 +523,7 @@ private fun SharedProfileHeaderRow(
             ) {
                 Text(
                     text = username,
-                    color = UserProfileColors.textPrimary,
+                    color = outgoingPalette?.primary ?: UserProfileColors.textPrimary,
                     fontSize = with(density) { legacyPoppinsSize(context, 11).toSp() },
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -529,7 +534,7 @@ private fun SharedProfileHeaderRow(
             bio?.let {
                 Text(
                     text = it,
-                    color = UserProfileColors.textSecondary,
+                    color = outgoingPalette?.secondary ?: UserProfileColors.textSecondary,
                     fontSize = with(density) { legacyPoppinsSize(context, 9).toSp() },
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -632,6 +637,7 @@ private fun SharedProfileStatsRow(
     val stats = sharedProfileVisibleStats(sharedProfileData, viewModel, isOwnProfile)
     if (stats.isEmpty()) return
     val isDark = isSystemInDarkTheme()
+    val outgoingPalette = com.moments.android.views.messaging.components.chatOutgoingCardPalette()
     Row(Modifier.fillMaxWidth()) {
         stats.forEachIndexed { index, stat ->
             Column(
@@ -641,13 +647,13 @@ private fun SharedProfileStatsRow(
             ) {
                 Text(
                     text = MomentsFormat.count(stat.count, MomentsFormat.CountStyle.PROFILE_STAT),
-                    color = UserProfileColors.textPrimary,
+                    color = outgoingPalette?.primary ?: UserProfileColors.textPrimary,
                     fontSize = with(density) { legacyPoppinsSize(context, 11).toSp() },
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
                     text = stat.label,
-                    color = UserProfileColors.textSecondary,
+                    color = outgoingPalette?.secondary ?: UserProfileColors.textSecondary,
                     fontSize = with(density) { legacyPoppinsSize(context, 7).toSp() },
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
@@ -661,7 +667,8 @@ private fun SharedProfileStatsRow(
                         .width(1.dp)
                         .height(20.dp)
                         .background(
-                            UserProfileColors.borderColor.copy(alpha = if (isDark) 0.22f else 0.35f),
+                            outgoingPalette?.primary?.copy(alpha = 0.25f)
+                                ?: UserProfileColors.borderColor.copy(alpha = if (isDark) 0.22f else 0.35f),
                         ),
                 )
             }

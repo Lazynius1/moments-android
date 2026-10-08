@@ -40,7 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
-import com.moments.android.extensions.timeAgoDisplay
+import com.moments.android.extensions.timeAgoLongDisplay
 import com.moments.android.models.LoginSession
 import com.moments.android.utilities.MomentsFormat
 import kotlinx.coroutines.delay
@@ -365,7 +365,7 @@ private fun SessionCard(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                session.timestamp.timeAgoDisplay(),
+                session.timestamp.timeAgoLongDisplay(),
                 fontSize = 12.sp,
                 color = if (isDark) Color.White.copy(0.6f) else Color.Black.copy(0.5f),
             )

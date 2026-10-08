@@ -48,6 +48,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -404,6 +405,9 @@ fun GlassmorphicMessageBubble(
     val currentUserId = remember { FirebaseAuth.getInstance().currentUser?.uid.orEmpty() }
     val starred = isStarred || message.isStarred(currentUserId)
 
+    // Tarjetas salientes con panel propio adoptan el color de burbuja; las recibidas siguen neutras.
+    val outgoingCardTint = if (isCurrentUser) LocalChatOutgoingBubbleColor.current else null
+    CompositionLocalProvider(LocalChatOutgoingCardTint provides outgoingCardTint) {
     Box(modifier) {
         when (message.type) {
             MessageType.TEXT -> {
@@ -555,6 +559,7 @@ fun GlassmorphicMessageBubble(
                 ChatUnsupportedBubble(colors)
             }
         }
+    }
     }
 }
 
@@ -855,7 +860,7 @@ fun LinkPreviewCard(
     }
     val hostColor = when {
         embedded && outgoing -> onOutgoing.copy(.85f)
-        else -> chatSystemBlue(dark)
+        else -> chatReceivedAccent(dark)
     }
     val corner = if (embedded) 13.dp else 10.dp
     val imageMax = if (embedded) 150.dp else 120.dp

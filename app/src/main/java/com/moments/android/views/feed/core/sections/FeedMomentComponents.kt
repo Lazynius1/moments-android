@@ -85,6 +85,7 @@ import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.utilities.legacyPoppinsSize
 import com.moments.android.utilities.momentsPressIcon
 import com.moments.android.utilities.HapticManager
+import com.moments.android.utilities.MomentsFormat
 import com.moments.android.views.components.CurrentUserVerifiedBadge
 import com.moments.android.views.components.MomentCaptionView
 import com.moments.android.views.components.VerifiedBadgeView
@@ -106,7 +107,6 @@ import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
 import com.moments.android.views.messaging.components.chatMessagePressClassifier
 import com.moments.android.views.story.StoriesView
-import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -897,7 +897,11 @@ fun ModernPostCardView(
                 )
 
                 Text(
-                    text = relativeTime(moment.timestamp),
+                    // Fecha del post ≡ iOS: «hace 5 minutos» < 7 d; después «12 de septiembre».
+                    text = MomentsFormat.smartDate(
+                        java.util.Date(moment.timestamp),
+                        MomentsFormat.DateContext.FEED_TIMESTAMP,
+                    ),
                     color = colors.tertiary,
                     fontSize = with(density) { legacyPoppinsSize(context, 11).toSp() },
                     maxLines = 1,
@@ -1067,21 +1071,6 @@ private fun PostHeader(
                 onClick = onFollowClick,
             )
         }
-    }
-}
-
-@Composable
-private fun relativeTime(timestamp: Long): String {
-    val elapsed = System.currentTimeMillis() - timestamp
-    return when {
-        elapsed < TimeUnit.MINUTES.toMillis(1) -> stringResource(R.string.time_now)
-        elapsed < TimeUnit.HOURS.toMillis(1) ->
-            "${TimeUnit.MILLISECONDS.toMinutes(elapsed)} ${stringResource(R.string.time_min)}"
-        elapsed < TimeUnit.DAYS.toMillis(1) ->
-            "${TimeUnit.MILLISECONDS.toHours(elapsed)} ${stringResource(R.string.time_hour)}"
-        elapsed < TimeUnit.DAYS.toMillis(7) ->
-            "${TimeUnit.MILLISECONDS.toDays(elapsed)} ${stringResource(R.string.time_day)}"
-        else -> "${TimeUnit.MILLISECONDS.toDays(elapsed) / 7} ${stringResource(R.string.time_week)}"
     }
 }
 

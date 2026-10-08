@@ -110,5 +110,5 @@ object WhatsNewPresentationCoordinator {
             context.packageManager.getPackageInfo(context.packageName, 0)
         }
         info.versionName
-    }.getOrNull() ?: "1.1.0"
+    }.getOrNull() ?: "1.2.0"
 }

@@ -56,7 +56,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.moments.android.R
 import com.moments.android.coordinators.AsyncProfileImageView
-import com.moments.android.extensions.timeAgoDisplay
+import com.moments.android.extensions.timeAgoLongDisplay
 import com.moments.android.models.Moment
 import com.moments.android.services.cache.VideoThumbnailCache
 import com.moments.android.utilities.MomentsFormat
@@ -73,7 +73,8 @@ import com.moments.android.views.shared.ScreenshotProtectedView
 import com.moments.android.views.story.StoryRingAvatarView
 import com.moments.android.views.story.storyviewer.StoryRevealThumbnailPolicy
 import com.moments.android.views.story.storyviewer.StoryStaticPreviewSurface
-import java.text.SimpleDateFormat
+import java.text.NumberFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -205,7 +206,7 @@ fun ActivityCommentItemRow(
             )
 
             Text(
-                text = item.commentedAt.timeAgoDisplay(),
+                text = item.commentedAt.timeAgoLongDisplay(),
                 fontSize = 11.sp,
                 color = secondary.copy(alpha = 0.85f),
             )
@@ -329,7 +330,7 @@ private fun StandardEventRow(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(item.timestamp.timeAgoDisplay(), fontSize = 11.sp, color = secondary.copy(alpha = 0.85f))
+                Text(item.timestamp.timeAgoLongDisplay(), fontSize = 11.sp, color = secondary.copy(alpha = 0.85f))
                 if (hasContext) {
                     Text("•", fontSize = 10.sp, color = secondary.copy(alpha = 0.7f))
                     val username = item.targetUsername?.takeIf { it.isNotBlank() }
@@ -397,7 +398,7 @@ private fun VisitFollowerEventCard(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(item.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("•", fontSize = 10.sp, color = secondary.copy(alpha = 0.7f))
-                Text(item.timestamp.timeAgoDisplay(), fontSize = 11.sp, color = secondary)
+                Text(item.timestamp.timeAgoLongDisplay(), fontSize = 11.sp, color = secondary)
             }
             Text(
                 text = when (kind) {
@@ -467,7 +468,7 @@ private fun EchoEventCard(item: ActivityEventItem, modifier: Modifier) {
     val count = (item.echoParticipantsCount ?: 0).coerceAtLeast(0)
     val expiresAt = item.echoExpiresAt
     val expiresLabel = when {
-        expiresAt == null -> item.timestamp.timeAgoDisplay()
+        expiresAt == null -> item.timestamp.timeAgoLongDisplay()
         expiresAt.time <= System.currentTimeMillis() -> stringResource(R.string.echo_status_expired)
         else -> MomentsFormat.relativeTime(expiresAt, MomentsFormat.RelativeTimeStyle.CONVERSATIONAL)
     }
@@ -888,7 +889,8 @@ private fun StoryDateBadge(date: Date) {
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         Text(
-            SimpleDateFormat("d", Locale.getDefault()).format(date),
+            NumberFormat.getIntegerInstance(Locale.getDefault())
+                .format(Calendar.getInstance().apply { time = date }.get(Calendar.DAY_OF_MONTH)),
             color = Color.Black,
             fontWeight = FontWeight.Bold,
             fontSize = 17.sp,
@@ -897,7 +899,8 @@ private fun StoryDateBadge(date: Date) {
             style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)),
         )
         Text(
-            SimpleDateFormat("MMM", Locale.getDefault()).format(date).lowercase(),
+            // Mes abreviado autónomo del idioma (esqueleto localizado).
+            MomentsFormat.smartDate(date, MomentsFormat.DateContext.MONTH_ABBREVIATED).lowercase(Locale.getDefault()),
             color = Color.Black.copy(alpha = 0.75f),
             fontWeight = FontWeight.SemiBold,
             fontSize = 10.sp,

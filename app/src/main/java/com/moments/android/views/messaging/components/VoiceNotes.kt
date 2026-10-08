@@ -16,17 +16,19 @@ import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.os.PowerManager
 import com.moments.android.R
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -58,12 +60,22 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
@@ -75,6 +87,7 @@ import com.moments.android.utilities.withMomentsAudioFocus
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.moments.android.services.cache.PersistentAudioCache
+import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.feed.AdaptiveColors
 import kotlinx.coroutines.CoroutineScope
@@ -153,37 +166,56 @@ object ChatVoiceWaveformSamples {
 }
 
 object VoiceMessageLayout {
-    const val playButtonSize = 38f
-    const val playIconSize = 26f
+    // Barras genéricas (editor, sticker de voz, compositor).
     const val waveformHeight = 30f
     const val barWidth = 3.5f
     const val barSpacing = 2.5f
+
+    // Tarjeta del chat (≡ iOS): fila (play, onda, velocidad) centrada en vertical;
+    // el tiempo ocupa la franja inferior sin descentrarla.
+    const val horizontalPadding = 12f
+    const val rowHeight = 24f
+    const val timeLabelHeight = 13f
+    const val rowVerticalInset = 19f
+    const val timeBottomInset = 4f
+    const val cardHeight = rowVerticalInset * 2 + rowHeight
+
+    const val playButtonWidth = 28f
+    const val playIconSize = 22f
+    /** Zona táctil mínima del play y del arrastre de la onda. */
+    const val minTouchTarget = 44f
     const val outerSpacing = 10f
-    const val waveformLeadingInset = 12f
-    const val horizontalPadding = 14f
-    const val verticalPadding = 15f
-    const val bubbleWidthFraction = 0.75f
-    const val trailingGapMinLength = 10f
-    const val timeLabelWidth = 36f
     const val speedControlWidth = 34f
 
-    fun bubbleWidth(containerWidthDp: Float): Float =
-        min(containerWidthDp, 520f) * bubbleWidthFraction
+    const val cardBarWidth = 2.5f
+    const val cardBarSpacing = 2f
+    const val cardBarMaxHeight = 22f
+    const val cardBarMinHeight = 3f
+    const val progressHeadSize = 11f
+
+    /** Inicio horizontal de la onda dentro del contenido (alinea el tiempo). */
+    const val waveformLeadingOffset = playButtonWidth + outerSpacing
+
+    /** Mismo ancho máximo que una burbuja de texto del chat (≡ iOS). */
+    @Composable
+    fun bubbleWidth(isOutgoing: Boolean): Float =
+        ChatBubbleLayoutWidth.capped(
+            ChatBubbleLayoutWidth.maxTextBubbleWidth(isOutgoing = isOutgoing),
+            gutter = if (isOutgoing) 64.dp else 88.dp,
+        ).value
 
     fun availableWaveformWidth(bubbleWidth: Float, includesSpeedControl: Boolean): Float {
-        val trailing = timeLabelWidth + if (includesSpeedControl) outerSpacing + speedControlWidth else 0f
-        return max(
-            96f,
-            bubbleWidth - horizontalPadding * 2 - playButtonSize - outerSpacing - waveformLeadingInset - trailing - trailingGapMinLength,
-        )
+        val inner = bubbleWidth - horizontalPadding * 2
+        val trailing = if (includesSpeedControl) outerSpacing + speedControlWidth else 0f
+        return max(80f, inner - waveformLeadingOffset - trailing)
     }
 
     fun waveformBarCount(trackWidth: Float): Int =
-        (trackWidth / (barWidth + barSpacing)).toInt().coerceIn(24, 50)
+        floor((trackWidth + cardBarSpacing) / (cardBarWidth + cardBarSpacing)).toInt().coerceIn(16, 60)
 
     fun waveformTrackWidth(bubbleWidth: Float, includesSpeedControl: Boolean): Float {
         val count = waveformBarCount(availableWaveformWidth(bubbleWidth, includesSpeedControl))
-        return count * barWidth + max(count - 1, 0) * barSpacing
+        return count * cardBarWidth + max(count - 1, 0) * cardBarSpacing
     }
 }
 
@@ -493,8 +525,7 @@ fun GlassmorphicAudioMessage(
     val dark = androidx.compose.foundation.isSystemInDarkTheme()
     val colors = AdaptiveColors(dark)
     val outgoingFill = LocalChatOutgoingBubbleColor.current
-    val screenW = ChatBubbleLayoutWidth.containerWidth().value
-    val bubbleW = VoiceMessageLayout.bubbleWidth(screenW)
+    val bubbleW = VoiceMessageLayout.bubbleWidth(isOutgoing = isCurrentUser)
     val showsSpeedControl = !isSending && duration >= 8
     val trackWidth = VoiceMessageLayout.waveformTrackWidth(bubbleW, showsSpeedControl)
     val barCount = VoiceMessageLayout.waveformBarCount(
@@ -507,6 +538,10 @@ fun GlassmorphicAudioMessage(
     } else {
         colors.primary.copy(alpha = if (dark) 0.28f else 0.22f)
     }
+    // Recibidas: onda reproducida y cabezal con el acento del chat (contraste ≥ 3:1);
+    // play/pausa y velocidad en gris secundario y barras pendientes en gris (≡ iOS).
+    val accentColor = if (isCurrentUser) contentColor else chatReceivedAccentColor(outgoingFill, dark)
+    val playButtonColor = if (isCurrentUser) contentColor else colors.replyBarSecondaryText
     val durationLabelColor = if (isCurrentUser) contentColor.copy(0.9f) else colors.timestampColor
     val bubbleStroke = if (isCurrentUser) contentColor.copy(0.12f) else colors.messageBubbleStroke
     val shape = chatBubbleShape(
@@ -527,6 +562,8 @@ fun GlassmorphicAudioMessage(
     var scrubFraction by remember { mutableStateOf<Float?>(null) }
     var wasPlayingBeforeScrub by remember { mutableStateOf(false) }
     var playbackFilePath by remember { mutableStateOf<String?>(null) }
+    // Evita reanudar tras liberar el reproductor (p. ej. arrastre cancelado al salir de pantalla).
+    val isDisposed = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
 
     val waveformLevels = remember(waveformSamples, audioUrl, messageId, barCount) {
         val seed = audioUrl ?: messageId
@@ -578,6 +615,7 @@ fun GlassmorphicAudioMessage(
 
     DisposableEffect(player, proximityManager) {
         onDispose {
+            isDisposed.set(true)
             if (ChatAudioPlaybackCenter.shared.activeMessageId == messageId) {
                 ChatAudioPlaybackCenter.shared.deactivate(messageId)
             }
@@ -600,9 +638,13 @@ fun GlassmorphicAudioMessage(
         while (isPlaying) {
             currentTime = (player.currentPosition / 1000.0).toFloat()
             delay(50)
-            if (!player.playWhenReady || player.playbackState == Player.STATE_ENDED) {
+            // Pausa propia (play/arrastre): no tocar el progreso.
+            if (!isPlaying) break
+            val ended = player.playbackState == Player.STATE_ENDED
+            if (ended || !player.playWhenReady) {
                 isPlaying = false
-                currentTime = 0f
+                // Al terminar vuelve al inicio (el tiempo muestra la duración); en pausa externa se conserva.
+                currentTime = if (ended) 0f else (player.currentPosition / 1000.0).toFloat()
                 proximityManager.stopMonitoring()
                 restoreVoicePlaybackAudio(context, messageId)
                 ChatAudioPlaybackCenter.shared.deactivate(messageId)
@@ -613,10 +655,11 @@ fun GlassmorphicAudioMessage(
     // ≡ iOS displayedProgress / displayedTimeSeconds
     val playbackProgress = if (duration > 0) (currentTime / duration.toFloat()).coerceIn(0f, 1f) else 0f
     val displayedProgress = scrubFraction ?: playbackProgress
+    // Parado al inicio: duración total. Reproduciendo, en pausa a mitad o arrastrando: transcurrido.
     val displayedSeconds = when {
         duration <= 0 -> 0.0
-        isScrubbing -> currentTime.toDouble()
-        isPlaying || currentTime > 0.01f -> max(0.0, duration - currentTime)
+        scrubFraction != null -> scrubFraction!!.toDouble() * duration
+        isPlaying || currentTime > 0.01f -> min(duration, currentTime.toDouble())
         else -> duration
     }
 
@@ -629,16 +672,17 @@ fun GlassmorphicAudioMessage(
     }
 
     fun startPlayback() {
-        if (!isAudioAvailable || playbackFilePath.isNullOrBlank()) return
+        if (isDisposed.get() || !isAudioAvailable || playbackFilePath.isNullOrBlank()) return
         ChatAudioPlaybackCenter.shared.activate(messageId) {
             pausePlayback(notifyCenter = false)
         }
         // ≡ iOS configurePlaybackSession(speaker: true) al arrancar
         applyVoicePlaybackRoute(context, player, toEarpiece = false)
         player.setPlaybackSpeed(playbackRate)
-        if (currentTime > 0.01f && currentTime < duration) {
-            player.seekTo((currentTime * 1000).toLong())
-        }
+        // Reanuda donde quedó (incluido un seek en pausa); al final o sin progreso, desde el inicio.
+        val resumeAt = if (currentTime > 0.01f && currentTime < duration - 0.05) currentTime else 0f
+        currentTime = resumeAt
+        player.seekTo((resumeAt * 1000).toLong())
         player.play()
         isPlaying = true
         proximityManager.startMonitoring()
@@ -649,12 +693,35 @@ fun GlassmorphicAudioMessage(
         if (isPlaying) pausePlayback() else startPlayback()
     }
 
-    fun seekFraction(fraction: Float) {
-        if (duration <= 0) return
+    // ≡ iOS seekToFraction: fija el tiempo y mueve el reproductor.
+    fun seekToFraction(fraction: Float) {
+        if (duration <= 0 || isDisposed.get()) return
         val clamped = fraction.coerceIn(0f, 1f)
-        scrubFraction = clamped
         currentTime = (duration * clamped).toFloat()
         player.seekTo((currentTime * 1000).toLong())
+    }
+
+    // ≡ iOS beginScrub: pausa (sin reiniciar) para reanudar al soltar.
+    fun beginScrub(fraction: Float) {
+        if (isScrubbing) return
+        isScrubbing = true
+        scrubFraction = fraction
+        wasPlayingBeforeScrub = isPlaying
+        if (isPlaying) {
+            player.pause()
+            isPlaying = false
+        }
+        HapticManager.shared.lightImpact()
+    }
+
+    // ≡ iOS endScrub: seek en la posición soltada y reanuda si sonaba.
+    fun endScrub() {
+        if (!isScrubbing) return
+        scrubFraction?.let { seekToFraction(it) }
+        isScrubbing = false
+        scrubFraction = null
+        if (wasPlayingBeforeScrub && isAudioAvailable) startPlayback()
+        wasPlayingBeforeScrub = false
     }
 
     fun cycleRate() {
@@ -672,188 +739,335 @@ fun GlassmorphicAudioMessage(
         else -> "1×"
     }
 
-    Row(
+    val headScale by animateFloatAsState(
+        targetValue = if (isScrubbing) 1.25f else 1f,
+        animationSpec = if (MotionPolicy.reduceMotion) snap<Float>() else spring<Float>(
+            dampingRatio = MotionPolicy.Spring.TOGGLE_DAMPING.toFloat(),
+            stiffness = voiceSpringStiffness(MotionPolicy.Spring.TOGGLE_RESPONSE),
+        ),
+        label = "voiceHeadScale",
+    )
+    val scrubLabel = stringResource(R.string.chat_audio_scrub_accessibility)
+    val timeText = formatVoiceDuration(displayedSeconds)
+    val durationA11y = stringResource(R.string.chat_audio_duration_accessibility, timeText)
+    val rowHeight = VoiceMessageLayout.rowHeight.dp
+
+    // ≡ iOS: fila de 24 centrada (19 arriba / 19 abajo); el tiempo va en la franja inferior.
+    Box(
         modifier
             .width(bubbleW.dp)
             .clip(shape)
             .background(if (isCurrentUser) outgoingFill else colors.messageBubbleBackground)
-            .border(0.5.dp, bubbleStroke, shape)
-            .padding(
-                horizontal = VoiceMessageLayout.horizontalPadding.dp,
-                vertical = VoiceMessageLayout.verticalPadding.dp,
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(VoiceMessageLayout.outerSpacing.dp),
+            .border(0.5.dp, bubbleStroke, shape),
     ) {
-        Box(
+        Row(
             Modifier
-                .size(VoiceMessageLayout.playButtonSize.dp)
-                .clickable(
-                    enabled = isAudioAvailable && !isCheckingAvailability,
-                    onClick = { togglePlayback() },
-                ),
-            contentAlignment = Alignment.Center,
+                .padding(
+                    horizontal = VoiceMessageLayout.horizontalPadding.dp,
+                    vertical = VoiceMessageLayout.rowVerticalInset.dp,
+                )
+                .fillMaxWidth()
+                .height(rowHeight),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(VoiceMessageLayout.outerSpacing.dp),
         ) {
-            when {
-                isCheckingAvailability -> CircularProgressIndicator(
-                    Modifier.size(20.dp),
-                    color = contentColor,
-                    strokeWidth = 2.dp,
-                )
-                else -> Icon(
-                    imageVector = when {
-                        !isAudioAvailable -> Icons.Default.Error
-                        isPlaying -> Icons.Default.Pause
-                        else -> Icons.Default.PlayArrow
-                    },
-                    contentDescription = stringResource(
-                        if (isPlaying) R.string.chat_voice_pause else R.string.chat_voice_play,
+            // Play: hueco visual 28 × 24, zona táctil de 44 (≡ iOS).
+            Box(
+                Modifier
+                    .overflowTouchArea(
+                        visualWidth = VoiceMessageLayout.playButtonWidth.dp,
+                        visualHeight = rowHeight,
+                        touchSize = VoiceMessageLayout.minTouchTarget.dp,
+                    )
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        enabled = isAudioAvailable && !isCheckingAvailability,
+                        onClick = { togglePlayback() },
                     ),
-                    tint = contentColor,
-                    modifier = Modifier.size(VoiceMessageLayout.playIconSize.dp),
-                )
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isCheckingAvailability) {
+                    CircularProgressIndicator(
+                        Modifier.size(16.dp),
+                        color = playButtonColor,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(
+                        imageVector = when {
+                            !isAudioAvailable -> Icons.Default.Error
+                            isPlaying -> Icons.Default.Pause
+                            else -> Icons.Default.PlayArrow
+                        },
+                        contentDescription = stringResource(
+                            if (isPlaying) R.string.chat_voice_pause else R.string.chat_voice_play,
+                        ),
+                        tint = playButtonColor,
+                        modifier = Modifier.size(VoiceMessageLayout.playIconSize.dp),
+                    )
+                }
+                if (isSending && progress != null) {
+                    MediaProgressRing(progress, 30.dp, 2.dp)
+                }
             }
-            if (isSending && progress != null) {
-                MediaProgressRing(progress, 34.dp, 2.dp)
+
+            when {
+                isCheckingAvailability -> {
+                    VoiceCardWaveform(
+                        levels = List(barCount) { 0f },
+                        inactiveColor = waveformInactive,
+                        activeColor = waveformInactive,
+                        progress = -1f,
+                        minBarHeight = VoiceMessageLayout.cardBarMinHeight + 1f,
+                        modifier = Modifier.overflowTouchArea(
+                            visualWidth = trackWidth.dp,
+                            visualHeight = rowHeight,
+                            touchSize = VoiceMessageLayout.minTouchTarget.dp,
+                            touchWidth = trackWidth.dp,
+                        ),
+                    )
+                }
+                isAudioAvailable -> {
+                    // ≡ iOS scrubbableWaveform: onda + cabezal; toque salta, arrastre sigue al dedo.
+                    VoiceCardWaveform(
+                        levels = waveformLevels,
+                        inactiveColor = waveformInactive,
+                        activeColor = accentColor,
+                        progress = displayedProgress,
+                        headColor = accentColor,
+                        headScale = headScale,
+                        modifier = Modifier
+                            .overflowTouchArea(
+                                visualWidth = trackWidth.dp,
+                                visualHeight = rowHeight,
+                                touchSize = VoiceMessageLayout.minTouchTarget.dp,
+                                touchWidth = trackWidth.dp,
+                            )
+                            .pointerInput(duration, trackWidth) {
+                                detectVoiceWaveformScrub(
+                                    onTap = { seekToFraction(it) },
+                                    onBegan = { beginScrub(it) },
+                                    onFraction = { scrubFraction = it },
+                                    onEnded = { endScrub() },
+                                )
+                            }
+                            .semantics {
+                                contentDescription = scrubLabel
+                                stateDescription = "${formatVoiceDuration(currentTime.toDouble())} / ${formatVoiceDuration(duration)}"
+                                progressBarRangeInfo = ProgressBarRangeInfo(playbackProgress, 0f..1f)
+                                if (duration > 0) {
+                                    setProgress { value ->
+                                        seekToFraction(value)
+                                        true
+                                    }
+                                }
+                            },
+                    )
+                    if (showsSpeedControl) {
+                        // Hueco restante sin espaciados extra: la velocidad queda al borde derecho.
+                        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                            // Velocidad en gris neutro como el play (≡ iOS `controlColor`), ancho fijo.
+                            Text(
+                                speedLabel,
+                                color = playButtonColor,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .width(VoiceMessageLayout.speedControlWidth.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(playButtonColor.copy(alpha = if (dark) 0.15f else 0.12f))
+                                    .clickable { cycleRate() }
+                                    .padding(vertical = 4.dp),
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(Icons.Default.Error, null, tint = Color(0xFFFF9500), modifier = Modifier.size(14.dp))
+                        Text(
+                            stringResource(R.string.chat_audio_unavailable),
+                            color = durationLabelColor,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
 
-        when {
-            isCheckingAvailability -> {
-                Column(Modifier.padding(start = VoiceMessageLayout.waveformLeadingInset.dp)) {
-                    VisualWaveformView(
-                        levels = List(barCount) { 0.35f },
-                        color = waveformInactive,
-                        activeColor = waveformInactive,
-                        progress = 0f,
-                        modifier = Modifier.width(trackWidth.dp),
+        // ≡ iOS bottomLabel: abajo a la izquierda, alineado con el inicio de la onda; no desplaza la fila.
+        if (isCheckingAvailability || isAudioAvailable) {
+            Text(
+                text = if (isCheckingAvailability) stringResource(R.string.chat_loading) else timeText,
+                color = durationLabelColor,
+                fontSize = 11.sp,
+                lineHeight = 13.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = if (isCheckingAvailability) null else FontFamily.Monospace,
+                maxLines = 1,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(
+                        start = (VoiceMessageLayout.horizontalPadding + VoiceMessageLayout.waveformLeadingOffset).dp,
+                        bottom = VoiceMessageLayout.timeBottomInset.dp,
                     )
-                    Text(
-                        stringResource(R.string.chat_loading),
-                        color = durationLabelColor,
-                        fontSize = 11.sp,
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-            }
-            isAudioAvailable -> {
-                // ≡ iOS scrubbableWaveform + ChatHorizontalPanGesture(.both)
-                VisualWaveformView(
-                    levels = waveformLevels,
-                    color = waveformInactive,
-                    activeColor = contentColor,
-                    progress = displayedProgress,
-                    modifier = Modifier
-                        .padding(start = VoiceMessageLayout.waveformLeadingInset.dp)
-                        .width(trackWidth.dp)
-                        .pointerInput(duration, trackWidth) {
-                            detectVoiceWaveformScrub(
-                                onBegan = {
-                                    if (!isScrubbing) {
-                                        isScrubbing = true
-                                        wasPlayingBeforeScrub = isPlaying
-                                        if (isPlaying) pausePlayback()
-                                        HapticManager.shared.lightImpact()
-                                    }
-                                },
-                                onFraction = { seekFraction(it) },
-                                onEnded = {
-                                    isScrubbing = false
-                                    scrubFraction = null
-                                    if (wasPlayingBeforeScrub) startPlayback()
-                                },
-                            )
-                        },
-                )
-                Text(
-                    formatVoiceDuration(displayedSeconds),
-                    color = durationLabelColor,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.padding(start = VoiceMessageLayout.trailingGapMinLength.dp),
-                )
-                if (showsSpeedControl) {
-                    Text(
-                        speedLabel,
-                        color = contentColor,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        // Ancho fijo (≡ VoiceMessageLayout.speedControlWidth): 1×/1.5×/2× no mueven la onda.
-                        modifier = Modifier
-                            .width(VoiceMessageLayout.speedControlWidth.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(contentColor.copy(alpha = if (dark) 0.15f else 0.12f))
-                            .clickable { cycleRate() }
-                            .padding(vertical = 4.dp),
-                    )
-                }
-            }
-            else -> {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Icon(Icons.Default.Error, null, tint = Color(0xFFFF9500), modifier = Modifier.size(14.dp))
-                    Text(
-                        stringResource(R.string.chat_audio_unavailable),
-                        color = durationLabelColor,
-                        fontSize = 12.sp,
-                    )
-                }
-                Spacer(Modifier.weight(1f))
-            }
+                    .height(VoiceMessageLayout.timeLabelHeight.dp)
+                    .semantics { if (!isCheckingAvailability) contentDescription = durationA11y },
+            )
+        }
+    }
+}
+
+/** Respuesta de muelle (s) → rigidez Compose, con masa 1. */
+private fun voiceSpringStiffness(response: Double): Float {
+    val omega = 2 * Math.PI / response
+    return (omega * omega).toFloat()
+}
+
+/**
+ * Mide el contenido a la zona táctil y ocupa en el layout solo el hueco visual (≡ iOS padding negativo):
+ * la fila conserva 24 de alto y el toque desborda centrado.
+ */
+private fun Modifier.overflowTouchArea(
+    visualWidth: Dp,
+    visualHeight: Dp,
+    touchSize: Dp,
+    touchWidth: Dp = touchSize,
+): Modifier = layout { measurable, _ ->
+    val placeable = measurable.measure(Constraints.fixed(touchWidth.roundToPx(), touchSize.roundToPx()))
+    val w = visualWidth.roundToPx()
+    val h = visualHeight.roundToPx()
+    layout(w, h) {
+        placeable.place((w - placeable.width) / 2, (h - placeable.height) / 2)
+    }
+}
+
+/**
+ * Onda de la tarjeta (≡ iOS VisualWaveformView con barras de tarjeta + cabezal):
+ * barras simétricas respecto a la línea central; cabezal sobre esa línea en `progress`.
+ * `progress < 0` oculta el cabezal (placeholder de carga).
+ */
+@Composable
+private fun VoiceCardWaveform(
+    levels: List<Float>,
+    inactiveColor: Color,
+    activeColor: Color,
+    progress: Float,
+    modifier: Modifier = Modifier,
+    headColor: Color = activeColor,
+    headScale: Float = 1f,
+    minBarHeight: Float = VoiceMessageLayout.cardBarMinHeight,
+) {
+    Canvas(modifier) {
+        if (levels.isEmpty()) return@Canvas
+        val barW = VoiceMessageLayout.cardBarWidth.dp.toPx()
+        val step = barW + VoiceMessageLayout.cardBarSpacing.dp.toPx()
+        val maxH = VoiceMessageLayout.cardBarMaxHeight.dp.toPx()
+        val minH = minBarHeight.dp.toPx()
+        val centerY = size.height / 2f
+        val radius = androidx.compose.ui.geometry.CornerRadius(barW / 2f, barW / 2f)
+        levels.forEachIndexed { index, level ->
+            val h = max(minH, level.coerceIn(0f, 1f) * maxH)
+            val isActive = progress >= 0f && index.toFloat() / levels.size <= progress
+            drawRoundRect(
+                color = if (isActive) activeColor else inactiveColor,
+                topLeft = androidx.compose.ui.geometry.Offset(index * step, centerY - h / 2f),
+                size = androidx.compose.ui.geometry.Size(barW, h),
+                cornerRadius = radius,
+            )
+        }
+        if (progress >= 0f) {
+            val headRadius = VoiceMessageLayout.progressHeadSize.dp.toPx() / 2f * headScale
+            drawCircle(
+                color = headColor,
+                radius = headRadius,
+                center = androidx.compose.ui.geometry.Offset(size.width * progress.coerceIn(0f, 1f), centerY),
+            )
         }
     }
 }
 
 /**
- * ≡ iOS `ChatHorizontalPanGesture(.both)` sobre waveform:
- * falla si el gesto es vertical (no roba scroll); scrub por posición X absoluta.
+ * ≡ iOS onTapGesture + `ChatHorizontalPanGesture(.both)` sobre la onda:
+ * toque corto → salta; arrastre horizontal → scrub (consume solo aquí);
+ * gesto vertical → se suelta (no roba scroll); pulsación larga quieta → no se consume.
  */
 private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectVoiceWaveformScrub(
-    onBegan: () -> Unit,
+    onTap: (Float) -> Unit,
+    onBegan: (Float) -> Unit,
     onFraction: (Float) -> Unit,
     onEnded: () -> Unit,
 ) {
+    fun fractionAt(x: Float): Float = if (size.width > 0) (x / size.width).coerceIn(0f, 1f) else 0f
+
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
+        val slop = viewConfiguration.touchSlop
+        val longPressMs = viewConfiguration.longPressTimeoutMillis
         var totalX = 0f
         var totalY = 0f
         var validated = false
         var failed = false
         var began = false
 
-        while (!failed) {
-            val event = awaitPointerEvent(PointerEventPass.Main)
-            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-            if (change.changedToUp()) break
-            val delta = change.positionChange()
-            totalX += delta.x
-            totalY += delta.y
-            val horizontal = abs(totalX)
-            val vertical = abs(totalY)
-
-            if (!validated) {
-                if (vertical > 2f && vertical > horizontal) {
+        try {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Main)
+                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                if (change.changedToUp()) {
+                    if (began) {
+                        change.consume()
+                    } else if (!failed &&
+                        abs(totalX) < slop && abs(totalY) < slop &&
+                        change.uptimeMillis - down.uptimeMillis < longPressMs &&
+                        !change.isConsumed
+                    ) {
+                        change.consume()
+                        onTap(fractionAt(change.position.x))
+                    }
+                    break
+                }
+                // Otro gesto (scroll, swipe para responder, menú) ya lo tomó.
+                if (!began && change.isConsumed) {
                     failed = true
                     break
                 }
-                if (horizontal > 2f && horizontal > vertical * 1.2f) {
-                    validated = true
+                val delta = change.positionChange()
+                totalX += delta.x
+                totalY += delta.y
+                val horizontal = abs(totalX)
+                val vertical = abs(totalY)
+
+                if (!validated) {
+                    if (vertical > 2f && vertical > horizontal) {
+                        failed = true
+                        break
+                    }
+                    if (horizontal > 2f && horizontal > vertical * 1.2f) {
+                        validated = true
+                    }
+                }
+                if (validated) {
+                    if (!began) {
+                        began = true
+                        onBegan(fractionAt(change.position.x))
+                    }
+                    change.consume()
+                    onFraction(fractionAt(change.position.x))
                 }
             }
-            if (validated) {
-                if (!began) {
-                    began = true
-                    onBegan()
-                }
-                change.consume()
-                onFraction((change.position.x / size.width).coerceIn(0f, 1f))
-            }
+        } finally {
+            // Fin o cancelación (puntero perdido, recomposición): aplica el seek pendiente.
+            if (began) onEnded()
         }
-        if (began && !failed) onEnded()
     }
 }
 

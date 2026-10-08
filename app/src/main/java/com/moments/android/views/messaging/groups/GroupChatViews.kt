@@ -954,7 +954,8 @@ private fun GroupRequestRow(row: GroupPendingRequest, sent: Boolean, busy: Boole
             Text(if (sent) g("requestsPending") else stringResource(R.string.groups_invited_you, row.inviter),
                 style = MaterialTheme.typography.bodyMedium, color = colors.secondary)
             row.createdAt?.let { date ->
-                Text(android.text.format.DateUtils.getRelativeTimeSpanString(date.time, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS).toString(),
+                // Corto ≡ iOS («5 min», «3 h», «2 d»).
+                Text(com.moments.android.utilities.MomentsFormat.relativeTime(date),
                     style = MaterialTheme.typography.bodySmall, color = colors.secondary.copy(alpha = .8f))
             }
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

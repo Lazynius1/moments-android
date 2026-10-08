@@ -999,7 +999,7 @@ fun GlassmorphicChatView(
                         },
                         renderHeader = { header ->
                             GlassmorphicDateHeader(
-                                header.date,
+                                header.displayDate,
                                 Modifier
                                     .chatMenuDimmedWhenOpen(messagePresentation.menuSelection != null)
                                     .padding(vertical = 10.dp),

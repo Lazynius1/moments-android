@@ -49,7 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moments.android.R
 import com.moments.android.extensions.momentsChromeGlass
-import com.moments.android.extensions.timeAgoDisplay
+import com.moments.android.extensions.timeAgoLongDisplay
 import com.moments.android.views.messaging.components.AttachmentIcon
 import com.moments.android.views.messaging.components.AttachmentIconPreset
 import com.moments.android.views.messaging.components.AttachmentIconView
@@ -267,7 +267,7 @@ fun ConversationHistoryItem(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = conversation.lastUpdated.timeAgoDisplay(),
+                text = conversation.lastUpdated.timeAgoLongDisplay(),
                 color = NovaColors.textSecondary,
                 fontSize = 12.sp,
             )

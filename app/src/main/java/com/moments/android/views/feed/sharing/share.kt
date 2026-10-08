@@ -1627,12 +1627,14 @@ fun SharedDMPostCard(
     media: @Composable () -> Unit,
 ) {
     val isDark = isSystemInDarkTheme()
-    val cardBackground = if (isDark) {
+    // Saliente en el chat: cabecera/pie con el color de burbuja (media intacta); resto neutro.
+    val outgoingPalette = com.moments.android.views.messaging.components.chatOutgoingCardPalette()
+    val cardBackground = outgoingPalette?.background ?: if (isDark) {
         Color.fromHex("151C1D")
     } else {
         Color.fromHex("E8EEF0")
     }
-    val primaryText = if (isDark) Color.fromHex("FAF9F6") else Color.fromHex("0B1215")
+    val primaryText = outgoingPalette?.primary ?: if (isDark) Color.fromHex("FAF9F6") else Color.fromHex("0B1215")
     val cardWidth = ChatBubbleLayoutWidth.capped(SharedDMPostCardMetrics.width)
     val mediaWidth = cardWidth - SharedDMPostCardMetrics.mediaInset * 2
     val hasCaption = !caption.isNullOrBlank()
@@ -1648,7 +1650,7 @@ fun SharedDMPostCard(
             .background(cardBackground)
             .border(
                 0.75.dp,
-                if (isDark) Color.White.copy(0.13f) else Color.Black.copy(0.09f),
+                outgoingPalette?.stroke ?: if (isDark) Color.White.copy(0.13f) else Color.Black.copy(0.09f),
                 cardShape,
             ),
     ) {
@@ -1747,12 +1749,14 @@ fun Modifier.sharedDMPreviewCardChrome(): Modifier = this
 @Composable
 fun SharedDMPreviewCardSkeleton(modifier: Modifier = Modifier) {
     val isDark = isSystemInDarkTheme()
-    val cardBackground = if (isDark) {
+    // Mismo fondo que la tarjeta final (saliente teñida) para no parpadear al cargar.
+    val outgoingPalette = com.moments.android.views.messaging.components.chatOutgoingCardPalette()
+    val cardBackground = outgoingPalette?.background ?: if (isDark) {
         Color.fromHex("151C1D")
     } else {
         Color.fromHex("E8EEF0")
     }
-    val placeholderFill = if (isDark) Color.White.copy(0.10f) else Color.Black.copy(0.07f)
+    val placeholderFill = outgoingPalette?.primary?.copy(0.14f) ?: if (isDark) Color.White.copy(0.10f) else Color.Black.copy(0.07f)
     val cardWidth = ChatBubbleLayoutWidth.capped(SharedDMPostCardMetrics.width)
     val mediaWidth = cardWidth - SharedDMPostCardMetrics.mediaInset * 2
     Column(
@@ -1763,7 +1767,7 @@ fun SharedDMPreviewCardSkeleton(modifier: Modifier = Modifier) {
             .background(cardBackground)
             .border(
                 0.5.dp,
-                if (isDark) Color.White.copy(0.10f) else Color.Black.copy(0.06f),
+                outgoingPalette?.stroke ?: if (isDark) Color.White.copy(0.10f) else Color.Black.copy(0.06f),
                 RoundedCornerShape(SharedDMPostCardMetrics.cornerRadius),
             ),
     ) {

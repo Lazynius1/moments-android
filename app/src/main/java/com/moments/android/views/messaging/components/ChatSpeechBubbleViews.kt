@@ -264,8 +264,8 @@ fun ChatTextBubbleView(
     )
     val bubbleFill = if (isOutgoing) outgoingFill else colors.messageBubbleBackground
     val textColor = if (isOutgoing) chatBubbleTextColor(outgoingFill) else colors.messageTextColor
-    // ≡ iOS systemBlue (no Material Color.Blue)
-    val linkColor = if (isOutgoing) chatBubbleTextColor(outgoingFill).copy(alpha = 0.92f) else chatSystemBlue(colors.isDark)
+    // Recibidos: acento del color de burbuja con contraste ≥ 3:1 (enlaces y menciones).
+    val linkColor = if (isOutgoing) chatBubbleTextColor(outgoingFill).copy(alpha = 0.92f) else chatReceivedAccentColor(outgoingFill, colors.isDark)
     val isActiveSearchMatch = messageId != null && messageId == activeSearchId
     val highlightBg = Color(1f, 0.82f, 0.25f).copy(alpha = if (isActiveSearchMatch) 0.92f else 0.45f)
     val fontSizeSp = ChatMessageFont.bubbleSizeSp()

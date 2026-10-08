@@ -38,7 +38,7 @@ import com.moments.android.extensions.ChromeIconDescription
 import com.moments.android.extensions.MomentsGlassButtonPreset
 import com.moments.android.extensions.ProfileChromeIconButton
 import com.moments.android.extensions.ProfileGlassPillTrack
-import com.moments.android.extensions.timeAgoDisplay
+import com.moments.android.utilities.MomentsFormat
 import com.moments.android.models.Moment
 import com.moments.android.services.cache.UserCacheService
 import com.moments.android.services.firestore.FirestoreService
@@ -152,7 +152,11 @@ fun ModernExploreDetailHeader(
                                     color = colors.secondary.copy(alpha = 0.7f),
                                 )
                                 Text(
-                                    m.timestamp.timeAgoDisplay(),
+                                    // Fecha del post: mismo formato que el feed ≡ iOS.
+                                    MomentsFormat.smartDate(
+                                        m.timestamp,
+                                        MomentsFormat.DateContext.FEED_TIMESTAMP,
+                                    ),
                                     fontSize = 10.sp,
                                     color = colors.secondary.copy(alpha = 0.7f),
                                 )

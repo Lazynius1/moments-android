@@ -108,12 +108,15 @@ private fun ViewOncePillBubble(
     modifier: Modifier = Modifier,
 ) {
     val colors = AdaptiveColors(isSystemInDarkTheme())
+    // Enviada: píldora con el color de burbuja del chat; recibida neutra.
+    val palette = chatOutgoingCardPalette()
+    val foreground = palette?.primary ?: colors.messageTextColor
     val pillShape = RoundedCornerShape(percent = 50)
     Row(
         modifier
             .clip(pillShape)
-            .background(colors.messageBubbleBackground)
-            .border(0.8.dp, colors.messageBubbleStroke, pillShape)
+            .background(palette?.background ?: colors.messageBubbleBackground)
+            .border(0.8.dp, palette?.stroke ?: colors.messageBubbleStroke, pillShape)
             .then(if (onTap != null) Modifier.clickable(onClick = onTap) else Modifier)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -121,7 +124,7 @@ private fun ViewOncePillBubble(
     ) {
         Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
             if (showsDashedRing) {
-                val ringColor = colors.messageTextColor.copy(alpha = 0.7f)
+                val ringColor = foreground.copy(alpha = 0.7f)
                 Canvas(Modifier.size(30.dp)) {
                     drawCircle(
                         color = ringColor,
@@ -138,7 +141,7 @@ private fun ViewOncePillBubble(
         }
         Text(
             label,
-            color = colors.messageTextColor.copy(alpha = labelOpacity),
+            color = foreground.copy(alpha = labelOpacity),
             fontSize = 14.sp,
             fontWeight = labelWeight,
         )
@@ -216,7 +219,7 @@ private fun ViewOnceSentBubble(
     progress: Double?,
     modifier: Modifier,
 ) {
-    val colors = AdaptiveColors(isSystemInDarkTheme())
+    val foreground = chatOutgoingCardPalette()?.primary ?: AdaptiveColors(isSystemInDarkTheme()).messageTextColor
     // ≡ iOS statusText: viewed + allowReplay + replayedBy no vacío → "Replayed"
     val labelRes = when {
         message.isViewed &&
@@ -233,7 +236,7 @@ private fun ViewOnceSentBubble(
                 message.isViewed ->
                     ViewOnceGlyph(
                         Icons.Filled.Check,
-                        colors.messageTextColor.copy(alpha = 0.5f),
+                        foreground.copy(alpha = 0.5f),
                         size = 11.dp,
                     )
                 else -> ViewOnceGlyph(
@@ -242,7 +245,7 @@ private fun ViewOnceSentBubble(
                     } else {
                         Icons.Filled.CameraAlt
                     },
-                    tint = colors.messageTextColor,
+                    tint = foreground,
                     size = 11.dp,
                 )
             }
