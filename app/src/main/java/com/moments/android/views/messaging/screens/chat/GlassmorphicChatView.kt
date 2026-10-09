@@ -73,6 +73,7 @@ import com.moments.android.services.firestore.FirestoreService
 import com.moments.android.services.firestore.fetchUserByUsername
 import com.moments.android.views.messaging.components.GlassmorphicDateHeader
 import com.moments.android.views.messaging.components.GlassmorphicMessageRow
+import com.moments.android.views.messaging.components.ChatVoiceMiniPlayerHost
 import com.moments.android.views.messaging.components.ChatMessageBubbleCallbacks
 import com.moments.android.views.messaging.components.ChatMessageGroupPosition
 import com.moments.android.views.messaging.components.ChatRequestDisclaimerRow
@@ -712,6 +713,8 @@ fun GlassmorphicChatView(
         }
     }
 
+    BindChatVoicePlayback(session)
+
     DisposableEffect(voice) {
         val removeListener = com.moments.android.utilities.MomentsAudioSession.addInterruptionListener {
             if (voice.isRecording) voice.resetVoiceRecordingInteraction()
@@ -1093,6 +1096,26 @@ fun GlassmorphicChatView(
                         },
                         onGroupIntroTap = { showingConversationSettings = true },
                     ),
+                )
+                // Nota de voz sonando con su burbuja fuera de pantalla (≡ iOS voiceMiniPlayer).
+                ChatVoiceMiniPlayerHost(
+                    adaptiveColors = colors,
+                    senderName = { senderId ->
+                        when {
+                            senderId.isNullOrBlank() -> displayName
+                            senderId == session.currentUserId -> currentUserName
+                            conversation.isGroup ->
+                                com.moments.android.services.cache.UserCacheService.getCachedUser(senderId)?.username
+                                    ?: groupDirectory[conversation.id]?.allMemberNames?.get(senderId)
+                                    ?: conversation.groupMemberNames[senderId]
+                                    ?: context.getString(R.string.messaging_user_default)
+                            else -> displayName
+                        }
+                    },
+                    onJump = scroll::handleJumpToMessageFromOutside,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = headerHeight + 8.dp),
                 )
                 val navigation = ChatFloatingNavigationState.resolve(
                     hasCompletedInitialScroll = scroll.hasCompletedInitialScroll,

@@ -652,6 +652,7 @@ private fun ChatAudioMessageContent(
         isSending = message.status == MessageStatus.SENDING,
         progress = sendingProgress,
         groupPosition = groupPosition,
+        senderId = message.senderId,
     )
 }
 

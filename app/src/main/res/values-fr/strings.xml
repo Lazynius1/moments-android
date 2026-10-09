@@ -1243,6 +1243,8 @@ Pour toute question ou demande relative à la confidentialité, contactez-nous �
     <string name="messaging_archived">Archivées</string>
     <string name="chat_voice_play">Lire le message vocal</string>
     <string name="chat_voice_pause">Mettre en pause le message vocal</string>
+    <string name="chat_voice_mini_player_close">Fermer le lecteur</string>
+    <string name="chat_voice_mini_player_jump">Aller au message vocal</string>
     <string name="chat_request_closed_input">%1$s n\'accepte pas les demandes de message</string>
     <string name="network_offline_title">Mode hors ligne</string>
     <string name="network_slow_title">Connexion lente</string>

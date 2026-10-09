@@ -1812,6 +1812,8 @@
     <string name="chat_voice_speed">%1$.1fx</string>
     <string name="chat_voice_play">播放語音訊息</string>
     <string name="chat_voice_pause">暫停語音訊息</string>
+    <string name="chat_voice_mini_player_close">關閉播放器</string>
+    <string name="chat_voice_mini_player_jump">前往語音訊息</string>
     <string name="chat_audio_scrub_accessibility">語音訊息進度</string>
     <string name="chat_audio_duration_accessibility">時長 %1$s</string>
     <string name="chat_voice_record_hold_hint">按住即可錄音。向上滑動鎖定，向左滑動取消。</string>

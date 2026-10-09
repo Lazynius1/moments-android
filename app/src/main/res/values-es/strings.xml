@@ -1881,6 +1881,8 @@ Para preguntas o solicitudes de privacidad, contacta con nosotros en soporte@mom
     <string name="messaging_archived">Archivadas</string>
     <string name="chat_voice_play">Reproducir nota de voz</string>
     <string name="chat_voice_pause">Pausar nota de voz</string>
+    <string name="chat_voice_mini_player_close">Cerrar reproductor</string>
+    <string name="chat_voice_mini_player_jump">Ir a la nota de voz</string>
     <string name="chat_request_closed_input">%1$s no acepta solicitudes de mensaje</string>
     <string name="network_offline_title">Modo offline</string>
     <string name="offline_banner_message">Estás sin conexión. Las acciones pendientes se sincronizarán al reconectar.</string>

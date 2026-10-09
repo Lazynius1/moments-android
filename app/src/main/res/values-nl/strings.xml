@@ -1812,6 +1812,8 @@ Je kunt deze toestemmingen wijzigen in de instellingen van je apparaat. Als je z
     <string name="chat_voice_speed">%1$.1fx</string>
     <string name="chat_voice_play">Spraakbericht afspelen</string>
     <string name="chat_voice_pause">Spraakbericht pauzeren</string>
+    <string name="chat_voice_mini_player_close">Speler sluiten</string>
+    <string name="chat_voice_mini_player_jump">Ga naar spraakbericht</string>
     <string name="chat_audio_scrub_accessibility">Voortgang spraakbericht</string>
     <string name="chat_audio_duration_accessibility">Duur %1$s</string>
     <string name="chat_voice_record_hold_hint">Houd ingedrukt om op te nemen. Veeg omhoog om te vergrendelen of naar links om te annuleren.</string>

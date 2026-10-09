@@ -1812,6 +1812,8 @@ Możesz zmienić te uprawnienia w ustawieniach urządzenia. Jeśli je wyłączys
     <string name="chat_voice_speed">%1$.1fx</string>
     <string name="chat_voice_play">Odtwórz wiadomość głosową</string>
     <string name="chat_voice_pause">Wstrzymaj wiadomość głosową</string>
+    <string name="chat_voice_mini_player_close">Zamknij odtwarzacz</string>
+    <string name="chat_voice_mini_player_jump">Przejdź do wiadomości głosowej</string>
     <string name="chat_audio_scrub_accessibility">Postęp wiadomości głosowej</string>
     <string name="chat_audio_duration_accessibility">Czas trwania %1$s</string>
     <string name="chat_voice_record_hold_hint">Przytrzymaj, aby nagrać. Przesuń w górę, aby zablokować nagrywanie, lub w lewo, aby anulować.</string>

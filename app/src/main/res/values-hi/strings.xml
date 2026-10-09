@@ -1812,6 +1812,8 @@
     <string name="chat_voice_speed">गति: %1$.1fx</string>
     <string name="chat_voice_play">वॉइस मैसेज चलाएँ</string>
     <string name="chat_voice_pause">वॉइस मैसेज रोकें</string>
+    <string name="chat_voice_mini_player_close">प्लेयर बंद करें</string>
+    <string name="chat_voice_mini_player_jump">वॉइस मैसेज पर जाएं</string>
     <string name="chat_audio_scrub_accessibility">वॉइस संदेश की प्रगति</string>
     <string name="chat_audio_duration_accessibility">अवधि %1$s</string>
     <string name="chat_voice_record_hold_hint">रिकॉर्ड करने के लिए दबाकर रखें। लॉक करने के लिए ऊपर या रद्द करने के लिए बाईं ओर स्लाइड करें।</string>

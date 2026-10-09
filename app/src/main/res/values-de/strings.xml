@@ -1261,6 +1261,8 @@ Bei Fragen oder Anfragen zum Datenschutz kontaktiere uns unter soporte@momentsap
     <string name="messaging_archived">Archiviert</string>
     <string name="chat_voice_play">Sprachnachricht abspielen</string>
     <string name="chat_voice_pause">Sprachnachricht pausieren</string>
+    <string name="chat_voice_mini_player_close">Player schließen</string>
+    <string name="chat_voice_mini_player_jump">Zur Sprachnachricht springen</string>
     <string name="chat_request_closed_input">%1$s akzeptiert keine Nachrichtenanfragen</string>
     <string name="network_offline_title">Offline-Modus</string>
     <string name="network_slow_title">Langsame Verbindung</string>

@@ -1812,6 +1812,8 @@ Anda dapat mengubah izin ini di pengaturan perangkat. Jika izin dinonaktifkan, b
     <string name="chat_voice_speed">%1$.1fx</string>
     <string name="chat_voice_play">Putar pesan suara</string>
     <string name="chat_voice_pause">Jeda pesan suara</string>
+    <string name="chat_voice_mini_player_close">Tutup pemutar</string>
+    <string name="chat_voice_mini_player_jump">Buka pesan suara</string>
     <string name="chat_audio_scrub_accessibility">Progres pesan suara</string>
     <string name="chat_audio_duration_accessibility">Durasi %1$s</string>
     <string name="chat_voice_record_hold_hint">Tekan dan tahan untuk merekam. Geser ke atas untuk mengunci atau ke kiri untuk membatalkan.</string>

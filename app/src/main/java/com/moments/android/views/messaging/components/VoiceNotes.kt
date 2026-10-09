@@ -47,7 +47,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -82,9 +81,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import com.moments.android.utilities.withMomentsAudioFocus
-import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.moments.android.services.cache.PersistentAudioCache
 import com.moments.android.services.performance.MotionPolicy
@@ -230,15 +226,6 @@ object ChatVoiceWaveformGenerator {
     }
 }
 
-class ChatAudioPlaybackCenter private constructor() {
-    var activeMessageId: String? = null
-        private set
-    private var stopHandler: (() -> Unit)? = null
-    fun activate(messageId: String, stopOthers: () -> Unit) { if (activeMessageId != messageId) stopHandler?.invoke(); activeMessageId = messageId; stopHandler = stopOthers }
-    fun deactivate(messageId: String) { if (activeMessageId == messageId) { activeMessageId = null; stopHandler = null } }
-    fun stopCurrent() { stopHandler?.invoke(); activeMessageId = null; stopHandler = null }
-    companion object { val shared = ChatAudioPlaybackCenter() }
-}
 
 class AudioRecordingManager private constructor() {
     private val _audioPower = MutableStateFlow(0f)
@@ -470,7 +457,7 @@ class SimpleProximityManager(context: Context) {
 }
 
 /** Aplica ruta altavoz / auricular durante reproducción de voice note. */
-private fun applyVoicePlaybackRoute(context: Context, player: ExoPlayer, toEarpiece: Boolean) {
+internal fun applyVoicePlaybackRoute(context: Context, player: ExoPlayer, toEarpiece: Boolean) {
     val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
     if (toEarpiece) {
         am.mode = AudioManager.MODE_IN_COMMUNICATION
@@ -497,15 +484,6 @@ private fun applyVoicePlaybackRoute(context: Context, player: ExoPlayer, toEarpi
     }
 }
 
-private fun restoreVoicePlaybackAudio(context: Context, messageId: String) {
-    val active = ChatAudioPlaybackCenter.shared.activeMessageId
-    if (active != null && active != messageId) return
-    val am = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-    am.mode = AudioManager.MODE_NORMAL
-    @Suppress("DEPRECATION")
-    am.isSpeakerphoneOn = false
-}
-
 /**
  * Port de `GlassmorphicAudioMessage`.
  */
@@ -519,6 +497,7 @@ fun GlassmorphicAudioMessage(
     isSending: Boolean,
     progress: Double?,
     groupPosition: ChatMessageGroupPosition = ChatMessageGroupPosition.SINGLE,
+    senderId: String = "",
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -551,19 +530,17 @@ fun GlassmorphicAudioMessage(
         joinedRadius = ChatTextBubbleMetrics.joinedRadius,
     )
 
-    val player = remember { ExoPlayer.Builder(context).build().withMomentsAudioFocus(context) }
-    val proximityManager = remember { SimpleProximityManager(context) }
-    var isPlaying by remember { mutableStateOf(false) }
-    var currentTime by remember { mutableFloatStateOf(0f) }
-    var playbackRate by remember { mutableFloatStateOf(1f) }
+    // El reproductor vive fuera de la fila: la nota sigue sonando al hacer scroll.
+    val playback = ChatVoicePlaybackController
+    val isPlaying = playback.isPlayingMessage(messageId)
+    val currentTime = playback.position(messageId)
+    val playbackRate = playback.playbackRate
     var isCheckingAvailability by remember { mutableStateOf(true) }
     var isAudioAvailable by remember { mutableStateOf(true) }
     var isScrubbing by remember { mutableStateOf(false) }
     var scrubFraction by remember { mutableStateOf<Float?>(null) }
     var wasPlayingBeforeScrub by remember { mutableStateOf(false) }
     var playbackFilePath by remember { mutableStateOf<String?>(null) }
-    // Evita reanudar tras liberar el reproductor (p. ej. arrastre cancelado al salir de pantalla).
-    val isDisposed = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
 
     val waveformLevels = remember(waveformSamples, audioUrl, messageId, barCount) {
         val seed = audioUrl ?: messageId
@@ -597,59 +574,10 @@ fun GlassmorphicAudioMessage(
         isCheckingAvailability = false
     }
 
-    LaunchedEffect(playbackFilePath) {
-        val path = playbackFilePath
-        player.stop()
-        player.clearMediaItems()
-        if (path.isNullOrBlank()) return@LaunchedEffect
-        val uri = when {
-            path.startsWith("content:") || path.startsWith("http") || path.startsWith("file:") ->
-                android.net.Uri.parse(path)
-            else -> android.net.Uri.fromFile(File(path))
-        }
-        player.setMediaItem(MediaItem.fromUri(uri))
-        player.prepare()
-        currentTime = 0f
-        isPlaying = false
-    }
-
-    DisposableEffect(player, proximityManager) {
-        onDispose {
-            isDisposed.set(true)
-            if (ChatAudioPlaybackCenter.shared.activeMessageId == messageId) {
-                ChatAudioPlaybackCenter.shared.deactivate(messageId)
-            }
-            proximityManager.stopMonitoring()
-            restoreVoicePlaybackAudio(context, messageId)
-            player.release()
-        }
-    }
-
-    // ≡ iOS onChange(of: proximityManager.isNearEar)
-    LaunchedEffect(proximityManager.isNearEar, isPlaying) {
-        if (!isPlaying) return@LaunchedEffect
-        val position = player.currentPosition
-        applyVoicePlaybackRoute(context, player, toEarpiece = proximityManager.isNearEar)
-        if (position > 0) player.seekTo(position)
-        if (!player.isPlaying) player.play()
-    }
-
-    LaunchedEffect(isPlaying) {
-        while (isPlaying) {
-            currentTime = (player.currentPosition / 1000.0).toFloat()
-            delay(50)
-            // Pausa propia (play/arrastre): no tocar el progreso.
-            if (!isPlaying) break
-            val ended = player.playbackState == Player.STATE_ENDED
-            if (ended || !player.playWhenReady) {
-                isPlaying = false
-                // Al terminar vuelve al inicio (el tiempo muestra la duración); en pausa externa se conserva.
-                currentTime = if (ended) 0f else (player.currentPosition / 1000.0).toFloat()
-                proximityManager.stopMonitoring()
-                restoreVoicePlaybackAudio(context, messageId)
-                ChatAudioPlaybackCenter.shared.deactivate(messageId)
-            }
-        }
+    // Salir de pantalla no para el audio: solo avisa para mostrar la mini barra.
+    DisposableEffect(messageId) {
+        playback.bubbleAppeared(messageId)
+        onDispose { playback.bubbleDisappeared(messageId) }
     }
 
     // ≡ iOS displayedProgress / displayedTimeSeconds
@@ -663,54 +591,31 @@ fun GlassmorphicAudioMessage(
         else -> duration
     }
 
-    fun pausePlayback(notifyCenter: Boolean = true) {
-        player.pause()
-        isPlaying = false
-        proximityManager.stopMonitoring()
-        restoreVoicePlaybackAudio(context, messageId)
-        if (notifyCenter) ChatAudioPlaybackCenter.shared.deactivate(messageId)
-    }
-
     fun startPlayback() {
-        if (isDisposed.get() || !isAudioAvailable || playbackFilePath.isNullOrBlank()) return
-        ChatAudioPlaybackCenter.shared.activate(messageId) {
-            pausePlayback(notifyCenter = false)
-        }
-        // ≡ iOS configurePlaybackSession(speaker: true) al arrancar
-        applyVoicePlaybackRoute(context, player, toEarpiece = false)
-        player.setPlaybackSpeed(playbackRate)
-        // Reanuda donde quedó (incluido un seek en pausa); al final o sin progreso, desde el inicio.
-        val resumeAt = if (currentTime > 0.01f && currentTime < duration - 0.05) currentTime else 0f
-        currentTime = resumeAt
-        player.seekTo((resumeAt * 1000).toLong())
-        player.play()
-        isPlaying = true
-        proximityManager.startMonitoring()
+        val path = playbackFilePath
+        if (!isAudioAvailable || path.isNullOrBlank()) return
+        playback.play(context, messageId, path, duration, senderId, onFailure = { isAudioAvailable = false })
     }
 
     fun togglePlayback() {
         if (!isAudioAvailable || isCheckingAvailability) return
-        if (isPlaying) pausePlayback() else startPlayback()
+        if (isPlaying) playback.pause() else startPlayback()
     }
 
-    // ≡ iOS seekToFraction: fija el tiempo y mueve el reproductor.
+    // ≡ iOS seekToFraction: si la nota está activa mueve el reproductor; si no, guarda la posición.
     fun seekToFraction(fraction: Float) {
-        if (duration <= 0 || isDisposed.get()) return
+        if (duration <= 0) return
         val clamped = fraction.coerceIn(0f, 1f)
-        currentTime = (duration * clamped).toFloat()
-        player.seekTo((currentTime * 1000).toLong())
+        playback.seek(messageId, (duration * clamped).toFloat())
     }
 
-    // ≡ iOS beginScrub: pausa (sin reiniciar) para reanudar al soltar.
+    // ≡ iOS beginScrub: pausa para reanudar al soltar.
     fun beginScrub(fraction: Float) {
         if (isScrubbing) return
         isScrubbing = true
         scrubFraction = fraction
         wasPlayingBeforeScrub = isPlaying
-        if (isPlaying) {
-            player.pause()
-            isPlaying = false
-        }
+        if (isPlaying) playback.pause()
         HapticManager.shared.lightImpact()
     }
 
@@ -725,12 +630,7 @@ fun GlassmorphicAudioMessage(
     }
 
     fun cycleRate() {
-        playbackRate = when (playbackRate) {
-            1f -> 1.5f
-            1.5f -> 2f
-            else -> 1f
-        }
-        player.setPlaybackSpeed(playbackRate)
+        playback.cyclePlaybackRate()
     }
 
     val speedLabel = when (playbackRate) {
@@ -1072,7 +972,7 @@ private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectVo
 }
 
 /** Resuelve URL remota/local a path reproducible (≡ PersistentAudioCache + file URL). */
-private suspend fun resolveVoicePlaybackPath(audioUrl: String): String? = withContext(Dispatchers.IO) {
+internal suspend fun resolveVoicePlaybackPath(audioUrl: String): String? = withContext(Dispatchers.IO) {
     runCatching {
         val uri = android.net.Uri.parse(audioUrl)
         when (uri.scheme) {

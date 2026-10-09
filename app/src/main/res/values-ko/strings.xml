@@ -1812,6 +1812,8 @@
     <string name="chat_voice_speed">%1$.1fx</string>
     <string name="chat_voice_play">음성 메시지 재생</string>
     <string name="chat_voice_pause">음성 메시지 일시정지</string>
+    <string name="chat_voice_mini_player_close">플레이어 닫기</string>
+    <string name="chat_voice_mini_player_jump">음성 메시지로 이동</string>
     <string name="chat_audio_scrub_accessibility">음성 메시지 진행률</string>
     <string name="chat_audio_duration_accessibility">길이 %1$s</string>
     <string name="chat_voice_record_hold_hint">녹음하려면 길게 누르세요. 위로 밀어 잠그거나 왼쪽으로 밀어 취소하세요.</string>

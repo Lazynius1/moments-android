@@ -1868,6 +1868,8 @@ For privacy questions or requests, contact us at soporte@momentsapp.app or visit
     <string name="chat_voice_speed">%1$.1fx</string>
     <string name="chat_voice_play">Play voice message</string>
     <string name="chat_voice_pause">Pause voice message</string>
+    <string name="chat_voice_mini_player_close">Close player</string>
+    <string name="chat_voice_mini_player_jump">Go to voice message</string>
     <string name="chat_voice_record_hold_hint">Hold to record. Slide up to lock or left to cancel.</string>
     <string name="chat_voice_record_started">Recording started</string>
     <string name="chat_voice_record_cancelled">Recording cancelled</string>

@@ -1228,6 +1228,8 @@ Para dúvidas ou solicitações sobre privacidade, contacta-nos pelo e-mail supo
     <string name="messaging_archived">Arquivadas</string>
     <string name="chat_voice_play">Reproduzir mensagem de voz</string>
     <string name="chat_voice_pause">Pausar mensagem de voz</string>
+    <string name="chat_voice_mini_player_close">Fechar leitor</string>
+    <string name="chat_voice_mini_player_jump">Ir para a mensagem de voz</string>
     <string name="chat_request_closed_input">%1$s não aceita pedidos de mensagem</string>
     <string name="network_offline_title">Modo offline</string>
     <string name="network_slow_title">Ligação lenta</string>

@@ -1812,6 +1812,8 @@ Bu izinleri cihazının ayarlarından değiştirebilirsin. İzinleri kapatırsan
     <string name="chat_voice_speed">%1$.1fx</string>
     <string name="chat_voice_play">Sesli mesajı oynat</string>
     <string name="chat_voice_pause">Sesli mesajı duraklat</string>
+    <string name="chat_voice_mini_player_close">Oynatıcıyı kapat</string>
+    <string name="chat_voice_mini_player_jump">Sesli mesaja git</string>
     <string name="chat_audio_scrub_accessibility">Sesli mesaj ilerlemesi</string>
     <string name="chat_audio_duration_accessibility">Süre %1$s</string>
     <string name="chat_voice_record_hold_hint">Kayıt yapmak için basılı tut. Kilitlemek için yukarı, iptal etmek için sola kaydır.</string>

@@ -108,14 +108,11 @@ class GlassmorphicChatVoiceController(
             isRecording = true
             HapticManager.shared.playVoiceRecordStartSound()
             recordingTimer?.cancel()
+            // Sin límite de duración: la nota sigue grabando hasta que el usuario la suelta o la envía.
             recordingTimer = scope.launch {
                 while (interactionId == id && isRecording) {
                     delay(100L)
                     recordingTime += .1
-                    if (recordingTime >= 60.0) {
-                        finishVoiceRecording(id, VoiceRecordingFinishAction.SEND)
-                        break
-                    }
                 }
             }
         }

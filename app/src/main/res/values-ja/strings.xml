@@ -1812,6 +1812,8 @@
     <string name="chat_voice_speed">%1$.1fx</string>
     <string name="chat_voice_play">音声メッセージを再生</string>
     <string name="chat_voice_pause">音声メッセージを一時停止</string>
+    <string name="chat_voice_mini_player_close">プレーヤーを閉じる</string>
+    <string name="chat_voice_mini_player_jump">ボイスメッセージへ移動</string>
     <string name="chat_audio_scrub_accessibility">音声メッセージの再生位置</string>
     <string name="chat_audio_duration_accessibility">再生時間 %1$s</string>
     <string name="chat_voice_record_hold_hint">長押しして録音します。上にスライドすると固定、左にスライドするとキャンセルします。</string>

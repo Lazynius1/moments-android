@@ -1260,6 +1260,8 @@ Per a preguntes o sol·licituds de privacitat, contacta amb nosaltres a soporte@
     <string name="messaging_archived">Arxivades</string>
     <string name="chat_voice_play">Reprodueix la nota de veu</string>
     <string name="chat_voice_pause">Posa en pausa la nota de veu</string>
+    <string name="chat_voice_mini_player_close">Tanca el reproductor</string>
+    <string name="chat_voice_mini_player_jump">Ves a la nota de veu</string>
     <string name="chat_request_closed_input">%1$s no accepta sol·licituds de missatge</string>
     <string name="network_offline_title">Modo offline</string>
     <string name="network_slow_title">Connexió lenta</string>

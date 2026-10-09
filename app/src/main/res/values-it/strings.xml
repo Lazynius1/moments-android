@@ -1228,6 +1228,8 @@ Per domande o richieste sulla privacy, contattaci a soporte@momentsapp.app o vis
     <string name="messaging_archived">Archiviate</string>
     <string name="chat_voice_play">Riproduci messaggio vocale</string>
     <string name="chat_voice_pause">Metti in pausa il messaggio vocale</string>
+    <string name="chat_voice_mini_player_close">Chiudi il lettore</string>
+    <string name="chat_voice_mini_player_jump">Vai al messaggio vocale</string>
     <string name="chat_request_closed_input">%1$s non accetta richieste di messaggio</string>
     <string name="network_offline_title">Modalità offline</string>
     <string name="network_slow_title">Connessione lenta</string>
