@@ -601,6 +601,17 @@ fun MessagingView(
         }
     }
 
+    // Barras de nota de voz (lista o dentro de otro chat): abren el chat de la nota.
+    val voiceOpenRequest = com.moments.android.views.messaging.components.ChatVoicePlaybackController.pendingOpenConversationId
+    LaunchedEffect(voiceOpenRequest) {
+        val conversationId = voiceOpenRequest ?: return@LaunchedEffect
+        com.moments.android.views.messaging.components.ChatVoicePlaybackController.consumeOpenRequest()
+        val target = (viewModel.conversations + viewModel.archivedConversations)
+            .firstOrNull { it.id == conversationId }
+            ?: com.moments.android.views.messaging.services.ChatSessionEngine.cachedSession(conversationId)?.conversation
+        target?.let(viewModel::openConversation)
+    }
+
     @Composable
     fun ConversationListPane() {
         Column(Modifier.fillMaxSize().background(colors.surfaceBackground)) {
@@ -617,17 +628,7 @@ fun MessagingView(
                 currentStatus = currentStatus,
             )
             // Nota de voz que sigue sonando tras salir de su chat (≡ iOS ChatVoiceOutsideChatHost).
-            com.moments.android.views.messaging.components.ChatVoiceOutsideChatHost(
-                onOpen = { conversationId, messageId ->
-                    com.moments.android.views.messaging.services.ChatNavigationIntentStore
-                        .enqueueHighlight(conversationId, messageId)
-                    val target = (viewModel.conversations + viewModel.archivedConversations)
-                        .firstOrNull { it.id == conversationId }
-                        ?: com.moments.android.views.messaging.services.ChatSessionEngine
-                            .cachedSession(conversationId)?.conversation
-                    target?.let(viewModel::openConversation)
-                },
-            )
+            com.moments.android.views.messaging.components.ChatVoiceOutsideChatHost()
             val showSearch =
                 viewModel.conversations.isNotEmpty() ||
                     viewModel.archivedConversations.isNotEmpty() ||

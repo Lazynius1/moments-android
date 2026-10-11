@@ -119,13 +119,33 @@ object ChatVoicePlaybackController {
             return activeMessageId != null && presentedConversationId != conversation.id
         }
 
-    /** Lo fija el chat: devuelve la nota de voz que va justo después de un mensaje, si la hay. */
+    /**
+     * Los fija el chat en pantalla. Al empezar una nota desde ese chat pasan a ser los de la
+     * nota activa, así la cola sigue con las notas de su chat aunque luego se entre en otro.
+     */
     var nextVoiceNoteProvider: ((String) -> ChatVoiceQueueItem?)? = null
-    /** Lo fija el chat: se llama al empezar una nota nueva (para preparar la siguiente). */
     var onActiveMessageChanged: ((String) -> Unit)? = null
-    /** Lo fija el chat: nombre que se muestra para un remitente. */
     var senderNameProvider: ((String) -> String)? = null
     private var presentedConversation: ChatVoiceConversation? = null
+    private var activeNextProvider: ((String) -> ChatVoiceQueueItem?)? = null
+    private var activeOnMessageChanged: ((String) -> Unit)? = null
+    private var activeSenderNameProvider: ((String) -> String)? = null
+    /** La nota nueva viene de la cola (fin de la anterior), no de tocarla en el chat en pantalla. */
+    private var isAdvancingQueue = false
+
+    /** Petición de abrir un chat desde una barra (la atiende la lista de chats). */
+    var pendingOpenConversationId by mutableStateOf<String?>(null)
+        private set
+
+    /** Abre el chat de la nota en ese mensaje (barra fuera del chat). */
+    fun requestOpen(conversationId: String, messageId: String) {
+        com.moments.android.views.messaging.services.ChatNavigationIntentStore.enqueueHighlight(conversationId, messageId)
+        pendingOpenConversationId = conversationId
+    }
+
+    fun consumeOpenRequest() {
+        pendingOpenConversationId = null
+    }
 
     /** Posición guardada de las notas que se pausaron o se cambiaron por otra. */
     private val savedPositions = mutableStateMapOf<String, Float>()
@@ -153,10 +173,8 @@ object ChatVoicePlaybackController {
 
     // ── Chat en pantalla ──
 
-    /** Al entrar en un chat. Si suena una nota de otro chat, se para. */
+    /** Al entrar en un chat. Si suena una nota de otro chat, sigue sonando (con su barra arriba). */
     fun attach(conversation: ChatVoiceConversation) {
-        val active = activeConversation
-        if (activeMessageId != null && active != null && active.id != conversation.id) reset()
         presentedConversation = conversation
         presentedConversationId = conversation.id
         if (activeConversation?.id == conversation.id) activeConversation = conversation
@@ -249,6 +267,9 @@ object ChatVoicePlaybackController {
         activeSenderId = null
         activeConversation = null
         activeSenderName = ""
+        activeNextProvider = null
+        activeOnMessageChanged = null
+        activeSenderNameProvider = null
         currentTime = 0f
         duration = 0.0
         updateActiveBubbleVisibility()
@@ -328,13 +349,19 @@ object ChatVoicePlaybackController {
         releaseMedia()
         activeMessageId = messageId
         activeSenderId = senderId
-        presentedConversation?.let { activeConversation = it }
-        activeSenderName = senderNameProvider?.invoke(senderId).orEmpty()
+        val presented = presentedConversation
+        if (!isAdvancingQueue && presented != null) {
+            activeConversation = presented
+            activeNextProvider = nextVoiceNoteProvider
+            activeOnMessageChanged = onActiveMessageChanged
+            activeSenderNameProvider = senderNameProvider
+        }
+        activeSenderName = activeSenderNameProvider?.invoke(senderId).orEmpty()
         duration = knownDuration
         currentTime = savedPositions.remove(messageId) ?: 0f
         if (duration > 0 && currentTime >= duration - 0.05) currentTime = 0f
         updateActiveBubbleVisibility()
-        onActiveMessageChanged?.invoke(messageId)
+        activeOnMessageChanged?.invoke(messageId)
     }
 
     private fun releaseMedia() {
@@ -357,11 +384,13 @@ object ChatVoicePlaybackController {
 
         // Si el siguiente mensaje también es una nota de voz, la reproducción sigue con ella.
         val context = appContext
-        val next = finished?.let { nextVoiceNoteProvider?.invoke(it) }
+        val next = finished?.let { activeNextProvider?.invoke(it) }
         if (context != null && next != null && next.messageId != finished) {
             savedPositions.remove(next.messageId)
             releaseMedia()
+            isAdvancingQueue = true
             play(context, next.messageId, next.audioUrl, next.duration, next.senderId)
+            isAdvancingQueue = false
             return
         }
 
@@ -428,7 +457,7 @@ fun ChatVoiceMiniPlayerHost(
         cachedChatBubbleColor(context, com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty(), conversationId)
     }
     AnimatedVisibility(
-        visible = activeId != null && !playback.isActiveBubbleVisible,
+        visible = activeId != null && !playback.isActiveBubbleVisible && !playback.isPlayingOutsideChat,
         modifier = modifier,
         enter = slideInVertically { -it } + fadeIn(),
         exit = slideOutVertically { -it } + fadeOut(),
@@ -442,13 +471,14 @@ fun ChatVoiceMiniPlayerHost(
 }
 
 /**
- * Barra fuera del chat (≡ iOS `ChatVoiceOutsideChatHost`): sobre la lista de chats mientras sigue
- * sonando una nota de un chat del que se ha salido. Desaparece al volver a ese chat.
+ * Barra fuera del chat (≡ iOS `ChatVoiceOutsideChatHost`): mientras sigue sonando una nota de un
+ * chat del que se ha salido, sobre la lista de chats y arriba de cualquier otro chat. Desaparece
+ * al volver a ese chat. Tocarla abre su chat en la nota.
  */
 @Composable
 fun ChatVoiceOutsideChatHost(
-    onOpen: (conversationId: String, messageId: String) -> Unit,
     modifier: Modifier = Modifier,
+    onOpen: (conversationId: String, messageId: String) -> Unit = ChatVoicePlaybackController::requestOpen,
 ) {
     val playback = ChatVoicePlaybackController
     val conversation = playback.activeConversation

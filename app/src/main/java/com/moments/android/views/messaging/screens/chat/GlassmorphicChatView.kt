@@ -1130,6 +1130,12 @@ fun GlassmorphicChatView(
                         .align(Alignment.TopCenter)
                         .padding(top = headerHeight + 8.dp),
                 )
+                // Nota de otro chat que sigue sonando: su barra (foto y color de ese chat) lleva a él.
+                com.moments.android.views.messaging.components.ChatVoiceOutsideChatHost(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = headerHeight + 2.dp),
+                )
                 val navigation = ChatFloatingNavigationState.resolve(
                     hasCompletedInitialScroll = scroll.hasCompletedInitialScroll,
                     isSearchVisible = search.isSearchVisible,
