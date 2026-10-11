@@ -142,6 +142,10 @@ object ChatSessionEngine {
     }
 
     fun invalidateAll() {
+        // Cerrar sesión o cambiar de usuario: la nota que sonara no debe seguir.
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            com.moments.android.views.messaging.components.ChatVoicePlaybackController.reset()
+        }
         activeConversationId = null
         val cached = synchronized(lock) {
             val values = sessions.values.toList()

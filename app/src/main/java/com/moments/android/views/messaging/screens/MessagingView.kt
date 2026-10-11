@@ -616,6 +616,18 @@ fun MessagingView(
                 pendingRequestCount = pendingRequestCount,
                 currentStatus = currentStatus,
             )
+            // Nota de voz que sigue sonando tras salir de su chat (≡ iOS ChatVoiceOutsideChatHost).
+            com.moments.android.views.messaging.components.ChatVoiceOutsideChatHost(
+                onOpen = { conversationId, messageId ->
+                    com.moments.android.views.messaging.services.ChatNavigationIntentStore
+                        .enqueueHighlight(conversationId, messageId)
+                    val target = (viewModel.conversations + viewModel.archivedConversations)
+                        .firstOrNull { it.id == conversationId }
+                        ?: com.moments.android.views.messaging.services.ChatSessionEngine
+                            .cachedSession(conversationId)?.conversation
+                    target?.let(viewModel::openConversation)
+                },
+            )
             val showSearch =
                 viewModel.conversations.isNotEmpty() ||
                     viewModel.archivedConversations.isNotEmpty() ||

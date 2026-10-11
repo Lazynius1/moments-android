@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -63,6 +64,15 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.io.File
 
+/** Chat del que viene la nota que suena: lo que muestra la barra cuando se sale de él (≡ iOS). */
+data class ChatVoiceConversation(
+    val id: String,
+    val title: String,
+    val isGroup: Boolean,
+    val otherUserId: String?,
+    val groupImage: String,
+)
+
 /** Nota de voz que va justo después de otra (reproducción seguida). */
 data class ChatVoiceQueueItem(
     val messageId: String,
@@ -72,9 +82,10 @@ data class ChatVoiceQueueItem(
 )
 
 /**
- * ≡ iOS `ChatVoicePlaybackController`: un único reproductor para todo el chat. Vive fuera
+ * ≡ iOS `ChatVoicePlaybackController`: un único reproductor para toda la app. Vive fuera
  * de las burbujas para que la nota siga sonando aunque su fila salga de pantalla al hacer
- * scroll (la LazyColumn la desecha). Las burbujas y la mini barra solo leen su estado.
+ * scroll (la LazyColumn la desecha) o se salga del chat. Las burbujas y las mini barras
+ * solo leen su estado.
  */
 object ChatVoicePlaybackController {
     var activeMessageId by mutableStateOf<String?>(null)
@@ -92,11 +103,29 @@ object ChatVoicePlaybackController {
     /** Si la burbuja de la nota activa está en pantalla. La mini barra solo aparece cuando no. */
     var isActiveBubbleVisible by mutableStateOf(true)
         private set
+    /** Chat de la nota activa y chat que está en pantalla ahora (null fuera de los chats). */
+    var activeConversation by mutableStateOf<ChatVoiceConversation?>(null)
+        private set
+    var presentedConversationId by mutableStateOf<String?>(null)
+        private set
+    /** Quién envió la nota activa (para la barra de fuera en grupos). */
+    var activeSenderName by mutableStateOf("")
+        private set
+
+    /** La nota sigue sonando fuera de su chat: se muestra la barra de la lista de chats. */
+    val isPlayingOutsideChat: Boolean
+        get() {
+            val conversation = activeConversation ?: return false
+            return activeMessageId != null && presentedConversationId != conversation.id
+        }
 
     /** Lo fija el chat: devuelve la nota de voz que va justo después de un mensaje, si la hay. */
     var nextVoiceNoteProvider: ((String) -> ChatVoiceQueueItem?)? = null
     /** Lo fija el chat: se llama al empezar una nota nueva (para preparar la siguiente). */
     var onActiveMessageChanged: ((String) -> Unit)? = null
+    /** Lo fija el chat: nombre que se muestra para un remitente. */
+    var senderNameProvider: ((String) -> String)? = null
+    private var presentedConversation: ChatVoiceConversation? = null
 
     /** Posición guardada de las notas que se pausaron o se cambiaron por otra. */
     private val savedPositions = mutableStateMapOf<String, Float>()
@@ -120,6 +149,24 @@ object ChatVoicePlaybackController {
             // Pausa externa (foco de audio, auriculares desconectados…): reflejarla en la UI.
             if (!playWhenReady && isPlaying && player?.playbackState != Player.STATE_ENDED) pause()
         }
+    }
+
+    // ── Chat en pantalla ──
+
+    /** Al entrar en un chat. Si suena una nota de otro chat, se para. */
+    fun attach(conversation: ChatVoiceConversation) {
+        val active = activeConversation
+        if (activeMessageId != null && active != null && active.id != conversation.id) reset()
+        presentedConversation = conversation
+        presentedConversationId = conversation.id
+        if (activeConversation?.id == conversation.id) activeConversation = conversation
+    }
+
+    /** Al salir del chat: la nota sigue sonando y la barra pasa a la lista de chats. */
+    fun detach(conversationId: String) {
+        if (presentedConversationId != conversationId) return
+        presentedConversation = null
+        presentedConversationId = null
     }
 
     // ── Estado por mensaje ──
@@ -200,12 +247,14 @@ object ChatVoicePlaybackController {
         releaseMedia()
         activeMessageId = null
         activeSenderId = null
+        activeConversation = null
+        activeSenderName = ""
         currentTime = 0f
         duration = 0.0
         updateActiveBubbleVisibility()
     }
 
-    /** Al salir del chat: para, olvida las posiciones y suelta el reproductor. */
+    /** Para, olvida las posiciones y suelta el reproductor (otro chat, cerrar sesión). */
     fun reset() {
         stop()
         savedPositions.clear()
@@ -279,6 +328,8 @@ object ChatVoicePlaybackController {
         releaseMedia()
         activeMessageId = messageId
         activeSenderId = senderId
+        presentedConversation?.let { activeConversation = it }
+        activeSenderName = senderNameProvider?.invoke(senderId).orEmpty()
         duration = knownDuration
         currentTime = savedPositions.remove(messageId) ?: 0f
         if (duration > 0 && currentTime >= duration - 0.05) currentTime = 0f
@@ -317,6 +368,8 @@ object ChatVoicePlaybackController {
         releaseMedia()
         activeMessageId = null
         activeSenderId = null
+        activeConversation = null
+        activeSenderName = ""
         currentTime = 0f
         duration = 0.0
         updateActiveBubbleVisibility()
@@ -388,11 +441,62 @@ fun ChatVoiceMiniPlayerHost(
     }
 }
 
+/**
+ * Barra fuera del chat (≡ iOS `ChatVoiceOutsideChatHost`): sobre la lista de chats mientras sigue
+ * sonando una nota de un chat del que se ha salido. Desaparece al volver a ese chat.
+ */
+@Composable
+fun ChatVoiceOutsideChatHost(
+    onOpen: (conversationId: String, messageId: String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val playback = ChatVoicePlaybackController
+    val conversation = playback.activeConversation
+    val context = LocalContext.current
+    val bubbleColor = remember(conversation?.id) {
+        cachedChatBubbleColor(
+            context,
+            com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty(),
+            conversation?.id.orEmpty(),
+        )
+    }
+    AnimatedVisibility(
+        visible = playback.isPlayingOutsideChat,
+        modifier = modifier,
+        enter = slideInVertically { -it } + fadeIn(),
+        exit = slideOutVertically { -it } + fadeOut(),
+    ) {
+        val shown = conversation ?: return@AnimatedVisibility
+        ChatVoiceMiniPlayerBar(
+            bubbleColor = bubbleColor,
+            senderName = shown.title,
+            subtitlePrefix = if (shown.isGroup) playback.activeSenderName else null,
+            avatar = {
+                when {
+                    shown.isGroup -> com.moments.android.views.messaging.groups.GroupChatAvatar(image = shown.groupImage, size = 34.dp)
+                    !shown.otherUserId.isNullOrBlank() ->
+                        com.moments.android.coordinators.AsyncProfileImageView(shown.otherUserId, Modifier.size(34.dp).clip(CircleShape))
+                    else -> com.moments.android.views.profile.userprofile.sections.ProfileUnavailableAvatar(34.dp)
+                }
+            },
+            onTap = { playback.activeMessageId?.let { onOpen(shown.id, it) } },
+            modifier = Modifier.padding(vertical = 6.dp),
+        )
+    }
+}
+
+/**
+ * Barra compacta de la nota que suena (o está en pausa). En el chat empieza con play/pausa;
+ * fuera del chat lleva la foto del chat delante. Tocar el nombre (o la foto) lleva al mensaje.
+ */
 @Composable
 private fun ChatVoiceMiniPlayerBar(
     bubbleColor: Color,
     senderName: String,
     onTap: () -> Unit,
+    subtitlePrefix: String? = null,
+    avatar: (@Composable () -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val playback = ChatVoicePlaybackController
@@ -412,7 +516,7 @@ private fun ChatVoiceMiniPlayerBar(
     val closeLabel = stringResource(R.string.chat_voice_mini_player_close)
 
     Box(
-        Modifier
+        modifier
             .padding(horizontal = 12.dp)
             .fillMaxWidth()
             .shadow(10.dp, shape)
@@ -424,21 +528,17 @@ private fun ChatVoiceMiniPlayerBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(
-                Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .clickable {
-                        if (playback.isPlaying) playback.pause() else playback.resume(context)
-                    }
-                    .semantics { contentDescription = playLabel },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = onBubble,
-                )
+            if (avatar != null) {
+                Box(
+                    Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .border(1.5.dp, onBubble.copy(alpha = 0.35f), CircleShape)
+                        .clickable(onClick = onTap),
+                    contentAlignment = Alignment.Center,
+                ) { avatar() }
+            } else {
+                PlayPauseButton(onBubble, playLabel)
             }
             Column(
                 Modifier
@@ -454,13 +554,17 @@ private fun ChatVoiceMiniPlayerBar(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                val time = "${formatMiniPlayerTime(playback.currentTime.toDouble())} / ${formatMiniPlayerTime(playback.duration)}"
                 Text(
-                    "${formatMiniPlayerTime(playback.currentTime.toDouble())} / ${formatMiniPlayerTime(playback.duration)}",
+                    if (subtitlePrefix.isNullOrBlank()) time else "$subtitlePrefix · $time",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     color = onBubble.copy(alpha = 0.72f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                 )
             }
+            if (avatar != null) PlayPauseButton(onBubble, playLabel)
             Box(
                 Modifier
                     .clip(RoundedCornerShape(50))
@@ -497,6 +601,28 @@ private fun ChatVoiceMiniPlayerBar(
                 .height(2.dp)
                 .clip(RoundedCornerShape(1.dp))
                 .background(onBubble.copy(alpha = 0.85f)),
+        )
+    }
+}
+
+@Composable
+private fun PlayPauseButton(onBubble: Color, playLabel: String) {
+    val context = LocalContext.current
+    val playback = ChatVoicePlaybackController
+    Box(
+        Modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .clickable {
+                if (playback.isPlaying) playback.pause() else playback.resume(context)
+            }
+            .semantics { contentDescription = playLabel },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+            contentDescription = null,
+            tint = onBubble,
         )
     }
 }

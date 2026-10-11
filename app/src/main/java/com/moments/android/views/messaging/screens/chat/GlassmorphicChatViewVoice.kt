@@ -92,6 +92,8 @@ class GlassmorphicChatVoiceController(
     }
 
     private fun beginVoiceRecordingSegment(activity: Activity, id: String, startsLocked: Boolean) {
+        // Grabar pausa la nota que esté sonando (≡ iOS).
+        com.moments.android.views.messaging.components.ChatVoicePlaybackController.pause()
         interactionId = id
         isLocked = startsLocked
         isPreparingPreview = false

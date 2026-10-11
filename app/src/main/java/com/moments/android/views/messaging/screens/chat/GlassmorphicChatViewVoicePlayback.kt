@@ -2,6 +2,7 @@ package com.moments.android.views.messaging.screens.chat
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import com.moments.android.views.messaging.components.ChatVoiceConversation
 import com.moments.android.views.messaging.components.ChatVoicePlaybackController
 import com.moments.android.views.messaging.components.ChatVoiceQueueItem
 import com.moments.android.views.messaging.core.EnhancedChatViewModel
@@ -11,12 +12,19 @@ import com.moments.android.views.messaging.core.MessageType
 
 /**
  * ≡ iOS `configureVoicePlayback` / `tearDownVoicePlayback`: conecta el reproductor de notas
- * de voz con este chat y lo para al salir.
+ * de voz con este chat. Al salir la nota sigue sonando y su barra pasa a la lista de chats;
+ * la cola sigue con las notas ya cargadas. Al entrar en otro chat se para.
  */
 @Composable
-internal fun BindChatVoicePlayback(session: EnhancedChatViewModel) {
-    DisposableEffect(session) {
+internal fun BindChatVoicePlayback(
+    session: EnhancedChatViewModel,
+    conversation: ChatVoiceConversation,
+    senderName: (String?) -> String,
+) {
+    DisposableEffect(session, conversation) {
         val playback = ChatVoicePlaybackController
+        playback.attach(conversation)
+        playback.senderNameProvider = { senderName(it) }
         playback.nextVoiceNoteProvider = { messageId ->
             nextVoiceNoteMessage(session.messages.value, messageId)?.let { next ->
                 next.mediaUrl?.takeIf { it.isNotBlank() }?.let { url ->
@@ -35,9 +43,7 @@ internal fun BindChatVoicePlayback(session: EnhancedChatViewModel) {
             nextVoiceNoteMessage(session.messages.value, messageId)?.let(session::hydrateMediaIfNeeded)
         }
         onDispose {
-            playback.reset()
-            playback.nextVoiceNoteProvider = null
-            playback.onActiveMessageChanged = null
+            playback.detach(conversation.id)
         }
     }
 }

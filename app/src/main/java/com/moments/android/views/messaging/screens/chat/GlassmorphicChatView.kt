@@ -713,7 +713,30 @@ fun GlassmorphicChatView(
         }
     }
 
-    BindChatVoicePlayback(session)
+    val voiceSenderName: (String?) -> String = { senderId ->
+        when {
+            senderId.isNullOrBlank() -> displayName
+            senderId == session.currentUserId -> currentUserName
+            conversation.isGroup ->
+                com.moments.android.services.cache.UserCacheService.getCachedUser(senderId)?.username
+                    ?: groupDirectory[conversation.id]?.allMemberNames?.get(senderId)
+                    ?: conversation.groupMemberNames[senderId]
+                    ?: context.getString(R.string.messaging_user_default)
+            else -> displayName
+        }
+    }
+    BindChatVoicePlayback(
+        session = session,
+        conversation = com.moments.android.views.messaging.components.ChatVoiceConversation(
+            id = conversation.id.orEmpty(),
+            title = displayName,
+            isGroup = conversation.isGroup,
+            otherUserId = conversation.otherParticipantId,
+            groupImage = groupDirectory[conversation.id]?.image?.ifBlank { null }
+                ?: conversation.otherParticipantProfileImagePath.orEmpty(),
+        ),
+        senderName = voiceSenderName,
+    )
 
     DisposableEffect(voice) {
         val removeListener = com.moments.android.utilities.MomentsAudioSession.addInterruptionListener {
@@ -1101,18 +1124,7 @@ fun GlassmorphicChatView(
                 ChatVoiceMiniPlayerHost(
                     adaptiveColors = colors,
                     conversationId = conversation.id.orEmpty(),
-                    senderName = { senderId ->
-                        when {
-                            senderId.isNullOrBlank() -> displayName
-                            senderId == session.currentUserId -> currentUserName
-                            conversation.isGroup ->
-                                com.moments.android.services.cache.UserCacheService.getCachedUser(senderId)?.username
-                                    ?: groupDirectory[conversation.id]?.allMemberNames?.get(senderId)
-                                    ?: conversation.groupMemberNames[senderId]
-                                    ?: context.getString(R.string.messaging_user_default)
-                            else -> displayName
-                        }
-                    },
+                    senderName = voiceSenderName,
                     onJump = scroll::handleJumpToMessageFromOutside,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
