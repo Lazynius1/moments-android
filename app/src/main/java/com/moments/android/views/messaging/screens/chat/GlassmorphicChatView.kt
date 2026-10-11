@@ -1100,6 +1100,7 @@ fun GlassmorphicChatView(
                 // Nota de voz sonando con su burbuja fuera de pantalla (≡ iOS voiceMiniPlayer).
                 ChatVoiceMiniPlayerHost(
                     adaptiveColors = colors,
+                    conversationId = conversation.id.orEmpty(),
                     senderName = { senderId ->
                         when {
                             senderId.isNullOrBlank() -> displayName

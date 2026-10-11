@@ -31,12 +31,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -360,12 +362,18 @@ object ChatVoicePlaybackController {
 @Composable
 fun ChatVoiceMiniPlayerHost(
     adaptiveColors: AdaptiveColors,
+    conversationId: String,
     senderName: (String?) -> String,
     onJump: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val playback = ChatVoicePlaybackController
     val activeId = playback.activeMessageId
+    val context = LocalContext.current
+    // Color de las burbujas enviadas de este chat (≡ iOS chatOutgoingBubbleColor); lectura local, sin red.
+    val bubbleColor = remember(conversationId, activeId) {
+        cachedChatBubbleColor(context, com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty(), conversationId)
+    }
     AnimatedVisibility(
         visible = activeId != null && !playback.isActiveBubbleVisible,
         modifier = modifier,
@@ -373,7 +381,7 @@ fun ChatVoiceMiniPlayerHost(
         exit = slideOutVertically { -it } + fadeOut(),
     ) {
         ChatVoiceMiniPlayerBar(
-            adaptiveColors = adaptiveColors,
+            bubbleColor = bubbleColor,
             senderName = senderName(playback.activeSenderId),
             onTap = { playback.activeMessageId?.let(onJump) },
         )
@@ -382,13 +390,15 @@ fun ChatVoiceMiniPlayerHost(
 
 @Composable
 private fun ChatVoiceMiniPlayerBar(
-    adaptiveColors: AdaptiveColors,
+    bubbleColor: Color,
     senderName: String,
     onTap: () -> Unit,
 ) {
     val context = LocalContext.current
     val playback = ChatVoicePlaybackController
     val shape = RoundedCornerShape(18.dp)
+    // Mismo color que las burbujas enviadas, con el texto legible encima (≡ burbuja).
+    val onBubble = chatBubbleTextColor(bubbleColor)
     val progress = if (playback.duration > 0) {
         (playback.currentTime / playback.duration.toFloat()).coerceIn(0f, 1f)
     } else 0f
@@ -407,8 +417,7 @@ private fun ChatVoiceMiniPlayerBar(
             .fillMaxWidth()
             .shadow(10.dp, shape)
             .clip(shape)
-            .background(adaptiveColors.messageBubbleBackground)
-            .border(0.5.dp, adaptiveColors.messageBubbleStroke, shape),
+            .background(bubbleColor),
     ) {
         Row(
             Modifier.padding(start = 6.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
@@ -428,7 +437,7 @@ private fun ChatVoiceMiniPlayerBar(
                 Icon(
                     if (playback.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = null,
-                    tint = adaptiveColors.userAccentColor,
+                    tint = onBubble,
                 )
             }
             Column(
@@ -439,7 +448,7 @@ private fun ChatVoiceMiniPlayerBar(
             ) {
                 Text(
                     senderName,
-                    color = adaptiveColors.messageTextColor,
+                    color = onBubble,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -447,7 +456,7 @@ private fun ChatVoiceMiniPlayerBar(
                 )
                 Text(
                     "${formatMiniPlayerTime(playback.currentTime.toDouble())} / ${formatMiniPlayerTime(playback.duration)}",
-                    color = adaptiveColors.timestampColor,
+                    color = onBubble.copy(alpha = 0.72f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                 )
@@ -455,13 +464,13 @@ private fun ChatVoiceMiniPlayerBar(
             Box(
                 Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(adaptiveColors.messageTextColor.copy(alpha = 0.12f))
+                    .background(onBubble.copy(alpha = 0.16f))
                     .clickable { playback.cyclePlaybackRate() }
                     .width(38.dp)
                     .padding(vertical = 5.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(speedLabel, color = adaptiveColors.messageTextColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text(speedLabel, color = onBubble, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
             Box(
                 Modifier
@@ -474,7 +483,7 @@ private fun ChatVoiceMiniPlayerBar(
                 Icon(
                     Icons.Default.Close,
                     contentDescription = null,
-                    tint = adaptiveColors.messageTextColor.copy(alpha = 0.6f),
+                    tint = onBubble.copy(alpha = 0.72f),
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -487,7 +496,7 @@ private fun ChatVoiceMiniPlayerBar(
                 .fillMaxWidth(progress)
                 .height(2.dp)
                 .clip(RoundedCornerShape(1.dp))
-                .background(adaptiveColors.userAccentColor),
+                .background(onBubble.copy(alpha = 0.85f)),
         )
     }
 }
