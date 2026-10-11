@@ -302,7 +302,7 @@ object ChatVoicePlaybackController {
         val finished = activeMessageId
         if (finished != null) savedPositions.remove(finished)
 
-        // Como WhatsApp: si el siguiente mensaje también es una nota de voz, sigue con ella.
+        // Si el siguiente mensaje también es una nota de voz, la reproducción sigue con ella.
         val context = appContext
         val next = finished?.let { nextVoiceNoteProvider?.invoke(it) }
         if (context != null && next != null && next.messageId != finished) {
