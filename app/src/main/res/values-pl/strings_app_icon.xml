@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_group_appearance">WYGLĄD</string>
+    <string name="settings_app_icon_title">Ikona aplikacji</string>
+    <string name="app_icon_picker_description">Wybierz, jak Moments wygląda na ekranie głównym. Możesz to zmienić w każdej chwili.</string>
+    <string name="app_icon_picker_activate">Użyj tej ikony</string>
+    <string name="app_icon_picker_active">Obecna ikona</string>
+    <string name="app_icon_name_classic">Klasyczna</string>
+    <string name="app_icon_name_night">Noc</string>
+    <string name="app_icon_name_purple">Fiolet</string>
+    <string name="app_icon_name_purple_flat">Jednolity fiolet</string>
+    <string name="app_icon_name_white_flat">Jednolita biel</string>
+    <string name="app_icon_name_grape">Winogrono</string>
+    <string name="app_icon_name_ink">Atrament</string>
+    <string name="app_icon_name_silver">Srebro</string>
+    <string name="app_icon_name_gold">Złoto</string>
+    <string name="app_icon_name_glow">Blask</string>
+    <string name="app_icon_name_outline">Kontur</string>
+    <string name="app_icon_name_cosmic">Kosmiczna</string>
+    <string name="app_icon_name_pixel">Piksel</string>
+    <string name="app_icon_name_pride">Duma</string>
+    <string name="app_icon_name_pride_flag">Flaga</string>
+    <string name="app_icon_name_pride_ring">Pierścień</string>
+    <string name="app_icon_name_fire">Ogień</string>
+    <string name="app_icon_name_chrome">Chrom</string>
+    <string name="app_icon_name_neon">Neon</string>
+    <string name="app_icon_name_slime">Glut</string>
+    <string name="app_icon_name_flowers">Kwiaty</string>
+    <string name="app_icon_name_planet">Planeta</string>
+</resources>

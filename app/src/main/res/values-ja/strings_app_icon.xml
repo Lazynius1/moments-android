@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_group_appearance">外観</string>
+    <string name="settings_app_icon_title">アプリアイコン</string>
+    <string name="app_icon_picker_description">ホーム画面での Moments の見た目を選べます。いつでも変更できます。</string>
+    <string name="app_icon_picker_activate">このアイコンを使う</string>
+    <string name="app_icon_picker_active">現在のアイコン</string>
+    <string name="app_icon_name_classic">クラシック</string>
+    <string name="app_icon_name_night">ナイト</string>
+    <string name="app_icon_name_purple">パープル</string>
+    <string name="app_icon_name_purple_flat">パープル（単色）</string>
+    <string name="app_icon_name_white_flat">ホワイト（単色）</string>
+    <string name="app_icon_name_grape">グレープ</string>
+    <string name="app_icon_name_ink">インク</string>
+    <string name="app_icon_name_silver">シルバー</string>
+    <string name="app_icon_name_gold">ゴールド</string>
+    <string name="app_icon_name_glow">グロウ</string>
+    <string name="app_icon_name_outline">アウトライン</string>
+    <string name="app_icon_name_cosmic">コズミック</string>
+    <string name="app_icon_name_pixel">ピクセル</string>
+    <string name="app_icon_name_pride">プライド</string>
+    <string name="app_icon_name_pride_flag">フラッグ</string>
+    <string name="app_icon_name_pride_ring">リング</string>
+    <string name="app_icon_name_fire">ファイア</string>
+    <string name="app_icon_name_chrome">クローム</string>
+    <string name="app_icon_name_neon">ネオン</string>
+    <string name="app_icon_name_slime">スライム</string>
+    <string name="app_icon_name_flowers">フラワー</string>
+    <string name="app_icon_name_planet">プラネット</string>
+</resources>

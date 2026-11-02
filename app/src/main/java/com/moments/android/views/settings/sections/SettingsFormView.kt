@@ -185,6 +185,11 @@ fun SettingsFormView(
                     OnlineStatusSection()
                 }
             }
+            AnimatedSettingsBlock(visible = animateSections, delayMs = 300) {
+                SettingsGroup(title = stringResource(R.string.settings_group_appearance)) {
+                    AppIconSection()
+                }
+            }
             AnimatedSettingsBlock(visible = animateSections, delayMs = 350) {
                 SettingsGroup(title = stringResource(R.string.settings_group_support)) {
                     HelpSection(onRoute = onRoute)

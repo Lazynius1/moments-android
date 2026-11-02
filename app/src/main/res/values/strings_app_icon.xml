@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_group_appearance">APPEARANCE</string>
+    <string name="settings_app_icon_title">App icon</string>
+    <string name="app_icon_picker_description">Choose how Moments looks on your Home Screen. You can change it anytime.</string>
+    <string name="app_icon_picker_activate">Use this icon</string>
+    <string name="app_icon_picker_active">Current icon</string>
+    <string name="app_icon_name_classic">Classic</string>
+    <string name="app_icon_name_night">Night</string>
+    <string name="app_icon_name_purple">Purple</string>
+    <string name="app_icon_name_purple_flat">Flat purple</string>
+    <string name="app_icon_name_white_flat">Flat white</string>
+    <string name="app_icon_name_grape">Grape</string>
+    <string name="app_icon_name_ink">Ink</string>
+    <string name="app_icon_name_silver">Silver</string>
+    <string name="app_icon_name_gold">Gold</string>
+    <string name="app_icon_name_glow">Glow</string>
+    <string name="app_icon_name_outline">Outline</string>
+    <string name="app_icon_name_cosmic">Cosmic</string>
+    <string name="app_icon_name_pixel">Pixel</string>
+    <string name="app_icon_name_pride">Pride</string>
+    <string name="app_icon_name_pride_flag">Pride flag</string>
+    <string name="app_icon_name_pride_ring">Pride ring</string>
+    <string name="app_icon_name_fire">Fire</string>
+    <string name="app_icon_name_chrome">Chrome</string>
+    <string name="app_icon_name_neon">Neon</string>
+    <string name="app_icon_name_slime">Slime</string>
+    <string name="app_icon_name_flowers">Flowers</string>
+    <string name="app_icon_name_planet">Planet</string>
+</resources>

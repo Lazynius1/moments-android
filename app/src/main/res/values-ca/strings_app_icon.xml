@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_group_appearance">APARENÇA</string>
+    <string name="settings_app_icon_title">Icona de l\'app</string>
+    <string name="app_icon_picker_description">Tria com es veu Moments a la pantalla d\'inici. Pots canviar-ho quan vulguis.</string>
+    <string name="app_icon_picker_activate">Fes servir aquesta icona</string>
+    <string name="app_icon_picker_active">Icona actual</string>
+    <string name="app_icon_name_classic">Clàssic</string>
+    <string name="app_icon_name_night">Nit</string>
+    <string name="app_icon_name_purple">Morat</string>
+    <string name="app_icon_name_purple_flat">Morat llis</string>
+    <string name="app_icon_name_white_flat">Blanc llis</string>
+    <string name="app_icon_name_grape">Raïm</string>
+    <string name="app_icon_name_ink">Tinta</string>
+    <string name="app_icon_name_silver">Plata</string>
+    <string name="app_icon_name_gold">Or</string>
+    <string name="app_icon_name_glow">Brillantor</string>
+    <string name="app_icon_name_outline">Contorn</string>
+    <string name="app_icon_name_cosmic">Còsmic</string>
+    <string name="app_icon_name_pixel">Píxel</string>
+    <string name="app_icon_name_pride">Orgull</string>
+    <string name="app_icon_name_pride_flag">Bandera</string>
+    <string name="app_icon_name_pride_ring">Anell</string>
+    <string name="app_icon_name_fire">Foc</string>
+    <string name="app_icon_name_chrome">Crom</string>
+    <string name="app_icon_name_neon">Neó</string>
+    <string name="app_icon_name_slime">Slime</string>
+    <string name="app_icon_name_flowers">Flors</string>
+    <string name="app_icon_name_planet">Planeta</string>
+</resources>

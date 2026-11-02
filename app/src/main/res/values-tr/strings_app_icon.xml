@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_group_appearance">GÖRÜNÜM</string>
+    <string name="settings_app_icon_title">Uygulama simgesi</string>
+    <string name="app_icon_picker_description">Moments\'ın ana ekranında nasıl görüneceğini seç. İstediğin zaman değiştirebilirsin.</string>
+    <string name="app_icon_picker_activate">Bu simgeyi kullan</string>
+    <string name="app_icon_picker_active">Mevcut simge</string>
+    <string name="app_icon_name_classic">Klasik</string>
+    <string name="app_icon_name_night">Gece</string>
+    <string name="app_icon_name_purple">Mor</string>
+    <string name="app_icon_name_purple_flat">Düz mor</string>
+    <string name="app_icon_name_white_flat">Düz beyaz</string>
+    <string name="app_icon_name_grape">Üzüm</string>
+    <string name="app_icon_name_ink">Mürekkep</string>
+    <string name="app_icon_name_silver">Gümüş</string>
+    <string name="app_icon_name_gold">Altın</string>
+    <string name="app_icon_name_glow">Parıltı</string>
+    <string name="app_icon_name_outline">Kontur</string>
+    <string name="app_icon_name_cosmic">Kozmik</string>
+    <string name="app_icon_name_pixel">Piksel</string>
+    <string name="app_icon_name_pride">Onur</string>
+    <string name="app_icon_name_pride_flag">Bayrak</string>
+    <string name="app_icon_name_pride_ring">Halka</string>
+    <string name="app_icon_name_fire">Ateş</string>
+    <string name="app_icon_name_chrome">Krom</string>
+    <string name="app_icon_name_neon">Neon</string>
+    <string name="app_icon_name_slime">Slime</string>
+    <string name="app_icon_name_flowers">Çiçekler</string>
+    <string name="app_icon_name_planet">Gezegen</string>
+</resources>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_group_appearance">रूप-रंग</string>
+    <string name="settings_app_icon_title">ऐप आइकन</string>
+    <string name="app_icon_picker_description">चुनें कि होम स्क्रीन पर Moments कैसा दिखे। आप इसे कभी भी बदल सकते हैं।</string>
+    <string name="app_icon_picker_activate">यह आइकन इस्तेमाल करें</string>
+    <string name="app_icon_picker_active">मौजूदा आइकन</string>
+    <string name="app_icon_name_classic">क्लासिक</string>
+    <string name="app_icon_name_night">रात</string>
+    <string name="app_icon_name_purple">बैंगनी</string>
+    <string name="app_icon_name_purple_flat">सादा बैंगनी</string>
+    <string name="app_icon_name_white_flat">सादा सफ़ेद</string>
+    <string name="app_icon_name_grape">अंगूरी</string>
+    <string name="app_icon_name_ink">स्याही</string>
+    <string name="app_icon_name_silver">चांदी</string>
+    <string name="app_icon_name_gold">सोना</string>
+    <string name="app_icon_name_glow">चमक</string>
+    <string name="app_icon_name_outline">रूपरेखा</string>
+    <string name="app_icon_name_cosmic">ब्रह्मांड</string>
+    <string name="app_icon_name_pixel">पिक्सेल</string>
+    <string name="app_icon_name_pride">प्राइड</string>
+    <string name="app_icon_name_pride_flag">प्राइड झंडा</string>
+    <string name="app_icon_name_pride_ring">प्राइड रिंग</string>
+    <string name="app_icon_name_fire">आग</string>
+    <string name="app_icon_name_chrome">क्रोम</string>
+    <string name="app_icon_name_neon">नियॉन</string>
+    <string name="app_icon_name_slime">स्लाइम</string>
+    <string name="app_icon_name_flowers">फूल</string>
+    <string name="app_icon_name_planet">ग्रह</string>
+</resources>

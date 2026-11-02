@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_group_appearance">WEERGAVE</string>
+    <string name="settings_app_icon_title">App-icoon</string>
+    <string name="app_icon_picker_description">Kies hoe Moments eruitziet op je beginscherm. Je kunt het altijd wijzigen.</string>
+    <string name="app_icon_picker_activate">Dit icoon gebruiken</string>
+    <string name="app_icon_picker_active">Huidig icoon</string>
+    <string name="app_icon_name_classic">Klassiek</string>
+    <string name="app_icon_name_night">Nacht</string>
+    <string name="app_icon_name_purple">Paars</string>
+    <string name="app_icon_name_purple_flat">Effen paars</string>
+    <string name="app_icon_name_white_flat">Effen wit</string>
+    <string name="app_icon_name_grape">Druif</string>
+    <string name="app_icon_name_ink">Inkt</string>
+    <string name="app_icon_name_silver">Zilver</string>
+    <string name="app_icon_name_gold">Goud</string>
+    <string name="app_icon_name_glow">Gloed</string>
+    <string name="app_icon_name_outline">Omtrek</string>
+    <string name="app_icon_name_cosmic">Kosmisch</string>
+    <string name="app_icon_name_pixel">Pixel</string>
+    <string name="app_icon_name_pride">Pride</string>
+    <string name="app_icon_name_pride_flag">Vlag</string>
+    <string name="app_icon_name_pride_ring">Ring</string>
+    <string name="app_icon_name_fire">Vuur</string>
+    <string name="app_icon_name_chrome">Chroom</string>
+    <string name="app_icon_name_neon">Neon</string>
+    <string name="app_icon_name_slime">Slijm</string>
+    <string name="app_icon_name_flowers">Bloemen</string>
+    <string name="app_icon_name_planet">Planeet</string>
+</resources>

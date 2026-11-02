@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_group_appearance">外觀</string>
+    <string name="settings_app_icon_title">App 圖示</string>
+    <string name="app_icon_picker_description">選擇 Moments 在主畫面上的樣子，隨時都可以更改。</string>
+    <string name="app_icon_picker_activate">使用此圖示</string>
+    <string name="app_icon_picker_active">目前的圖示</string>
+    <string name="app_icon_name_classic">經典</string>
+    <string name="app_icon_name_night">夜晚</string>
+    <string name="app_icon_name_purple">紫色</string>
+    <string name="app_icon_name_purple_flat">純紫</string>
+    <string name="app_icon_name_white_flat">純白</string>
+    <string name="app_icon_name_grape">葡萄</string>
+    <string name="app_icon_name_ink">墨色</string>
+    <string name="app_icon_name_silver">銀色</string>
+    <string name="app_icon_name_gold">金色</string>
+    <string name="app_icon_name_glow">光暈</string>
+    <string name="app_icon_name_outline">線條</string>
+    <string name="app_icon_name_cosmic">宇宙</string>
+    <string name="app_icon_name_pixel">像素</string>
+    <string name="app_icon_name_pride">驕傲</string>
+    <string name="app_icon_name_pride_flag">彩虹旗</string>
+    <string name="app_icon_name_pride_ring">彩虹環</string>
+    <string name="app_icon_name_fire">火焰</string>
+    <string name="app_icon_name_chrome">鉻</string>
+    <string name="app_icon_name_neon">霓虹</string>
+    <string name="app_icon_name_slime">史萊姆</string>
+    <string name="app_icon_name_flowers">花朵</string>
+    <string name="app_icon_name_planet">星球</string>
+</resources>

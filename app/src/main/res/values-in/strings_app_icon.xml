@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_group_appearance">TAMPILAN</string>
+    <string name="settings_app_icon_title">Ikon aplikasi</string>
+    <string name="app_icon_picker_description">Pilih tampilan Moments di layar utama. Kamu bisa mengubahnya kapan saja.</string>
+    <string name="app_icon_picker_activate">Gunakan ikon ini</string>
+    <string name="app_icon_picker_active">Ikon saat ini</string>
+    <string name="app_icon_name_classic">Klasik</string>
+    <string name="app_icon_name_night">Malam</string>
+    <string name="app_icon_name_purple">Ungu</string>
+    <string name="app_icon_name_purple_flat">Ungu polos</string>
+    <string name="app_icon_name_white_flat">Putih polos</string>
+    <string name="app_icon_name_grape">Anggur</string>
+    <string name="app_icon_name_ink">Tinta</string>
+    <string name="app_icon_name_silver">Perak</string>
+    <string name="app_icon_name_gold">Emas</string>
+    <string name="app_icon_name_glow">Kilau</string>
+    <string name="app_icon_name_outline">Garis</string>
+    <string name="app_icon_name_cosmic">Kosmik</string>
+    <string name="app_icon_name_pixel">Piksel</string>
+    <string name="app_icon_name_pride">Pride</string>
+    <string name="app_icon_name_pride_flag">Bendera</string>
+    <string name="app_icon_name_pride_ring">Cincin</string>
+    <string name="app_icon_name_fire">Api</string>
+    <string name="app_icon_name_chrome">Krom</string>
+    <string name="app_icon_name_neon">Neon</string>
+    <string name="app_icon_name_slime">Slime</string>
+    <string name="app_icon_name_flowers">Bunga</string>
+    <string name="app_icon_name_planet">Planet</string>
+</resources>

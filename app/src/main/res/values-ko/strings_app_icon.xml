@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_group_appearance">모양</string>
+    <string name="settings_app_icon_title">앱 아이콘</string>
+    <string name="app_icon_picker_description">홈 화면에 표시될 Moments의 모습을 선택하세요. 언제든지 바꿀 수 있어요.</string>
+    <string name="app_icon_picker_activate">이 아이콘 사용</string>
+    <string name="app_icon_picker_active">현재 아이콘</string>
+    <string name="app_icon_name_classic">클래식</string>
+    <string name="app_icon_name_night">나이트</string>
+    <string name="app_icon_name_purple">퍼플</string>
+    <string name="app_icon_name_purple_flat">단색 퍼플</string>
+    <string name="app_icon_name_white_flat">단색 화이트</string>
+    <string name="app_icon_name_grape">그레이프</string>
+    <string name="app_icon_name_ink">잉크</string>
+    <string name="app_icon_name_silver">실버</string>
+    <string name="app_icon_name_gold">골드</string>
+    <string name="app_icon_name_glow">글로우</string>
+    <string name="app_icon_name_outline">윤곽선</string>
+    <string name="app_icon_name_cosmic">코스믹</string>
+    <string name="app_icon_name_pixel">픽셀</string>
+    <string name="app_icon_name_pride">프라이드</string>
+    <string name="app_icon_name_pride_flag">깃발</string>
+    <string name="app_icon_name_pride_ring">링</string>
+    <string name="app_icon_name_fire">파이어</string>
+    <string name="app_icon_name_chrome">크롬</string>
+    <string name="app_icon_name_neon">네온</string>
+    <string name="app_icon_name_slime">슬라임</string>
+    <string name="app_icon_name_flowers">플라워</string>
+    <string name="app_icon_name_planet">플래닛</string>
+</resources>
