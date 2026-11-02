@@ -38,8 +38,22 @@ import java.io.InputStream
 object AIContentProvenance {
     private const val WINDOW_BYTES = 8 * 1024 * 1024
 
-    // Cubre trainedAlgorithmicMedia y compositeWithTrainedAlgorithmicMedia
-    private val MARKER = "rainedAlgorithmicMedia".toByteArray(Charsets.US_ASCII)
+    // Basta con una: marca IPTC (cubre trainedAlgorithmicMedia y compositeWithTrainedAlgorithmicMedia)
+    // y parámetros de herramientas de difusión (Stable Diffusion, ComfyUI, InvokeAI, NovelAI).
+    private val MARKERS = listOf(
+        "rainedAlgorithmicMedia", "\"class_type\"", "invokeai_metadata", "sd-metadata", "NovelAI",
+    ).map { it.toByteArray(Charsets.US_ASCII) }
+
+    // Tienen que aparecer las dos: parámetros de Automatic1111/Forge y manifiestos C2PA de generadores conocidos.
+    private val MARKER_PAIRS = listOf(
+        "Steps: " to "Sampler: ",
+        "c2pa" to "OpenAI",
+        "c2pa" to "Adobe Firefly",
+        "c2pa" to "Google AI",
+    ).map { (a, b) -> a.toByteArray(Charsets.US_ASCII) to b.toByteArray(Charsets.US_ASCII) }
+
+    private fun containsMarker(data: ByteArray): Boolean =
+        MARKERS.any { indexOf(data, it) } || MARKER_PAIRS.any { (a, b) -> indexOf(data, a) && indexOf(data, b) }
 
     /** Lee el archivo original; nunca lanza. Llamar fuera del hilo principal. */
     fun isAIGenerated(context: Context, uri: Uri): Boolean = try {
@@ -57,12 +71,12 @@ object AIContentProvenance {
 
         // Cabeza
         val head = resolver.openInputStream(uri)?.use { readUpTo(it, WINDOW_BYTES) } ?: return false
-        if (indexOf(head, MARKER)) return true
+        if (containsMarker(head)) return true
         // Archivo entero leído o tamaño desconocido: solo la cabeza
         if (head.size < WINDOW_BYTES || length == null || length <= head.size) return false
 
         // Cola (solapa lo justo para no perder un marcador partido)
-        val tailStart = maxOf(length - WINDOW_BYTES, head.size.toLong() - (MARKER.size - 1))
+        val tailStart = maxOf(length - WINDOW_BYTES, head.size.toLong() - 64)
         val tailLength = (length - tailStart).toInt()
         val tail = resolver.openFileDescriptor(uri, "r")?.use { pfd ->
             FileInputStream(pfd.fileDescriptor).use { input ->
@@ -70,7 +84,7 @@ object AIContentProvenance {
                 readUpTo(input, tailLength)
             }
         } ?: return false
-        return indexOf(tail, MARKER)
+        return containsMarker(tail)
     }
 
     private fun readUpTo(input: InputStream, limit: Int): ByteArray {
