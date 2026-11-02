@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -142,7 +143,7 @@ fun AppIconSection() {
     )
 
     if (isShowingPicker) {
-        MomentsModalSheet(onDismissRequest = { isShowingPicker = false }) { dismiss ->
+        MomentsModalSheet(onDismissRequest = { isShowingPicker = false }, allowExpanded = false) { dismiss ->
             AppIconPicker(
                 currentIcon = currentIcon,
                 onApply = { icon ->
@@ -169,41 +170,23 @@ private fun AppIconPicker(
     val isActive = active == currentIcon
     val secondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.55f)
 
+    // Como en iOS: el carrusel llena la hoja; nombre, contador y botón abajo.
     Column(
         Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .navigationBarsPadding()
-            .padding(bottom = 12.dp),
+            .padding(top = 8.dp, bottom = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            AnimatedContent(targetState = pagerState.currentPage, label = "appIconIndex") { page ->
-                Text(
-                    "%02d".format(page + 1),
-                    color = BrandPurple,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                )
-            }
-            Text(
-                " / %02d".format(icons.size),
-                color = secondary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(bottom = 3.dp),
-            )
-        }
-
         BoxWithConstraints(
             Modifier
                 .fillMaxWidth()
-                .height(230.dp),
+                .weight(1f),
         ) {
-            val iconSize = 170.dp
+            val iconSize = min(maxHeight.value * 0.86f, 260f).dp
             val sidePadding = (maxWidth - iconSize) / 2
             val iconSizePx = with(LocalDensity.current) { iconSize.toPx() }
+            val corner = RoundedCornerShape(iconSize * 0.225f)
             HorizontalPager(
                 state = pagerState,
                 pageSize = PageSize.Fixed(iconSize),
@@ -225,8 +208,8 @@ private fun AppIconPicker(
                         }
                         // Sin recorte: con el recorte cuadrado la sombra asomaba en picos por las esquinas.
                         .blur((progress * 4f).dp, BlurredEdgeTreatment.Unbounded)
-                        .shadow(10.dp, RoundedCornerShape(38.dp))
-                        .clip(RoundedCornerShape(38.dp)),
+                        .shadow(10.dp, corner)
+                        .clip(corner),
                 ) {
                     // La imagen trae el margen del icono adaptativo: se recorta a lo visible.
                     Image(
@@ -244,7 +227,12 @@ private fun AppIconPicker(
             }
         }
 
-        Box(Modifier.heightIn(min = 34.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .padding(top = 14.dp)
+                .heightIn(min = 34.dp),
+            contentAlignment = Alignment.Center,
+        ) {
             icons.forEachIndexed { index, icon ->
                 val offset = (index - pagerState.currentPage) - pagerState.currentPageOffsetFraction
                 Text(
@@ -258,6 +246,25 @@ private fun AppIconPicker(
                     },
                 )
             }
+        }
+
+        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            AnimatedContent(targetState = pagerState.currentPage, label = "appIconIndex") { page ->
+                Text(
+                    "%02d".format(page + 1),
+                    color = BrandPurple,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                )
+            }
+            Text(
+                " / %02d".format(icons.size),
+                color = secondary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+            )
         }
 
         Text(
