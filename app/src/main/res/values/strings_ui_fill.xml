@@ -15,4 +15,5 @@
     <string name="story_question_answer_send">Send answer</string>
     <string name="story_text_editor_suggested_colors">Suggested</string>
     <string name="story_text_editor_eyedropper">Pick from photo</string>
+    <string name="modern_comments_load_earlier">View earlier comments</string>
 </resources>

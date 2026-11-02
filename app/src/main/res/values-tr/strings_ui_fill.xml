@@ -15,4 +15,5 @@
     <string name="story_question_answer_send">Yanıtı gönder</string>
     <string name="story_text_editor_suggested_colors">Önerilenler</string>
     <string name="story_text_editor_eyedropper">Fotoğraftan seç</string>
+    <string name="modern_comments_load_earlier">Önceki yorumları gör</string>
 </resources>

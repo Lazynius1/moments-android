@@ -185,6 +185,9 @@ fun ModernCommentsView(
     var muteSettingsListener by remember { mutableStateOf<ListenerRegistration?>(null) }
     var commentsListenerRefreshId by remember { mutableStateOf(0) }
     var loadedMomentId by remember { mutableStateOf<String?>(null) }
+    // Ventana de comentarios escuchados (los más recientes); "ver anteriores" la amplía.
+    var commentsWindow by remember { mutableStateOf(COMMENTS_PAGE_SIZE) }
+    var hasEarlierComments by remember { mutableStateOf(false) }
 
     val filterResult = remember(comments, mutedUserIds, mutedWordsNormalized, currentUid) {
         applyCommentMuteFilters(comments, currentUid, mutedUserIds, mutedWordsNormalized)
@@ -260,13 +263,15 @@ fun ModernCommentsView(
             return
         }
         val listenerRefreshId = commentsListenerRefreshId
-        isLoading = true
+        // Solo skeleton en la primera carga; al ampliar la ventana la lista sigue a la vista.
+        if (comments.isEmpty()) isLoading = true
         commentsListener?.remove()
         commentsListener = firestore.db
             .collection("users").document(moment.authorId)
             .collection("moments").document(momentId)
             .collection("comments")
             .orderBy("timestamp", Query.Direction.ASCENDING)
+            .limitToLast(commentsWindow.toLong())
             .addSnapshotListener { snapshot, error ->
                 if (commentsListenerRefreshId != listenerRefreshId || moment.id != momentId) {
                     return@addSnapshotListener
@@ -280,8 +285,15 @@ fun ModernCommentsView(
                     val data = doc.data as? Map<String, Any?> ?: return@mapNotNull null
                     runCatching { Comment.from(doc.id, data) }.getOrNull()
                 }
+                hasEarlierComments = (snapshot?.size() ?: 0) >= commentsWindow
                 isLoading = false
             }
+    }
+
+    fun loadEarlierComments() {
+        hasEarlierComments = false
+        commentsWindow += COMMENTS_PAGE_SIZE
+        setupCommentsListener()
     }
 
     fun revealMutedCommentTemporarily(commentId: String) {
@@ -324,6 +336,8 @@ fun ModernCommentsView(
         stopCommentObservers()
         if (clearExistingComments) {
             comments = emptyList()
+            commentsWindow = COMMENTS_PAGE_SIZE
+            hasEarlierComments = false
         }
 
         if (moment.disableComments) {
@@ -608,6 +622,21 @@ fun ModernCommentsView(
                                     nestingLevel = 0,
                                     maxNestingLevel = maxCommentNestingLevel,
                                 )
+                            }
+                            if (hasEarlierComments) {
+                                item(key = "load_earlier_comments") {
+                                    TextButton(
+                                        onClick = { loadEarlierComments() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(
+                                            stringResource(R.string.modern_comments_load_earlier),
+                                            color = Color.Gray,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -1200,3 +1229,5 @@ private fun moderateCommentInBackground(
         )
     }
 }
+
+private const val COMMENTS_PAGE_SIZE = 100

@@ -15,4 +15,5 @@
     <string name="story_question_answer_send">답변 보내기</string>
     <string name="story_text_editor_suggested_colors">추천</string>
     <string name="story_text_editor_eyedropper">사진에서 선택</string>
+    <string name="modern_comments_load_earlier">이전 댓글 보기</string>
 </resources>

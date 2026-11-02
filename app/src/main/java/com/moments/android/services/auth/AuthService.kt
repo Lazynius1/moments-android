@@ -1379,7 +1379,9 @@ object AuthService {
     // MARK: - Account management (AccountManagementService.swift)
 
     suspend fun reactivateAccount() {
-        val userId = _currentFirebaseUser.value?.uid ?: error("Usuario no autenticado")
+        // La sesión puede cerrarse durante las esperas: se usa el usuario capturado al empezar.
+        val firebaseUser = _currentFirebaseUser.value ?: error("Usuario no autenticado")
+        val userId = firebaseUser.uid
         _isVerifyingAccount.value = true
         _authState.value = AuthState.VerifyingAccount
         try {
@@ -1395,7 +1397,7 @@ object AuthService {
             val check = checkAccountStatus(userId)
             _isVerifyingAccount.value = false
             if (check.isActive && check.user != null) {
-                hydrateAuthenticatedSession(_currentFirebaseUser.value!!, check.user)
+                hydrateAuthenticatedSession(firebaseUser, check.user)
             } else {
                 _authState.value = AuthState.Deactivated
             }
@@ -1407,7 +1409,9 @@ object AuthService {
     }
 
     suspend fun deactivateAccount() {
-        val userId = _currentFirebaseUser.value?.uid ?: error("Usuario no autenticado")
+        // La sesión puede cerrarse durante las esperas: se usa el usuario capturado al empezar.
+        val firebaseUser = _currentFirebaseUser.value ?: error("Usuario no autenticado")
+        val userId = firebaseUser.uid
         // ≡ AccountManagementService.deactivateAccount
         db.collection("users").document(userId).update(
             mapOf(
@@ -1418,7 +1422,7 @@ object AuthService {
         ).await()
         val userData = _currentUser.value ?: firestoreService.fetchUser(userId)
         saveCachedAccountStatus(userId, CachedAccountDecision.DEACTIVATED)
-        applyDeactivatedSession(_currentFirebaseUser.value!!, userData)
+        applyDeactivatedSession(firebaseUser, userData)
     }
 
     suspend fun deleteAccount(confirmation: AccountDeletionConfirmation) {

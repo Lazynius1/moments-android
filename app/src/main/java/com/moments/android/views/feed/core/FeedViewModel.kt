@@ -378,10 +378,14 @@ class FeedViewModel : ViewModel() {
         clearListeners()
         mutedUserIdsCache = emptySet()
         mutedUserIdsCacheTimestampMs = 0L
-        // iOS kicks fetchMoments then sleeps 0.5s
         val scopeJob = listenerScope
         fetchMoments(scopeJob, userId, currentFeedType)
-        delay(500)
+        val generation = feedGeneration
+        // El indicador de refresco se queda hasta que llegan los datos (máx. 8 s), no un tiempo fijo.
+        delay(300)
+        withTimeoutOrNull(8_000) {
+            while (isLoading && feedGeneration == generation) delay(100)
+        }
     }
 
     /**
