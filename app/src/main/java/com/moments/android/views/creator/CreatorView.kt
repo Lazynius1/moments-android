@@ -53,6 +53,8 @@ fun CreatorView(
     initialMedia: List<CreatorMedia>? = null,
     startInCameraWhenOnlySticker: Boolean = false,
     modifier: Modifier = Modifier,
+    /** Pantalla inicial o cámara de historias: desde ahí se puede volver deslizando. */
+    onAtRootChange: ((Boolean) -> Unit)? = null,
 ) {
     if (!showCreatorView) return
 
@@ -163,6 +165,10 @@ fun CreatorView(
             applyFlow(CreatorFlow.MEDIA_SELECTION)
             onIsCreatingStoryChange(false)
         }
+    }
+
+    LaunchedEffect(currentFlow) {
+        onAtRootChange?.invoke(currentFlow == CreatorFlow.TYPE_SELECTION || currentFlow == CreatorFlow.STORY_CAMERA)
     }
 
     // ≡ onDisappear cleanup

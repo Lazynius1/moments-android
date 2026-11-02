@@ -7,6 +7,13 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.ui.input.pointer.pointerInput
+import com.moments.android.views.creator.CreatorView
+import com.moments.android.views.feed.rememberAdaptiveColors
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -104,6 +111,9 @@ import com.moments.android.services.firestore.fetchUserByUsername
 import com.moments.android.views.shared.OfflineBannerOverlay
 import com.moments.android.views.shared.tabbar.LocalTabBarHide
 import com.moments.android.views.shared.tabbar.TabBarHideController
+import com.moments.android.views.shared.tabbar.MomentsTabSwipeContainer
+import com.moments.android.views.shared.tabbar.momentsTabBarSwipeFade
+import com.moments.android.views.shared.tabbar.rememberMomentsTabSwipeState
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.story.StoryRingAvatarView
 import com.moments.android.views.feed.video.FeedReelsHostOverlay
@@ -167,6 +177,7 @@ fun TabBarScreen(
     // ≡ iOS `.toolbar(.hidden, for: .tabBar)` desde Settings / edit / moment zoom
     var suppressTabBar by remember { mutableStateOf(false) }
     val tabBarHide = remember { TabBarHideController() }
+    val tabSwipe = rememberMomentsTabSwipeState()
     val reelsHost = remember { FeedReelsHostState() }
     val adaptiveWindow = LocalAdaptiveWindowState.current
 
@@ -352,16 +363,49 @@ fun TabBarScreen(
         }
     }
     val navContent: @Composable (PaddingValues) -> Unit = { padding ->
-        MomentsTabNavHost(
-            navigationState = tabNavigationState,
-            navigator = tabNavigator,
-            padding = padding,
-            isCreatingStory = isCreatingStory,
-            onIsCreatingStoryChange = { isCreatingStory = it },
-            openCreatorInStoryMode = openCreatorInStoryMode,
-            onOpenCreatorInStoryModeChange = { openCreatorInStoryMode = it },
-            onSuppressTabBarChange = { suppressTabBar = it },
-        )
+        // Deslizar entre pestañas (y a la izquierda de Inicio, el creador) solo con el dock.
+        MomentsTabSwipeContainer(
+            state = tabSwipe,
+            selectedTab = selectedTab,
+            canSwipeTabs = navigationVisible,
+            onSelectTabInstantly = { tabNavigator.selectTabIndex(it) },
+            enabled = adaptiveWindow.isCompactHandset,
+            creator = { close ->
+                val creatorSurface = rememberAdaptiveColors().surfaceBackground
+                Box(Modifier.fillMaxSize().background(creatorSurface)) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.statusBars.union(WindowInsets.navigationBars)),
+                    ) {
+                        CreatorView(
+                            showCreatorView = true,
+                            onShowCreatorViewChange = { visible ->
+                                if (!visible) {
+                                    close()
+                                    isCreatingStory = false
+                                }
+                            },
+                            isCreatingStory = isCreatingStory,
+                            onIsCreatingStoryChange = { isCreatingStory = it },
+                            onAtRootChange = { tabSwipe.creatorAtRoot = it },
+                        )
+                    }
+                }
+            },
+        ) {
+            MomentsTabNavHost(
+                navigationState = tabNavigationState,
+                navigator = tabNavigator,
+                padding = padding,
+                isCreatingStory = isCreatingStory,
+                onIsCreatingStoryChange = { isCreatingStory = it },
+                openCreatorInStoryMode = openCreatorInStoryMode,
+                onOpenCreatorInStoryModeChange = { openCreatorInStoryMode = it },
+                onSuppressTabBarChange = { suppressTabBar = it },
+                changesTabInstantly = { tabSwipe.changesTabInstantly },
+            )
+        }
     }
 
     CompositionLocalProvider(
@@ -380,14 +424,28 @@ fun TabBarScreen(
                 ),
                 bottomBar = {
                     if (navigationVisible) {
-                        MomentsCustomTabBar(
-                            selectedTab = selectedTab,
-                            onSelectTab = ::selectTab,
-                            onOpenCreator = { selectTab(AppTab.toIndex(AppTab.CREATE)) },
-                            showFeedBadge = hasNewFeedContent,
-                            unreadMessagesCount = unreadMessagesCount,
-                            showProfileBadge = hasUnreadNotifications,
-                        )
+                        // Con el creador deslizado el dock se desvanece y no responde.
+                        Box(Modifier.momentsTabBarSwipeFade(tabSwipe)) {
+                            MomentsCustomTabBar(
+                                selectedTab = selectedTab,
+                                onSelectTab = ::selectTab,
+                                onOpenCreator = { selectTab(AppTab.toIndex(AppTab.CREATE)) },
+                                showFeedBadge = hasNewFeedContent,
+                                unreadMessagesCount = unreadMessagesCount,
+                                showProfileBadge = hasUnreadNotifications,
+                            )
+                            if (tabSwipe.isCreatorMounted) {
+                                Box(
+                                    Modifier
+                                        .matchParentSize()
+                                        .pointerInput(Unit) {
+                                            awaitEachGesture {
+                                                awaitFirstDown(requireUnconsumed = false).consume()
+                                            }
+                                        },
+                                )
+                            }
+                        }
                     }
                 },
                 content = navContent,

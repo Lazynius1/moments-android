@@ -1,5 +1,8 @@
 package com.moments.android.coordinators.nav3
 
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,6 +26,8 @@ import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.scene.DialogSceneStrategy
 import androidx.navigation3.ui.NavDisplay
+import androidx.navigation3.ui.defaultPopTransitionSpec
+import androidx.navigation3.ui.defaultTransitionSpec
 import com.moments.android.coordinators.CoordinatorNavigationEvent
 import com.moments.android.coordinators.MainViewModel
 import com.moments.android.coordinators.NavigationEventBus
@@ -59,6 +64,8 @@ fun MomentsTabNavHost(
     onOpenCreatorInStoryModeChange: (Boolean) -> Unit,
     onSuppressTabBarChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    /** Al deslizar entre pestañas el cambio es instantáneo: la transición la dibuja el gesto. */
+    changesTabInstantly: () -> Boolean = { false },
 ) {
     val dialogStrategy = remember { DialogSceneStrategy<NavKey>() }
     val fullScreenDialog = remember {
@@ -283,8 +290,16 @@ fun MomentsTabNavHost(
         },
         sceneStrategies = listOf(dialogStrategy),
         modifier = modifier.fillMaxSize(),
+        transitionSpec = {
+            if (changesTabInstantly()) instantTransform else defaultTransitionSpec<NavKey>()(this)
+        },
+        popTransitionSpec = {
+            if (changesTabInstantly()) instantTransform else defaultPopTransitionSpec<NavKey>()(this)
+        },
     )
 }
+
+private val instantTransform = ContentTransform(EnterTransition.None, ExitTransition.None)
 
 private fun NavKey?.isFullScreenDialogRoute(): Boolean = when (this) {
     MomentsNavKey.Creator,
