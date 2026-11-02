@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_error_load_profile">Gagal memuat profil</string>
+    <string name="profile_error_load_connections">Gagal memuat koneksi</string>
+    <string name="profile_error_load_moments">Gagal memuat momen</string>
+    <string name="profile_error_update_profile">Gagal memperbarui profil</string>
+    <string name="profile_error_follow">Gagal mengikuti orang ini</string>
+    <string name="profile_error_update_connections">Gagal memperbarui koneksi</string>
+    <string name="profile_error_unfollow">Gagal berhenti mengikuti</string>
+    <string name="profile_error_cancel_request">Gagal membatalkan permintaan</string>
+    <string name="profile_error_remove_follower">Gagal menghapus pengikut</string>
+    <string name="profile_error_signed_out">Masuk untuk melanjutkan</string>
+    <string name="story_question_answer_title">Jawab</string>
+    <string name="story_question_answer_label">Jawabanmu</string>
+    <string name="story_question_answer_send">Kirim jawaban</string>
+    <string name="story_text_editor_suggested_colors">Disarankan</string>
+    <string name="story_text_editor_eyedropper">Pilih dari foto</string>
+</resources>

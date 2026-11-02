@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Traducciones tomadas de iOS (Localizable.strings) para cadenas que faltaban en este idioma. -->
+<resources>
+    <string name="saved_moments_filters_apply">Aplicar</string>
+    <string name="saved_moments_filters_button">Filtres</string>
+    <string name="saved_moments_filters_contains">Conté</string>
+    <string name="saved_moments_filters_reset">Restablir</string>
+    <string name="saved_moments_filters_sort">Ordenar</string>
+    <string name="saved_moments_filters_title">Filtres</string>
+    <string name="toast_action_moment_archived">Moment arxivat</string>
+</resources>

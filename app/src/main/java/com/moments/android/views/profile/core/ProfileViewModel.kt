@@ -8,9 +8,11 @@ import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.moments.android.R
 import com.moments.android.models.AppUser
 import com.moments.android.models.GroupedVisit
 import com.moments.android.models.Moment
@@ -128,7 +130,7 @@ class ProfileViewModel(
                 if (isNetworkError(error)) {
                     isOffline = true
                 } else if (userProfile == null) {
-                    errorMessage = error.message
+                    errorMessage = appString(R.string.profile_error_load_profile)
                 }
                 isLoading = false
             }
@@ -138,7 +140,7 @@ class ProfileViewModel(
                 LocalPersistenceService.saveProfileMomentsAsync(moments, userId, sync = true)
             }.onFailure { error ->
                 if (!isNetworkError(error) && moments.isEmpty()) {
-                    errorMessage = error.message
+                    showActionError(R.string.profile_error_load_moments)
                 }
             }
             isLoadingMoments = false
@@ -179,7 +181,7 @@ class ProfileViewModel(
                 )
             }
         }.onFailure {
-            errorMessage = it.message
+            showActionError(R.string.profile_error_load_connections)
             isLoading = false
         }
     }
@@ -262,7 +264,7 @@ class ProfileViewModel(
 
     fun refreshProfile() {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: run {
-            errorMessage = "Usuario no autenticado. Por favor, inicia sesión."
+            showActionError(R.string.profile_error_signed_out)
             return
         }
         if (isRefreshing || isLoading) return
@@ -283,7 +285,7 @@ class ProfileViewModel(
                     .onSuccess { applyFetchedProfile(it) }
                     .onFailure {
                         hasErrors = true
-                        errorMessage = it.message
+                        if (userProfile == null) errorMessage = appString(R.string.profile_error_load_profile) else showActionError(R.string.profile_error_load_profile)
                     }
             }
             val connectionsJob = async { fetchConnections(userId) }
@@ -417,7 +419,7 @@ class ProfileViewModel(
                 } else {
                     firestoreService.unpinMoment(moment.authorId, momentId)
                 }
-            }.onFailure { errorMessage = it.message }
+            }.onFailure { showActionError(R.string.common_error) }
         }
     }
 
@@ -436,7 +438,7 @@ class ProfileViewModel(
                 onExpire = {
                     viewModelScope.launch {
                         runCatching { firestoreService.archiveMoment(moment.authorId, momentId) }
-                            .onFailure { errorMessage = it.message }
+                            .onFailure { showActionError(R.string.common_error) }
                     }
                 },
             ),
@@ -450,13 +452,13 @@ class ProfileViewModel(
                 firestoreService.deleteMoment(moment.authorId, momentId)
                 moments = moments.filterNot { it.id == momentId }
                 LocalPersistenceService.deleteMomentAsync(momentId)
-            }.onFailure { errorMessage = it.message }
+            }.onFailure { showActionError(R.string.common_error) }
         }
     }
 
     override fun followUser(userId: String) {
         val currentId = FirebaseAuth.getInstance().currentUser?.uid ?: run {
-            errorMessage = "Usuario no autenticado. Por favor, inicia sesión."
+            showActionError(R.string.profile_error_signed_out)
             return
         }
         recentUnfollows.remove(userId)
@@ -479,13 +481,13 @@ class ProfileViewModel(
                 if (following.none { it.id == userId }) {
                     following = following + target
                 }
-            }.onFailure { errorMessage = it.message }
+            }.onFailure { showActionError(R.string.profile_error_follow) }
         }
     }
 
     override fun unfollowUser(userId: String) {
         val currentId = FirebaseAuth.getInstance().currentUser?.uid ?: run {
-            errorMessage = "Usuario no autenticado."
+            showActionError(R.string.profile_error_signed_out)
             return
         }
         recentUnfollows += userId
@@ -504,7 +506,7 @@ class ProfileViewModel(
             }.onFailure {
                 recentUnfollows -= userId
                 lastUnfollowTime.remove(userId)
-                errorMessage = it.message
+                showActionError(R.string.profile_error_unfollow)
             }
         }
     }
@@ -515,14 +517,14 @@ class ProfileViewModel(
             runCatching {
                 firestoreService.cancelFollowRequest(current, userId)
                 FollowStateStore.setState(FollowButtonState.CAN_REQUEST_FOLLOW, userId)
-            }.onFailure { errorMessage = it.message }
+            }.onFailure { showActionError(R.string.profile_error_cancel_request) }
         }
     }
 
     /** ≡ iOS batch delete `users/{me}/followers/{userId}`. */
     fun removeFollower(userId: String) {
         val currentId = FirebaseAuth.getInstance().currentUser?.uid ?: run {
-            errorMessage = "Usuario no autenticado."
+            showActionError(R.string.profile_error_signed_out)
             return
         }
         viewModelScope.launch {
@@ -534,7 +536,7 @@ class ProfileViewModel(
                 mutuals = mutuals.filterNot { it.id == userId }
                 LocalPersistenceService.saveFollowersAsync(currentId, followers)
                 LocalPersistenceService.saveMutualsAsync(currentId, mutuals)
-            }.onFailure { errorMessage = it.message }
+            }.onFailure { showActionError(R.string.profile_error_remove_follower) }
         }
     }
 
@@ -574,7 +576,7 @@ class ProfileViewModel(
 
     fun updateProfileDetails(bio: String?, websiteUrl: String?, interests: List<String>? = null) {
         val id = FirebaseAuth.getInstance().currentUser?.uid ?: run {
-            errorMessage = "Usuario no autenticado. Por favor, inicia sesión."
+            showActionError(R.string.profile_error_signed_out)
             return
         }
         viewModelScope.launch {
@@ -588,7 +590,7 @@ class ProfileViewModel(
                     interests,
                 )
                 fetchProfile(id)
-            }.onFailure { errorMessage = it.message }
+            }.onFailure { showActionError(R.string.profile_error_update_profile) }
         }
     }
 
@@ -596,7 +598,7 @@ class ProfileViewModel(
 
     fun uploadProfilePicture(context: Context, uri: Uri) {
         val id = FirebaseAuth.getInstance().currentUser?.uid ?: run {
-            errorMessage = "Usuario no autenticado. Por favor, inicia sesión."
+            showActionError(R.string.profile_error_signed_out)
             return
         }
         viewModelScope.launch {
@@ -613,7 +615,7 @@ class ProfileViewModel(
                     profileImageLocalPath = file.path,
                 )
                 fetchProfile(id)
-            }.onFailure { errorMessage = it.message }
+            }.onFailure { showActionError(R.string.profile_error_update_profile) }
         }
     }
 
@@ -685,4 +687,14 @@ class ProfileViewModel(
                 .thenByDescending { it.pinnedAt ?: it.timestamp }
                 .thenByDescending { it.timestamp },
         )
+
+    private fun appString(resId: Int): String =
+        FirebaseApp.getInstance().applicationContext.getString(resId)
+
+    /** Fallos de acciones: aviso flotante y el perfil sigue a la vista; solo cargar el perfil usa la pantalla de error. */
+    private fun showActionError(resId: Int) {
+        InAppNotificationService.showActionToast(
+            InAppActionToast.create(prefix = appString(resId), isError = true),
+        )
+    }
 }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="creator_select_from_gallery">Selecionar fotos</string>
+    <string name="creator_allow_gallery_access">Permitir acesso à galeria</string>
+    <string name="chat_attachment_allow_library">Permitir acesso à galeria</string>
+    <string name="audience_members_limit">Uma lista de público pode ter no máximo %1$d membros</string>
+</resources>

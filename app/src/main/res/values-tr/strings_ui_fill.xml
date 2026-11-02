@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_error_load_profile">Profil yüklenemedi</string>
+    <string name="profile_error_load_connections">Bağlantılar yüklenemedi</string>
+    <string name="profile_error_load_moments">Anlar yüklenemedi</string>
+    <string name="profile_error_update_profile">Profil güncellenemedi</string>
+    <string name="profile_error_follow">Bu kişi takip edilemedi</string>
+    <string name="profile_error_update_connections">Bağlantılar güncellenemedi</string>
+    <string name="profile_error_unfollow">Takipten çıkılamadı</string>
+    <string name="profile_error_cancel_request">İstek iptal edilemedi</string>
+    <string name="profile_error_remove_follower">Takipçi kaldırılamadı</string>
+    <string name="profile_error_signed_out">Devam etmek için giriş yap</string>
+    <string name="story_question_answer_title">Yanıtla</string>
+    <string name="story_question_answer_label">Yanıtın</string>
+    <string name="story_question_answer_send">Yanıtı gönder</string>
+    <string name="story_text_editor_suggested_colors">Önerilenler</string>
+    <string name="story_text_editor_eyedropper">Fotoğraftan seç</string>
+</resources>

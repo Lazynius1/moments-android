@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_error_load_profile">プロフィールを読み込めませんでした</string>
+    <string name="profile_error_load_connections">つながりを読み込めませんでした</string>
+    <string name="profile_error_load_moments">モーメントを読み込めませんでした</string>
+    <string name="profile_error_update_profile">プロフィールを更新できませんでした</string>
+    <string name="profile_error_follow">フォローできませんでした</string>
+    <string name="profile_error_update_connections">つながりを更新できませんでした</string>
+    <string name="profile_error_unfollow">フォローを解除できませんでした</string>
+    <string name="profile_error_cancel_request">リクエストを取り消せませんでした</string>
+    <string name="profile_error_remove_follower">フォロワーを削除できませんでした</string>
+    <string name="profile_error_signed_out">続けるにはログインしてください</string>
+    <string name="story_question_answer_title">回答する</string>
+    <string name="story_question_answer_label">あなたの回答</string>
+    <string name="story_question_answer_send">回答を送信</string>
+    <string name="story_text_editor_suggested_colors">おすすめ</string>
+    <string name="story_text_editor_eyedropper">写真から選ぶ</string>
+</resources>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_error_load_profile">प्रोफ़ाइल लोड नहीं हो सकी</string>
+    <string name="profile_error_load_connections">कनेक्शन लोड नहीं हो सके</string>
+    <string name="profile_error_load_moments">मोमेंट्स लोड नहीं हो सके</string>
+    <string name="profile_error_update_profile">प्रोफ़ाइल अपडेट नहीं हो सकी</string>
+    <string name="profile_error_follow">इस व्यक्ति को फ़ॉलो नहीं किया जा सका</string>
+    <string name="profile_error_update_connections">कनेक्शन अपडेट नहीं हो सके</string>
+    <string name="profile_error_unfollow">अनफ़ॉलो नहीं किया जा सका</string>
+    <string name="profile_error_cancel_request">अनुरोध रद्द नहीं हो सका</string>
+    <string name="profile_error_remove_follower">फ़ॉलोअर को हटाया नहीं जा सका</string>
+    <string name="profile_error_signed_out">जारी रखने के लिए साइन इन करें</string>
+    <string name="story_question_answer_title">जवाब दें</string>
+    <string name="story_question_answer_label">आपका जवाब</string>
+    <string name="story_question_answer_send">जवाब भेजें</string>
+    <string name="story_text_editor_suggested_colors">सुझाए गए</string>
+    <string name="story_text_editor_eyedropper">फ़ोटो से चुनें</string>
+</resources>

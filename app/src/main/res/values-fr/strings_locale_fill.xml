@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Traducciones tomadas de iOS (Localizable.strings) para cadenas que faltaban en este idioma. -->
+<resources>
+    <string name="saved_moments_filters_apply">Appliquer</string>
+    <string name="saved_moments_filters_button">Filtres</string>
+    <string name="saved_moments_filters_contains">Contient</string>
+    <string name="saved_moments_filters_reset">Réinitialiser</string>
+    <string name="saved_moments_filters_sort">Trier</string>
+    <string name="saved_moments_filters_title">Filtres</string>
+    <string name="story_share_audience">Audience</string>
+    <string name="story_share_back">Back</string>
+    <string name="story_share_chain_audience">Chains are visible to everyone and last 48 hours. Interactions apply only to your part.</string>
+    <string name="story_share_chain_settings">Chain settings</string>
+    <string name="story_share_close">Close</string>
+    <string name="story_share_customize">Customize</string>
+    <string name="story_share_disabled">Disabled</string>
+    <string name="story_share_expiration">Available for</string>
+    <string name="story_share_interactions">Interactions</string>
+    <string name="story_share_only_this_story">These options apply only to this story. Your defaults in Settings stay the same.</string>
+    <string name="story_share_review">Choose who can see and interact.</string>
+    <string name="story_share_title">Share story</string>
+    <string name="story_share_your_story">Your story</string>
+    <string name="toast_action_moment_archived">Moment archivé</string>
+</resources>

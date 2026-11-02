@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_error_load_profile">Nie udało się wczytać profilu</string>
+    <string name="profile_error_load_connections">Nie udało się wczytać połączeń</string>
+    <string name="profile_error_load_moments">Nie udało się wczytać momentów</string>
+    <string name="profile_error_update_profile">Nie udało się zaktualizować profilu</string>
+    <string name="profile_error_follow">Nie udało się zaobserwować tej osoby</string>
+    <string name="profile_error_update_connections">Nie udało się zaktualizować połączeń</string>
+    <string name="profile_error_unfollow">Nie udało się przestać obserwować</string>
+    <string name="profile_error_cancel_request">Nie udało się anulować prośby</string>
+    <string name="profile_error_remove_follower">Nie udało się usunąć obserwującego</string>
+    <string name="profile_error_signed_out">Zaloguj się, aby kontynuować</string>
+    <string name="story_question_answer_title">Odpowiedz</string>
+    <string name="story_question_answer_label">Twoja odpowiedź</string>
+    <string name="story_question_answer_send">Wyślij odpowiedź</string>
+    <string name="story_text_editor_suggested_colors">Sugerowane</string>
+    <string name="story_text_editor_eyedropper">Wybierz ze zdjęcia</string>
+</resources>

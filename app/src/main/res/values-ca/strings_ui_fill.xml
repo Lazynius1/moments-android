@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_error_load_profile">No s\'ha pogut carregar el perfil</string>
+    <string name="profile_error_load_connections">No s\'han pogut carregar les connexions</string>
+    <string name="profile_error_load_moments">No s\'han pogut carregar els moments</string>
+    <string name="profile_error_update_profile">No s\'ha pogut actualitzar el perfil</string>
+    <string name="profile_error_follow">No s\'ha pogut seguir aquesta persona</string>
+    <string name="profile_error_update_connections">No s\'han pogut actualitzar les connexions</string>
+    <string name="profile_error_unfollow">No s\'ha pogut deixar de seguir</string>
+    <string name="profile_error_cancel_request">No s\'ha pogut cancel·lar la sol·licitud</string>
+    <string name="profile_error_remove_follower">No s\'ha pogut eliminar el seguidor</string>
+    <string name="profile_error_signed_out">Inicia sessió per continuar</string>
+    <string name="story_question_answer_title">Respon</string>
+    <string name="story_question_answer_label">La teva resposta</string>
+    <string name="story_question_answer_send">Envia la resposta</string>
+    <string name="story_text_editor_suggested_colors">Suggerits</string>
+    <string name="story_text_editor_eyedropper">Tria de la foto</string>
+</resources>

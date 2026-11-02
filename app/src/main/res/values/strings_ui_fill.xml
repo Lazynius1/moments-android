@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_error_load_profile">Couldn\'t load the profile</string>
+    <string name="profile_error_load_connections">Couldn\'t load connections</string>
+    <string name="profile_error_load_moments">Couldn\'t load moments</string>
+    <string name="profile_error_update_profile">Couldn\'t update the profile</string>
+    <string name="profile_error_follow">Couldn\'t follow this person</string>
+    <string name="profile_error_update_connections">Couldn\'t update connections</string>
+    <string name="profile_error_unfollow">Couldn\'t unfollow</string>
+    <string name="profile_error_cancel_request">Couldn\'t cancel the request</string>
+    <string name="profile_error_remove_follower">Couldn\'t remove the follower</string>
+    <string name="profile_error_signed_out">Sign in to continue</string>
+    <string name="story_question_answer_title">Answer</string>
+    <string name="story_question_answer_label">Your answer</string>
+    <string name="story_question_answer_send">Send answer</string>
+    <string name="story_text_editor_suggested_colors">Suggested</string>
+    <string name="story_text_editor_eyedropper">Pick from photo</string>
+</resources>

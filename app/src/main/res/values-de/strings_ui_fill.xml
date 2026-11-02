@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_error_load_profile">Profil konnte nicht geladen werden</string>
+    <string name="profile_error_load_connections">Verbindungen konnten nicht geladen werden</string>
+    <string name="profile_error_load_moments">Momente konnten nicht geladen werden</string>
+    <string name="profile_error_update_profile">Profil konnte nicht aktualisiert werden</string>
+    <string name="profile_error_follow">Folgen hat nicht geklappt</string>
+    <string name="profile_error_update_connections">Verbindungen konnten nicht aktualisiert werden</string>
+    <string name="profile_error_unfollow">Entfolgen hat nicht geklappt</string>
+    <string name="profile_error_cancel_request">Anfrage konnte nicht zurückgezogen werden</string>
+    <string name="profile_error_remove_follower">Follower konnte nicht entfernt werden</string>
+    <string name="profile_error_signed_out">Melde dich an, um fortzufahren</string>
+    <string name="story_question_answer_title">Antworten</string>
+    <string name="story_question_answer_label">Deine Antwort</string>
+    <string name="story_question_answer_send">Antwort senden</string>
+    <string name="story_text_editor_suggested_colors">Vorschläge</string>
+    <string name="story_text_editor_eyedropper">Aus Foto wählen</string>
+</resources>

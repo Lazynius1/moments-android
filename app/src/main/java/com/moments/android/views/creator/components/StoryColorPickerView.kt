@@ -41,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import com.moments.android.utilities.HapticManager
 import kotlin.math.PI
 import kotlin.math.atan2
+import androidx.compose.ui.res.stringResource
+import com.moments.android.R
 
 /** Port de `StoryColorPickerPanel` de `StoryColorPickerView.swift`. */
 @Composable
@@ -143,7 +145,7 @@ fun StoryColorPickerPanel(
 
         if (suggestedColors.isNotEmpty()) {
             StoryColorSuggestedRow(
-                title = "Suggested",
+                title = stringResource(R.string.story_text_editor_suggested_colors),
                 colors = suggestedColors,
                 selectedColor = selectedColor,
                 onSelectedColorChange = onSelectedColorChange,
@@ -158,7 +160,7 @@ fun StoryColorPickerPanel(
 
         onPickFromCanvas?.let { pick ->
             Text(
-                text = "Pick from photo",
+                text = stringResource(R.string.story_text_editor_eyedropper),
                 color = Color.White,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,

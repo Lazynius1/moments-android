@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_error_load_profile">Kan profiel niet laden</string>
+    <string name="profile_error_load_connections">Kan connecties niet laden</string>
+    <string name="profile_error_load_moments">Kan momenten niet laden</string>
+    <string name="profile_error_update_profile">Kan profiel niet bijwerken</string>
+    <string name="profile_error_follow">Kan deze persoon niet volgen</string>
+    <string name="profile_error_update_connections">Kan connecties niet bijwerken</string>
+    <string name="profile_error_unfollow">Kan niet ontvolgen</string>
+    <string name="profile_error_cancel_request">Kan verzoek niet annuleren</string>
+    <string name="profile_error_remove_follower">Kan volger niet verwijderen</string>
+    <string name="profile_error_signed_out">Log in om door te gaan</string>
+    <string name="story_question_answer_title">Beantwoorden</string>
+    <string name="story_question_answer_label">Je antwoord</string>
+    <string name="story_question_answer_send">Antwoord versturen</string>
+    <string name="story_text_editor_suggested_colors">Voorgesteld</string>
+    <string name="story_text_editor_eyedropper">Kies uit foto</string>
+</resources>

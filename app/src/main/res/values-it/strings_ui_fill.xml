@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_error_load_profile">Impossibile caricare il profilo</string>
+    <string name="profile_error_load_connections">Impossibile caricare le connessioni</string>
+    <string name="profile_error_load_moments">Impossibile caricare i momenti</string>
+    <string name="profile_error_update_profile">Impossibile aggiornare il profilo</string>
+    <string name="profile_error_follow">Impossibile seguire questa persona</string>
+    <string name="profile_error_update_connections">Impossibile aggiornare le connessioni</string>
+    <string name="profile_error_unfollow">Impossibile smettere di seguire</string>
+    <string name="profile_error_cancel_request">Impossibile annullare la richiesta</string>
+    <string name="profile_error_remove_follower">Impossibile rimuovere il follower</string>
+    <string name="profile_error_signed_out">Accedi per continuare</string>
+    <string name="story_question_answer_title">Rispondi</string>
+    <string name="story_question_answer_label">La tua risposta</string>
+    <string name="story_question_answer_send">Invia risposta</string>
+    <string name="story_text_editor_suggested_colors">Suggeriti</string>
+    <string name="story_text_editor_eyedropper">Scegli dalla foto</string>
+</resources>

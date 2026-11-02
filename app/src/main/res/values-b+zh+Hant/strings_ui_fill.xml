@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_error_load_profile">無法載入個人檔案</string>
+    <string name="profile_error_load_connections">無法載入人脈</string>
+    <string name="profile_error_load_moments">無法載入動態</string>
+    <string name="profile_error_update_profile">無法更新個人檔案</string>
+    <string name="profile_error_follow">無法追蹤此人</string>
+    <string name="profile_error_update_connections">無法更新人脈</string>
+    <string name="profile_error_unfollow">無法取消追蹤</string>
+    <string name="profile_error_cancel_request">無法取消要求</string>
+    <string name="profile_error_remove_follower">無法移除粉絲</string>
+    <string name="profile_error_signed_out">請登入以繼續</string>
+    <string name="story_question_answer_title">回答</string>
+    <string name="story_question_answer_label">你的回答</string>
+    <string name="story_question_answer_send">傳送回答</string>
+    <string name="story_text_editor_suggested_colors">建議</string>
+    <string name="story_text_editor_eyedropper">從相片選取</string>
+</resources>

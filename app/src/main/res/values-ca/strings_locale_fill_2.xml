@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="creator_select_from_gallery">Selecciona fotos</string>
+    <string name="creator_allow_gallery_access">Permet l\'accés a la galeria</string>
+    <string name="chat_attachment_allow_library">Permet l\'accés a la galeria</string>
+    <string name="audience_members_limit">Una llista d\'audiència pot tenir com a màxim %1$d membres</string>
+</resources>

@@ -985,6 +985,7 @@ private fun RowScope.CreateTabButton(
 ) {
     // ≡ iOS modern Tab `camera.aperture`: icono suelto (sin pill/gradiente), un poco mayor
     // que house/person (26) para que lea como el simbólico de captura.
+    val createLabel = stringResource(R.string.tab_bar_create)
     Box(
         modifier = Modifier
             .weight(1f)
@@ -994,7 +995,7 @@ private fun RowScope.CreateTabButton(
                 indication = null,
                 onClick = onClick,
             )
-            .semantics { contentDescription = "Create" },
+            .semantics { contentDescription = createLabel },
         contentAlignment = Alignment.Center,
     ) {
         Icon(

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_error_load_profile">프로필을 불러오지 못했어요</string>
+    <string name="profile_error_load_connections">연결을 불러오지 못했어요</string>
+    <string name="profile_error_load_moments">모먼트를 불러오지 못했어요</string>
+    <string name="profile_error_update_profile">프로필을 업데이트하지 못했어요</string>
+    <string name="profile_error_follow">팔로우하지 못했어요</string>
+    <string name="profile_error_update_connections">연결을 업데이트하지 못했어요</string>
+    <string name="profile_error_unfollow">팔로우를 취소하지 못했어요</string>
+    <string name="profile_error_cancel_request">요청을 취소하지 못했어요</string>
+    <string name="profile_error_remove_follower">팔로워를 삭제하지 못했어요</string>
+    <string name="profile_error_signed_out">계속하려면 로그인하세요</string>
+    <string name="story_question_answer_title">답변하기</string>
+    <string name="story_question_answer_label">내 답변</string>
+    <string name="story_question_answer_send">답변 보내기</string>
+    <string name="story_text_editor_suggested_colors">추천</string>
+    <string name="story_text_editor_eyedropper">사진에서 선택</string>
+</resources>

@@ -1491,12 +1491,12 @@ fun QuestionResponseInputView(
             verticalArrangement = Arrangement.spacedBy(18.dp),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp).padding(bottom = 28.dp),
         ) {
-            Text("Answer", fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.story_question_answer_title), fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
             Text(questionText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
             OutlinedTextField(
                 value = responseText,
                 onValueChange = { responseText = it },
-                label = { Text("Your answer") },
+                label = { Text(stringResource(R.string.story_question_answer_label)) },
                 minLines = 3,
                 maxLines = 6,
                 enabled = !isLoading,
@@ -1525,7 +1525,7 @@ fun QuestionResponseInputView(
                         strokeWidth = 2.dp,
                     )
                 } else {
-                    Text("Send answer")
+                    Text(stringResource(R.string.story_question_answer_send))
                 }
             }
         }
