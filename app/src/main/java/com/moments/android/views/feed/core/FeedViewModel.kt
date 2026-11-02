@@ -128,10 +128,25 @@ class FeedViewModel : ViewModel() {
         return muted
     }
 
+    /** Momento y dueño de `cachedFollowingIds`: se reutilizan 2 min en recargas y cambios de feed. */
+    private var followingIdsFetchedAtMs = 0L
+    private var followingIdsViewerId: String? = null
+
+    /**
+     * Solo los IDs (sin perfiles) y cacheados: antes cada carga del feed descargaba
+     * hasta 1000 perfiles completos que no se usaban.
+     */
     private suspend fun resolveFollowingIds(viewerId: String): Set<String> {
-        return runCatching {
-            firestoreService.fetchFollowing(viewerId).map { it.id }.toSet()
-        }.getOrDefault(emptySet()).also { cachedFollowingIds = it }
+        if (followingIdsViewerId == viewerId && System.currentTimeMillis() - followingIdsFetchedAtMs < 120_000) {
+            return cachedFollowingIds
+        }
+        return runCatching { firestoreService.fetchFollowingIds(viewerId) }
+            .getOrDefault(emptySet())
+            .also {
+                cachedFollowingIds = it
+                followingIdsViewerId = viewerId
+                followingIdsFetchedAtMs = System.currentTimeMillis()
+            }
     }
 
     private fun sortMomentsChronologically(

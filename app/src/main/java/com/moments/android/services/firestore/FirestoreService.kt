@@ -265,6 +265,15 @@ class FirestoreService(
             .update("blockedUsers", FieldValue.arrayRemove(targetUserId)).await()
     }
 
+    /** Solo los IDs de a quién sigue, sin descargar cada perfil (para el feed). */
+    suspend fun fetchFollowingIds(userId: String): Set<String> {
+        val snap = db.collection("users").document(userId).collection("following")
+            .limit(1000)
+            .get()
+            .await()
+        return snap.documents.mapNotNull { doc -> (doc.data?.get("userId") as? String) ?: doc.id }.toSet()
+    }
+
     suspend fun fetchFollowing(userId: String): List<AppUser> {
         val snap = db.collection("users").document(userId).collection("following")
             .limit(1000)

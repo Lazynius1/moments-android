@@ -239,6 +239,9 @@ fun CaptionAndDetailsView(
                     titleRes = R.string.creator_share,
                     isLoading = isPublishing && !isLaunching,
                     onClick = {
+                        // Durante la animación de salida el botón vuelve a ser pulsable:
+                        // un segundo toque publicaba el mismo momento dos veces.
+                        if (isPublishing) return@GlowSharePill
                         if (FirebaseAuth.getInstance().currentUser == null) return@GlowSharePill
                         isPublishing = true
                         val aspect = preferredMomentAspectRatio(selectedMediaItems)

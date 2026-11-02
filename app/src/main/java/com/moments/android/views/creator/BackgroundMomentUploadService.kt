@@ -685,6 +685,12 @@ object BackgroundMomentUploadService {
         isProcessing = true
         val job = scope.launch {
             processUpload(moment)
+            // Igual que la subida original: si terminó, fuera de la cola de recuperación
+            // (si no, la siguiente sincronización la volvía a publicar).
+            if (moment.status == UploadStatus.Completed || moment.status == UploadStatus.Moderated) {
+                LocalPersistenceService.deleteActionAsync(moment.tempId)
+                deleteActionFiles(moment.tempId)
+            }
             runningUploadJobs.remove(moment.tempId)
         }
         runningUploadJobs[moment.tempId] = job
@@ -694,6 +700,11 @@ object BackgroundMomentUploadService {
         val storagePrefix = "users/${moment.userId}/moments/${moment.plannedMomentId}/"
         runningUploadJobs.remove(moment.tempId)?.cancel()
         MediaUploadService.cancelUploads(storagePrefix)
+        // Cancelado: que no lo retome la cola de recuperación al abrir o al reconectar.
+        scope.launch {
+            LocalPersistenceService.deleteActionAsync(moment.tempId)
+            deleteActionFiles(moment.tempId)
+        }
         if (liveActivityMomentId == moment.tempId) endLiveActivity()
         removeUploadingMoment(moment)
     }
@@ -940,6 +951,8 @@ object BackgroundMomentUploadService {
 
             // Duplicate check (iOS)
             val alreadyUploading = uploadingMoments.any { moment ->
+                // La misma subida ya en pantalla (también si falló y espera "Reintentar"): no duplicar.
+                if (moment.tempId == action.id) return@any true
                 val active = moment.status == UploadStatus.Compressing ||
                     moment.status == UploadStatus.Uploading ||
                     moment.status == UploadStatus.Processing
