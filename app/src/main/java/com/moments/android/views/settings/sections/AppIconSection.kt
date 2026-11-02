@@ -95,9 +95,22 @@ enum class MomentsAppIcon(
     SLIME("Slime", R.string.app_icon_name_slime, R.drawable.app_icon_slime),
     FLOWERS("Flowers", R.string.app_icon_name_flowers, R.drawable.app_icon_flowers),
     PLANET("Planet", R.string.app_icon_name_planet, R.drawable.app_icon_planet),
+    // Navidad
+    SANTA_HAT("SantaHat", R.string.app_icon_name_santa_hat, R.drawable.app_icon_santa_hat),
+    CANDY_CANE("CandyCane", R.string.app_icon_name_candy_cane, R.drawable.app_icon_candy_cane),
+    SNOW("Snow", R.string.app_icon_name_snow, R.drawable.app_icon_snow),
+    BAUBLES("Baubles", R.string.app_icon_name_baubles, R.drawable.app_icon_baubles),
+    LIGHTS("Lights", R.string.app_icon_name_lights, R.drawable.app_icon_lights),
+    GINGERBREAD("Gingerbread", R.string.app_icon_name_gingerbread, R.drawable.app_icon_gingerbread),
+    CHRISTMAS_TREE("ChristmasTree", R.string.app_icon_name_christmas_tree, R.drawable.app_icon_christmas_tree),
+    SNOWMAN("Snowman", R.string.app_icon_name_snowman, R.drawable.app_icon_snowman),
     ;
 
-    fun component(context: Context) =
+    /** Iconos de temporada: solo se ofrecen en Navidad (1 de noviembre a 6 de enero). */
+    val isChristmas: Boolean
+        get() = this in setOf(SANTA_HAT, CANDY_CANE, SNOW, BAUBLES, LIGHTS, GINGERBREAD, CHRISTMAS_TREE, SNOWMAN)
+
+        fun component(context: Context) =
         ComponentName(context.packageName, "com.moments.android.AppIcon$aliasName")
 }
 
@@ -106,6 +119,18 @@ enum class MomentsAppIcon(
  * apagado). Por eso el icono elegido se guarda y se aplica al pasar la app a segundo plano.
  */
 object AppIconManager {
+    fun isChristmasSeason(date: java.util.Calendar = java.util.Calendar.getInstance()): Boolean {
+        val month = date.get(java.util.Calendar.MONTH)
+        val day = date.get(java.util.Calendar.DAY_OF_MONTH)
+        return month == java.util.Calendar.NOVEMBER || month == java.util.Calendar.DECEMBER || (month == java.util.Calendar.JANUARY && day <= 6)
+    }
+
+    /** Lo que ofrece el selector: fuera de temporada, sin los de Navidad salvo el que ya esté puesto. */
+    fun available(current: MomentsAppIcon): List<MomentsAppIcon> {
+        val inSeason = isChristmasSeason()
+        return MomentsAppIcon.entries.filter { !it.isChristmas || inSeason || it == current }
+    }
+
     private const val PREFS = "app_icon"
     private const val KEY_PENDING = "pending"
 
@@ -221,10 +246,10 @@ private fun AppIconPicker(
     currentIcon: MomentsAppIcon,
     onApply: (MomentsAppIcon) -> Unit,
 ) {
-    val icons = MomentsAppIcon.entries
+    val icons = remember(currentIcon) { AppIconManager.available(currentIcon) }
     val view = LocalView.current
     val isDark = isSystemInDarkTheme()
-    val pagerState = rememberPagerState(initialPage = currentIcon.ordinal) { icons.size }
+    val pagerState = rememberPagerState(initialPage = icons.indexOf(currentIcon).coerceAtLeast(0)) { icons.size }
     val active = icons[pagerState.currentPage]
     val isActive = active == currentIcon
     val secondary = if (isDark) Color.White.copy(alpha = 0.6f) else Color.Black.copy(alpha = 0.55f)

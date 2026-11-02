@@ -326,6 +326,102 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+        <activity-alias
+            android:name=".AppIconSantaHat"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_santa_hat"
+            android:roundIcon="@mipmap/ic_launcher_santa_hat"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".AppIconCandyCane"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_candy_cane"
+            android:roundIcon="@mipmap/ic_launcher_candy_cane"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".AppIconSnow"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_snow"
+            android:roundIcon="@mipmap/ic_launcher_snow"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".AppIconBaubles"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_baubles"
+            android:roundIcon="@mipmap/ic_launcher_baubles"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".AppIconLights"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_lights"
+            android:roundIcon="@mipmap/ic_launcher_lights"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".AppIconGingerbread"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_gingerbread"
+            android:roundIcon="@mipmap/ic_launcher_gingerbread"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".AppIconChristmasTree"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_christmas_tree"
+            android:roundIcon="@mipmap/ic_launcher_christmas_tree"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".AppIconSnowman"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_snowman"
+            android:roundIcon="@mipmap/ic_launcher_snowman"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
         <receiver
             android:name=".widget.MomentsWidgetProvider"
             android:exported="true"
