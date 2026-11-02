@@ -27,4 +27,6 @@
     <string name="app_icon_name_slime">史萊姆</string>
     <string name="app_icon_name_flowers">花朵</string>
     <string name="app_icon_name_planet">星球</string>
+    <string name="app_icon_changed_title">已更換圖示</string>
+    <string name="app_icon_changed_message">離開 Moments 後，新圖示就會出現在主畫面上。</string>
 </resources>

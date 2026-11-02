@@ -27,4 +27,6 @@
     <string name="app_icon_name_slime">Glut</string>
     <string name="app_icon_name_flowers">Kwiaty</string>
     <string name="app_icon_name_planet">Planeta</string>
+    <string name="app_icon_changed_title">Ikona zmieniona</string>
+    <string name="app_icon_changed_message">Nowa ikona pojawi się na ekranie głównym, gdy wyjdziesz z Moments.</string>
 </resources>

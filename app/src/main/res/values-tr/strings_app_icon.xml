@@ -27,4 +27,6 @@
     <string name="app_icon_name_slime">Slime</string>
     <string name="app_icon_name_flowers">Çiçekler</string>
     <string name="app_icon_name_planet">Gezegen</string>
+    <string name="app_icon_changed_title">Simge değiştirildi</string>
+    <string name="app_icon_changed_message">Yeni simgen, Moments\'tan çıktığında ana ekranda görünecek.</string>
 </resources>

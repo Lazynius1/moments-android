@@ -27,4 +27,6 @@
     <string name="app_icon_name_slime">Slime</string>
     <string name="app_icon_name_flowers">Bunga</string>
     <string name="app_icon_name_planet">Planet</string>
+    <string name="app_icon_changed_title">Ikon diubah</string>
+    <string name="app_icon_changed_message">Ikon barumu akan muncul di layar utama setelah kamu keluar dari Moments.</string>
 </resources>

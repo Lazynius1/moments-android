@@ -27,4 +27,6 @@
     <string name="app_icon_name_slime">スライム</string>
     <string name="app_icon_name_flowers">フラワー</string>
     <string name="app_icon_name_planet">プラネット</string>
+    <string name="app_icon_changed_title">アイコンを変更しました</string>
+    <string name="app_icon_changed_message">Moments を閉じると、新しいアイコンがホーム画面に表示されます。</string>
 </resources>

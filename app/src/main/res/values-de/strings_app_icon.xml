@@ -27,4 +27,6 @@
     <string name="app_icon_name_slime">Schleim</string>
     <string name="app_icon_name_flowers">Blumen</string>
     <string name="app_icon_name_planet">Planet</string>
+    <string name="app_icon_changed_title">Symbol geändert</string>
+    <string name="app_icon_changed_message">Dein neues Symbol erscheint auf dem Home-Bildschirm, sobald du Moments verlässt.</string>
 </resources>

@@ -27,4 +27,6 @@
     <string name="app_icon_name_slime">Slime</string>
     <string name="app_icon_name_flowers">Flores</string>
     <string name="app_icon_name_planet">Planeta</string>
+    <string name="app_icon_changed_title">Ícone alterado</string>
+    <string name="app_icon_changed_message">O teu novo ícone vai aparecer no ecrã principal quando saíres do Moments.</string>
 </resources>

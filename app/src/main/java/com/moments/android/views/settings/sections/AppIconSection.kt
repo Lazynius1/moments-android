@@ -29,7 +29,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AppShortcut
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -99,8 +101,17 @@ enum class MomentsAppIcon(
         ComponentName(context.packageName, "com.moments.android.AppIcon$aliasName")
 }
 
+/**
+ * Cambiar el acceso activo con la app abierta la cierra (el sistema retira la tarea del acceso
+ * apagado). Por eso el icono elegido se guarda y se aplica al pasar la app a segundo plano.
+ */
 object AppIconManager {
+    private const val PREFS = "app_icon"
+    private const val KEY_PENDING = "pending"
+
+    /** Icono elegido: el pendiente si lo hay, si no el acceso activo. */
     fun current(context: Context): MomentsAppIcon {
+        pending(context)?.let { return it }
         val pm = context.packageManager
         return MomentsAppIcon.entries.firstOrNull {
             it != MomentsAppIcon.CLASSIC &&
@@ -108,8 +119,23 @@ object AppIconManager {
         } ?: MomentsAppIcon.CLASSIC
     }
 
+    fun request(context: Context, icon: MomentsAppIcon) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_PENDING, icon.name).apply()
+    }
+
+    /** Llamado al pasar la app a segundo plano. */
+    fun applyPending(context: Context) {
+        val icon = pending(context) ?: return
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY_PENDING).apply()
+        apply(context, icon)
+    }
+
+    private fun pending(context: Context): MomentsAppIcon? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_PENDING, null)
+            ?.let { name -> MomentsAppIcon.entries.firstOrNull { it.name == name } }
+
     /** Activa primero el nuevo acceso y luego apaga el resto, para que el lanzador nunca se quede sin ninguno. */
-    fun apply(context: Context, icon: MomentsAppIcon) {
+    private fun apply(context: Context, icon: MomentsAppIcon) {
         val pm = context.packageManager
         pm.setComponentEnabledSetting(
             icon.component(context),
@@ -138,6 +164,7 @@ fun AppIconSection() {
     val context = LocalContext.current
     var currentIcon by remember { mutableStateOf(AppIconManager.current(context)) }
     var isShowingPicker by remember { mutableStateOf(false) }
+    var isShowingChangedAlert by remember { mutableStateOf(false) }
 
     SettingsRow(
         icon = Icons.Outlined.AppShortcut,
@@ -151,12 +178,40 @@ fun AppIconSection() {
             AppIconPicker(
                 currentIcon = currentIcon,
                 onApply = { icon ->
-                    AppIconManager.apply(context, icon)
+                    AppIconManager.request(context, icon)
                     currentIcon = icon
                     dismiss()
+                    isShowingChangedAlert = true
                 },
             )
         }
+    }
+
+    if (isShowingChangedAlert) {
+        AlertDialog(
+            onDismissRequest = { isShowingChangedAlert = false },
+            icon = {
+                Image(
+                    painter = painterResource(currentIcon.preview),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(13.dp))
+                        .graphicsLayer {
+                            scaleX = 1.5f
+                            scaleY = 1.5f
+                        },
+                )
+            },
+            title = { Text(stringResource(R.string.app_icon_changed_title)) },
+            text = { Text(stringResource(R.string.app_icon_changed_message), textAlign = TextAlign.Center) },
+            confirmButton = {
+                TextButton(onClick = { isShowingChangedAlert = false }) {
+                    Text(stringResource(R.string.common_ok), color = BrandPurple)
+                }
+            },
+        )
     }
 }
 

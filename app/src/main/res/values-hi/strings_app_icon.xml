@@ -27,4 +27,6 @@
     <string name="app_icon_name_slime">स्लाइम</string>
     <string name="app_icon_name_flowers">फूल</string>
     <string name="app_icon_name_planet">ग्रह</string>
+    <string name="app_icon_changed_title">आइकन बदल गया</string>
+    <string name="app_icon_changed_message">Moments से बाहर निकलने पर आपका नया आइकन होम स्क्रीन पर दिखेगा।</string>
 </resources>

@@ -1,6 +1,10 @@
 package com.moments.android
 
 import android.app.Application
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
+import com.moments.android.views.settings.sections.AppIconManager
 import com.moments.android.services.activity.TimeSpentManager
 import com.moments.android.reportes.AppealService
 import com.moments.android.services.auth.AuthService
@@ -79,6 +83,12 @@ class MomentsApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        // El icono elegido en Ajustes se aplica al salir de la app: cambiarlo dentro la cierra.
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStop(owner: LifecycleOwner) {
+                AppIconManager.applyPending(this@MomentsApplication)
+            }
+        })
         // Mapbox: token público desde local.properties → BuildConfig (antes de cualquier MapView).
         if (FeedMaps.hasMapboxToken()) {
             MapboxOptions.accessToken = BuildConfig.MAPBOX_ACCESS_TOKEN

@@ -27,4 +27,6 @@
     <string name="app_icon_name_slime">Slijm</string>
     <string name="app_icon_name_flowers">Bloemen</string>
     <string name="app_icon_name_planet">Planeet</string>
+    <string name="app_icon_changed_title">Icoon gewijzigd</string>
+    <string name="app_icon_changed_message">Je nieuwe icoon verschijnt op je beginscherm zodra je Moments verlaat.</string>
 </resources>

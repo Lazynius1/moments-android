@@ -27,4 +27,6 @@
     <string name="app_icon_name_slime">슬라임</string>
     <string name="app_icon_name_flowers">플라워</string>
     <string name="app_icon_name_planet">플래닛</string>
+    <string name="app_icon_changed_title">아이콘이 변경됐어요</string>
+    <string name="app_icon_changed_message">Moments를 나가면 새 아이콘이 홈 화면에 표시돼요.</string>
 </resources>

@@ -27,4 +27,6 @@
     <string name="app_icon_name_slime">Slime</string>
     <string name="app_icon_name_flowers">Fiori</string>
     <string name="app_icon_name_planet">Pianeta</string>
+    <string name="app_icon_changed_title">Icona cambiata</string>
+    <string name="app_icon_changed_message">La nuova icona apparirà nella schermata Home quando esci da Moments.</string>
 </resources>
