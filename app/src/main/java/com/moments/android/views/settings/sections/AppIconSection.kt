@@ -186,8 +186,8 @@ private fun AppIconPicker(
                 .fillMaxWidth()
                 .weight(1f),
         ) {
-            // Como en iOS, el icono ocupa más o menos la mitad del ancho.
-            val iconSize = minOf(maxHeight.value * 0.86f, maxWidth.value * 0.52f, 240f).dp
+            // El icono a la vista domina la hoja, como en iOS; los de los lados asoman por los bordes.
+            val iconSize = minOf(maxHeight.value * 0.86f, maxWidth.value * 0.62f, 270f).dp
             val sidePadding = (maxWidth - iconSize) / 2
             val iconSizePx = with(LocalDensity.current) { iconSize.toPx() }
             val corner = RoundedCornerShape(iconSize * 0.225f)
