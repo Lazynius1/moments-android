@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PageSize
@@ -185,7 +186,8 @@ private fun AppIconPicker(
                 .fillMaxWidth()
                 .weight(1f),
         ) {
-            val iconSize = min(maxHeight.value * 0.86f, 260f).dp
+            // Como en iOS, el icono ocupa más o menos la mitad del ancho.
+            val iconSize = minOf(maxHeight.value * 0.86f, maxWidth.value * 0.52f, 240f).dp
             val sidePadding = (maxWidth - iconSize) / 2
             val iconSizePx = with(LocalDensity.current) { iconSize.toPx() }
             val corner = RoundedCornerShape(iconSize * 0.225f)
@@ -193,7 +195,10 @@ private fun AppIconPicker(
                 state = pagerState,
                 pageSize = PageSize.Fixed(iconSize),
                 contentPadding = PaddingValues(horizontal = sidePadding),
-                modifier = Modifier.align(Alignment.Center),
+                // Más alto que su hueco: los de los lados suben y bajan al girar sin cortarse en recto.
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .requiredHeight(maxHeight + iconSize),
             ) { page ->
                 val offset = (page - pagerState.currentPage) - pagerState.currentPageOffsetFraction
                 val progress = min(abs(offset), 1f)
