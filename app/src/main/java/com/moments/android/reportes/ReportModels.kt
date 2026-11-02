@@ -1,5 +1,6 @@
 package com.moments.android.reportes
 
+import com.moments.android.icons.MomentsIcons
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
@@ -17,7 +18,6 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.moments.android.R
 import com.moments.android.models.Moment
@@ -77,7 +77,7 @@ enum class ReportCategory(val raw: String) {
             NUDITY -> Icons.Default.VisibilityOff
             SCAMS -> Icons.Default.Error
             FALSE_INFO -> Icons.Default.Info
-            UNLABELED_AI -> Icons.Outlined.AutoAwesome
+            UNLABELED_AI -> MomentsIcons.AILabel
             INTELLECTUAL_PROPERTY -> Icons.Default.Copyright
         }
 

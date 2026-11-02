@@ -14,6 +14,49 @@ import androidx.compose.ui.unit.dp
  * `camera.aperture` usado en el Tab create de iOS.
  */
 object MomentsIcons {
+    /** Contenido creado con IA: la ö de Moments con los puntos hechos píxeles. */
+    val AILabel: ImageVector
+        get() {
+            if (_aiLabel != null) return _aiLabel!!
+            _aiLabel = ImageVector.Builder(
+                name = "moments.aiLabel",
+                defaultWidth = 24.dp,
+                defaultHeight = 24.dp,
+                viewportWidth = 24f,
+                viewportHeight = 24f,
+            ).apply {
+                // Aro
+                path(
+                    fill = null,
+                    stroke = SolidColor(Color.Black),
+                    strokeLineWidth = 1.73f,
+                    strokeLineCap = StrokeCap.Round,
+                ) {
+                    moveTo(12f, 7.2f)
+                    arcTo(7.2f, 7.2f, 0f, isMoreThanHalf = true, isPositiveArc = true, 12f, 21.6f)
+                    arcTo(7.2f, 7.2f, 0f, isMoreThanHalf = true, isPositiveArc = true, 12f, 7.2f)
+                    close()
+                }
+                // Puntos de la ö como píxeles
+                for (left in listOf(7.08f, 13.56f)) {
+                    path(fill = SolidColor(Color.Black)) {
+                        moveTo(left + 0.6f, 1.44f)
+                        lineTo(left + 2.76f, 1.44f)
+                        quadTo(left + 3.36f, 1.44f, left + 3.36f, 2.04f)
+                        lineTo(left + 3.36f, 4.2f)
+                        quadTo(left + 3.36f, 4.8f, left + 2.76f, 4.8f)
+                        lineTo(left + 0.6f, 4.8f)
+                        quadTo(left, 4.8f, left, 4.2f)
+                        lineTo(left, 2.04f)
+                        quadTo(left, 1.44f, left + 0.6f, 1.44f)
+                        close()
+                    }
+                }
+            }.build()
+            return _aiLabel!!
+        }
+    private var _aiLabel: ImageVector? = null
+
     val CameraAperture: ImageVector
         get() {
             if (_cameraAperture != null) return _cameraAperture!!

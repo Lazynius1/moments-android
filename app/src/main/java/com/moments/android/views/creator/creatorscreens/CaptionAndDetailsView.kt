@@ -1,5 +1,6 @@
 package com.moments.android.views.creator.creatorscreens
 
+import com.moments.android.icons.MomentsIcons
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
@@ -41,7 +42,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -497,7 +497,7 @@ fun CaptionAndDetailsView(
                     )
                     OptionDivider(divider)
                     MinimalToggleRow(
-                        icon = Icons.Outlined.AutoAwesome,
+                        icon = MomentsIcons.AILabel,
                         title = stringResource(R.string.ai_toggle_title),
                         subtitle = stringResource(
                             if (aiDetectedFromMetadata && aiGenerated) R.string.ai_toggle_detected
