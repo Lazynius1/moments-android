@@ -106,7 +106,7 @@ enum class MomentsAppIcon(
     SNOWMAN("Snowman", R.string.app_icon_name_snowman, R.drawable.app_icon_snowman),
     ;
 
-    /** Iconos de temporada: solo se ofrecen en Navidad (1 de noviembre a 6 de enero). */
+    /** Iconos de temporada: solo se ofrecen en Navidad (ver [AppIconManager.isChristmasSeason]). */
     val isChristmas: Boolean
         get() = this in setOf(SANTA_HAT, CANDY_CANE, SNOW, BAUBLES, LIGHTS, GINGERBREAD, CHRISTMAS_TREE, SNOWMAN)
 
@@ -119,10 +119,28 @@ enum class MomentsAppIcon(
  * apagado). Por eso el icono elegido se guarda y se aplica al pasar la app a segundo plano.
  */
 object AppIconManager {
-    fun isChristmasSeason(date: java.util.Calendar = java.util.Calendar.getInstance()): Boolean {
-        val month = date.get(java.util.Calendar.MONTH)
+    /**
+     * Temporada de Navidad según la región del dispositivo (la app es global):
+     * por defecto del 1 de noviembre al 6 de enero; en Filipinas empieza en septiembre
+     * y donde se sigue el calendario ortodoxo dura hasta el 19 de enero.
+     */
+    fun isChristmasSeason(
+        date: java.util.Calendar = java.util.Calendar.getInstance(),
+        region: String = java.util.Locale.getDefault().country,
+    ): Boolean {
+        val month = date.get(java.util.Calendar.MONTH) + 1
         val day = date.get(java.util.Calendar.DAY_OF_MONTH)
-        return month == java.util.Calendar.NOVEMBER || month == java.util.Calendar.DECEMBER || (month == java.util.Calendar.JANUARY && day <= 6)
+        val (startMonth, endDayOfJanuary) = christmasWindow(region)
+        return month >= startMonth || (month == 1 && day <= endDayOfJanuary)
+    }
+
+    private val orthodoxRegions = setOf("RU", "UA", "BY", "RS", "ME", "MK", "GE", "MD", "ET", "ER", "EG", "AM")
+
+    /** Mes de inicio (hasta diciembre) y último día de enero de la temporada. */
+    private fun christmasWindow(region: String): Pair<Int, Int> = when (region.uppercase()) {
+        "PH" -> 9 to 6
+        in orthodoxRegions -> 11 to 19
+        else -> 11 to 6
     }
 
     /** Lo que ofrece el selector: fuera de temporada, sin los de Navidad salvo el que ya esté puesto. */
