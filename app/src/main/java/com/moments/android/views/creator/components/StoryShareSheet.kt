@@ -1,5 +1,8 @@
 package com.moments.android.views.creator.components
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import com.moments.android.icons.MomentsIcons
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -127,6 +130,7 @@ fun StoryShareSheet(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.Top) {
+                        Icon(MomentsIcons.AILabel, contentDescription = null, modifier = Modifier.padding(top = 2.dp).size(22.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(stringResource(R.string.ai_toggle_title), style = MaterialTheme.typography.bodyLarge)
                             Text(stringResource(if (aiDetectedFromMetadata && aiGenerated) R.string.ai_toggle_detected else R.string.ai_toggle_subtitle),
