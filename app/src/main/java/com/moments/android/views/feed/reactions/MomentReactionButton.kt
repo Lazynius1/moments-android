@@ -174,30 +174,25 @@ fun EpicReactionButton(
     var showReactionsSheet by remember { mutableStateOf(false) }
     var listener by remember { mutableStateOf<ListenerRegistration?>(null) }
 
-    fun updateReactionState(reactions: Map<String, List<String>>) {
-        val userId = uid ?: return
-        var userReaction: ReactionType? = null
-        for ((raw, userIds) in reactions) {
-            if (userIds.contains(userId)) {
-                userReaction = ReactionType.fromRaw(raw)
-                break
-            }
-        }
-        val total = reactions.values.sumOf { it.size }
-        hasReacted = userReaction != null
-        currentReaction = userReaction
-        reactionCount = total
-    }
-
-    DisposableEffect(moment.id, moment.authorId) {
-        val registration = firestore.listenToReactions(moment.id, moment.authorId) { reactions ->
-            scope.launch {
-                updateReactionState(reactions)
+    // Solo la reacción propia en directo y el total con un recuento: escuchar todas las
+    // reacciones de cada tarjeta costaba tantas lecturas como reacciones tuviera el post.
+    DisposableEffect(moment.id, moment.authorId, uid) {
+        val userId = uid
+        val registration = userId?.let {
+            firestore.listenToOwnReaction(moment.id, moment.authorId, it) { raw ->
+                scope.launch {
+                    val reaction = raw?.let(ReactionType::fromRaw)
+                    hasReacted = reaction != null
+                    currentReaction = reaction
+                }
             }
         }
         listener = registration
+        scope.launch {
+            firestore.fetchReactionCount(moment.id, moment.authorId)?.let { reactionCount = it }
+        }
         onDispose {
-            registration.remove()
+            registration?.remove()
             listener = null
         }
     }
@@ -237,9 +232,10 @@ fun EpicReactionButton(
             delay(100)
             showRipple = false
         }
+        // Cambiar de reacción no suma: el usuario sigue contando una vez.
+        if (!hasReacted) reactionCount += 1
         hasReacted = true
         currentReaction = reactionType
-        reactionCount += 1
         AffinityTracker.trackInteraction(AffinityInteractionType.MOMENT_REACTION, moment.authorId)
         val userId = uid ?: return
         scope.launch {

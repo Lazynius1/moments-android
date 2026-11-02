@@ -884,6 +884,33 @@ class FirestoreService(
         return aggregateReactions(snapshot.documents)
     }
 
+    /** Escucha solo la reacción del usuario (un documento), no todas las del momento. */
+    fun listenToOwnReaction(
+        momentId: String,
+        authorId: String,
+        userId: String,
+        onUpdate: (String?) -> Unit,
+    ): ListenerRegistration =
+        db.collection("users").document(authorId)
+            .collection("moments").document(momentId)
+            .collection("reactions").document(userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) return@addSnapshotListener
+                onUpdate(snapshot?.getString("reactionType"))
+            }
+
+    /** Número de reacciones con un recuento del servidor (1 lectura), sin descargarlas. */
+    suspend fun fetchReactionCount(momentId: String, authorId: String): Int? = runCatching {
+        db.collection("users").document(authorId)
+            .collection("moments").document(momentId)
+            .collection("reactions")
+            .count()
+            .get(com.google.firebase.firestore.AggregateSource.SERVER)
+            .await()
+            .count
+            .toInt()
+    }.getOrNull()
+
     /** Port de `listenToReactions` — listener tiempo real. */
     fun listenToReactions(
         momentId: String,
