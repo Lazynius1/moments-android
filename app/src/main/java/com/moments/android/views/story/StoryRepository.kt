@@ -315,6 +315,8 @@ class StoryRepository(
                 chainId = document.chainId,
                 chainPosition = document.chainPosition,
                 chainTitle = document.chainTitle,
+                aiGenerated = document.aiGenerated,
+                aiLabelSource = document.aiLabelSource,
             )
         }
 

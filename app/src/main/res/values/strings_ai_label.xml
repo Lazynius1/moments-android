@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_toggle_title">Made with AI</string>
+    <string name="ai_toggle_subtitle">Turn this on if the image, video or audio is realistic and was generated or edited with AI.</string>
+    <string name="ai_toggle_detected">We detected that this content was made with AI.</string>
+    <string name="ai_badge">AI info</string>
+    <string name="ai_info_title">Made with AI</string>
+    <string name="ai_info_creator">The person who posted this said it was generated or edited with artificial intelligence.</string>
+    <string name="ai_info_metadata">This content includes data showing it was generated or edited with artificial intelligence.</string>
+    <string name="ai_info_footer">Labels help you understand what you\'re seeing. If you see unlabeled AI content, you can report it.</string>
+    <string name="report_category_unlabeledAI_title">Unlabeled AI content</string>
+    <string name="report_category_unlabeledAI_subtitle">Realistic AI images, videos or audio without the label</string>
+</resources>

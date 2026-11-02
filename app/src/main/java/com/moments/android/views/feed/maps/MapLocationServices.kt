@@ -548,6 +548,8 @@ object LocationSearchService {
             disableComments = optBoolean("disableComments"),
             hideLikeCounts = optBoolean("hideLikeCounts"),
             allowSharing = optBoolean("allowSharing", true),
+            aiGenerated = optBoolean("aiGenerated"),
+            aiLabelSource = optStringOrNull("aiLabelSource"),
         )
     }
 

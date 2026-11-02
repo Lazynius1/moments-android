@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_toggle_title">Creat amb IA</string>
+    <string name="ai_toggle_subtitle">Activa-ho si la imatge, el vídeo o l\'àudio són realistes i s\'han generat o modificat amb IA.</string>
+    <string name="ai_toggle_detected">Hem detectat que aquest contingut s\'ha creat amb IA.</string>
+    <string name="ai_badge">Info d\'IA</string>
+    <string name="ai_info_title">Contingut creat amb IA</string>
+    <string name="ai_info_creator">Qui ho ha publicat ha indicat que aquest contingut s\'ha generat o modificat amb intel·ligència artificial.</string>
+    <string name="ai_info_metadata">Aquest contingut inclou dades que indiquen que s\'ha generat o modificat amb intel·ligència artificial.</string>
+    <string name="ai_info_footer">Les etiquetes ajuden a entendre què estàs veient. Si veus contingut d\'IA sense etiquetar, pots denunciar-lo.</string>
+    <string name="report_category_unlabeledAI_title">Contingut d\'IA sense etiquetar</string>
+    <string name="report_category_unlabeledAI_subtitle">Imatges, vídeos o àudios realistes fets amb IA sense l\'etiqueta</string>
+</resources>

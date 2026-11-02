@@ -78,6 +78,7 @@ import com.moments.android.views.permission.shared.PermissionPrimerGate
 import com.moments.android.views.permission.shared.PermissionPrimerGateHost
 import com.moments.android.views.permission.shared.PhotoLibraryAccess
 import com.moments.android.views.permission.shared.photoLibraryAccess
+import com.moments.android.views.shared.AIContentProvenance
 import com.moments.android.views.shared.MomentsModalSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -246,6 +247,7 @@ fun MediaSelectionView(
                         aspectRatio = cardAspect,
                         recommendedAspectRatio = aspectRatio,
                         feedCrop = MediaItemFeedCrop.fullBounds(cardAspect.displayName),
+                        isAIGenerated = AIContentProvenance.isAIGenerated(context, uri),
                     )
                 }
             }
@@ -395,6 +397,8 @@ fun MediaSelectionView(
                                             feedCrop = feedCrop,
                                             immersiveUri = asset.uri,
                                             immersiveAspectRatio = imgW / max(imgH, 1f),
+                                            // Metadatos del original, no del recorte
+                                            isAIGenerated = AIContentProvenance.isAIGenerated(context, asset.uri),
                                         )
                                     }
                                 }

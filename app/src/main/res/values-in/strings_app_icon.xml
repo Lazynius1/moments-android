@@ -29,4 +29,12 @@
     <string name="app_icon_name_planet">Planet</string>
     <string name="app_icon_changed_title">Ikon diubah</string>
     <string name="app_icon_changed_message">Ikon barumu akan muncul di layar utama setelah kamu keluar dari Moments.</string>
+    <string name="app_icon_name_santa_hat">Topi Santa</string>
+    <string name="app_icon_name_candy_cane">Permen tongkat</string>
+    <string name="app_icon_name_snow">Salju</string>
+    <string name="app_icon_name_baubles">Bola hias</string>
+    <string name="app_icon_name_lights">Lampu</string>
+    <string name="app_icon_name_gingerbread">Kue jahe</string>
+    <string name="app_icon_name_christmas_tree">Pohon Natal</string>
+    <string name="app_icon_name_snowman">Manusia salju</string>
 </resources>

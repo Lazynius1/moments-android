@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_toggle_title">Dibuat dengan AI</string>
+    <string name="ai_toggle_subtitle">Aktifkan jika gambar, video, atau audio terlihat nyata dan dibuat atau diubah dengan AI.</string>
+    <string name="ai_toggle_detected">Kami mendeteksi bahwa konten ini dibuat dengan AI.</string>
+    <string name="ai_badge">Info AI</string>
+    <string name="ai_info_title">Konten dibuat dengan AI</string>
+    <string name="ai_info_creator">Orang yang mempostingnya menyatakan bahwa konten ini dibuat atau diubah dengan kecerdasan buatan.</string>
+    <string name="ai_info_metadata">Konten ini berisi data yang menunjukkan bahwa konten dibuat atau diubah dengan kecerdasan buatan.</string>
+    <string name="ai_info_footer">Label membantumu memahami apa yang kamu lihat. Jika melihat konten AI tanpa label, kamu bisa melaporkannya.</string>
+    <string name="report_category_unlabeledAI_title">Konten AI tanpa label</string>
+    <string name="report_category_unlabeledAI_subtitle">Gambar, video, atau audio AI yang terlihat nyata tanpa label</string>
+</resources>

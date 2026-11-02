@@ -1066,4 +1066,6 @@ private fun FeedMoment.toDomainMoment(): Moment = Moment(
     aspectRatio = aspectRatio,
     timestamp = Date(timestamp),
     isArchived = isArchived,
+    aiGenerated = aiGenerated,
+    aiLabelSource = aiLabelSource,
 )

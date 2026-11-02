@@ -29,4 +29,12 @@
     <string name="app_icon_name_planet">Planeta</string>
     <string name="app_icon_changed_title">Ícone alterado</string>
     <string name="app_icon_changed_message">Seu novo ícone vai aparecer na tela de início quando você sair do Moments.</string>
+    <string name="app_icon_name_santa_hat">Gorro</string>
+    <string name="app_icon_name_candy_cane">Bengala</string>
+    <string name="app_icon_name_snow">Neve</string>
+    <string name="app_icon_name_baubles">Bolas</string>
+    <string name="app_icon_name_lights">Luzes</string>
+    <string name="app_icon_name_gingerbread">Biscoito</string>
+    <string name="app_icon_name_christmas_tree">Árvore</string>
+    <string name="app_icon_name_snowman">Boneco de neve</string>
 </resources>

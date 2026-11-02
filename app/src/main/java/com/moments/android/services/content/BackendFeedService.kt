@@ -88,6 +88,9 @@ data class FeedMoment(
     val disableComments: Boolean,
     /** Paridad iOS `Moment.allowSharing` — oculta bookmark si false. */
     val allowSharing: Boolean = true,
+    /** Etiqueta de contenido generado con IA. */
+    val aiGenerated: Boolean = false,
+    val aiLabelSource: String? = null,
     val hasHiddenLayers: Boolean = false,
     val hiddenLayerCount: Int = 0,
     /** Paridad iOS `Moment.audience` — != "everyone" → ScreenshotProtected. */
@@ -229,6 +232,9 @@ data class BackendStoryDocument(
     val mediaItem: BackendStoryMediaItem?,
     val imagePath: String?,
     val videoUrl: String?,
+    /** Etiqueta de contenido generado con IA. */
+    val aiGenerated: Boolean = false,
+    val aiLabelSource: String? = null,
 )
 
 data class BackendAuthorStoryBundleResponse(
@@ -680,6 +686,8 @@ private fun JSONObject.toFeedMoment(): FeedMoment {
         hideLikeCounts = optBoolean("hideLikeCounts"),
         disableComments = optBoolean("disableComments"),
         allowSharing = optBoolean("allowSharing", true),
+        aiGenerated = optBoolean("aiGenerated"),
+        aiLabelSource = stringOrNull("aiLabelSource"),
         hasHiddenLayers = optBoolean("hasHiddenLayers"),
         hiddenLayerCount = optInt("hiddenLayerCount"),
         audience = stringOrNull("audience"),
@@ -773,6 +781,8 @@ private fun JSONObject.toMoment(): Moment {
         disableComments = optBoolean("disableComments"),
         hideLikeCounts = optBoolean("hideLikeCounts"),
         allowSharing = optBoolean("allowSharing", true),
+        aiGenerated = optBoolean("aiGenerated"),
+        aiLabelSource = stringOrNull("aiLabelSource"),
         scheduledDate = optLongOrNull("scheduledDate")?.let { Date(it) },
         isPinned = if (has("isPinned") && !isNull("isPinned") && optBoolean("isPinned")) true else null,
         pinnedAt = optLongOrNull("pinnedAt")?.let { Date(it) },
@@ -889,6 +899,8 @@ private fun JSONObject.toBackendStoryDocument(): BackendStoryDocument = BackendS
     },
     imagePath = stringOrNull("imagePath"),
     videoUrl = stringOrNull("videoUrl"),
+    aiGenerated = optBoolean("aiGenerated"),
+    aiLabelSource = stringOrNull("aiLabelSource"),
 )
 
 /** ≡ `StoryRepository.decodeBackendStory` — fuente de verdad en StoryRepository. */

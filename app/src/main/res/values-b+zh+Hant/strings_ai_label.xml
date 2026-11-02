@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_toggle_title">使用 AI 製作</string>
+    <string name="ai_toggle_subtitle">如果圖片、影片或音訊看起來真實，且是用 AI 生成或編輯的，請開啟此選項。</string>
+    <string name="ai_toggle_detected">我們偵測到此內容是用 AI 製作的。</string>
+    <string name="ai_badge">AI 資訊</string>
+    <string name="ai_info_title">使用 AI 製作的內容</string>
+    <string name="ai_info_creator">發布者表示此內容是用人工智慧生成或編輯的。</string>
+    <string name="ai_info_metadata">此內容包含顯示其由人工智慧生成或編輯的資料。</string>
+    <string name="ai_info_footer">標籤能幫助你了解所看到的內容。如果看到未標示的 AI 內容，可以檢舉。</string>
+    <string name="report_category_unlabeledAI_title">未標示的 AI 內容</string>
+    <string name="report_category_unlabeledAI_subtitle">未加標籤、用 AI 製作的逼真圖片、影片或音訊</string>
+</resources>

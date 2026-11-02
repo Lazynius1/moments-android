@@ -29,4 +29,12 @@
     <string name="app_icon_name_planet">Gezegen</string>
     <string name="app_icon_changed_title">Simge değiştirildi</string>
     <string name="app_icon_changed_message">Yeni simgen, Moments\'tan çıktığında ana ekranda görünecek.</string>
+    <string name="app_icon_name_santa_hat">Noel şapkası</string>
+    <string name="app_icon_name_candy_cane">Şeker baston</string>
+    <string name="app_icon_name_snow">Kar</string>
+    <string name="app_icon_name_baubles">Süs topları</string>
+    <string name="app_icon_name_lights">Işıklar</string>
+    <string name="app_icon_name_gingerbread">Zencefilli kurabiye</string>
+    <string name="app_icon_name_christmas_tree">Çam ağacı</string>
+    <string name="app_icon_name_snowman">Kardan adam</string>
 </resources>

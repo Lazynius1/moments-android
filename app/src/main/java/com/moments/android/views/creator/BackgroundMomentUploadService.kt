@@ -100,6 +100,9 @@ class UploadingMoment(
     val allowSharing: Boolean = true,
     val scheduledDate: Date? = null,
     val hiddenLayers: List<HiddenLayerDraft> = emptyList(),
+    /** Etiqueta IA: "creator" | "metadata"; solo si aiGenerated. */
+    val aiGenerated: Boolean = false,
+    val aiLabelSource: String? = null,
     tempId: String? = null,
     plannedMomentId: String? = null,
 ) : PendingPublication {
@@ -223,6 +226,8 @@ object BackgroundMomentUploadService {
         recoveryActionId: String? = null,
         shouldPersistAction: Boolean = true,
         plannedMomentId: String? = null,
+        aiGenerated: Boolean = false,
+        aiLabelSource: String? = null,
     ): UploadingMoment? {
         val ctx = appContext ?: return null
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return null
@@ -247,6 +252,8 @@ object BackgroundMomentUploadService {
             allowSharing = allowSharing,
             scheduledDate = scheduledDate,
             hiddenLayers = hiddenLayers.orEmpty(),
+            aiGenerated = aiGenerated,
+            aiLabelSource = if (aiGenerated) aiLabelSource else null,
             tempId = recoveryActionId,
             plannedMomentId = plannedMomentId,
         )
@@ -581,6 +588,8 @@ object BackgroundMomentUploadService {
                 allowSharing = uploadingMoment.allowSharing,
                 scheduledDate = uploadingMoment.scheduledDate,
                 momentId = uploadingMoment.plannedMomentId,
+                aiGenerated = uploadingMoment.aiGenerated,
+                aiLabelSource = uploadingMoment.aiLabelSource,
             )
         } else {
             firestoreService.createMomentWithVisibility(
@@ -600,6 +609,8 @@ object BackgroundMomentUploadService {
                 allowSharing = uploadingMoment.allowSharing,
                 scheduledDate = uploadingMoment.scheduledDate,
                 momentId = uploadingMoment.plannedMomentId,
+                aiGenerated = uploadingMoment.aiGenerated,
+                aiLabelSource = uploadingMoment.aiLabelSource,
             )
         }
     }
@@ -801,6 +812,8 @@ object BackgroundMomentUploadService {
             allowSharing = uploadingMoment.allowSharing,
             scheduledDate = uploadingMoment.scheduledDate,
             hiddenLayers = cachedHiddenLayers.takeIf { it.isNotEmpty() },
+            aiGenerated = uploadingMoment.aiGenerated,
+            aiLabelSource = uploadingMoment.aiLabelSource,
         )
         val action = CachedAction(
             id = uploadingMoment.tempId,
@@ -1039,6 +1052,8 @@ object BackgroundMomentUploadService {
                     recoveryActionId = action.id,
                     shouldPersistAction = false,
                     plannedMomentId = payload.plannedMomentId,
+                    aiGenerated = payload.aiGenerated,
+                    aiLabelSource = payload.aiLabelSource,
                 )
             }
         } catch (e: Exception) {

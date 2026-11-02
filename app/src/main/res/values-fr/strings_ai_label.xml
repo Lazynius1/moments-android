@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_toggle_title">Créé avec l\'IA</string>
+    <string name="ai_toggle_subtitle">Active cette option si l\'image, la vidéo ou l\'audio sont réalistes et ont été générés ou modifiés avec l\'IA.</string>
+    <string name="ai_toggle_detected">Nous avons détecté que ce contenu a été créé avec l\'IA.</string>
+    <string name="ai_badge">Infos IA</string>
+    <string name="ai_info_title">Contenu créé avec l\'IA</string>
+    <string name="ai_info_creator">La personne qui l\'a publié a indiqué que ce contenu a été généré ou modifié par intelligence artificielle.</string>
+    <string name="ai_info_metadata">Ce contenu comporte des données indiquant qu\'il a été généré ou modifié par intelligence artificielle.</string>
+    <string name="ai_info_footer">Les étiquettes t\'aident à comprendre ce que tu vois. Si tu vois du contenu IA sans étiquette, tu peux le signaler.</string>
+    <string name="report_category_unlabeledAI_title">Contenu IA sans étiquette</string>
+    <string name="report_category_unlabeledAI_subtitle">Images, vidéos ou audios réalistes créés avec l\'IA sans étiquette</string>
+</resources>

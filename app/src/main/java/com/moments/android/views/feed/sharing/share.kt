@@ -954,6 +954,8 @@ private fun FeedMoment.toShareMoment(): Moment = Moment(
     disableComments = disableComments,
     hideLikeCounts = hideLikeCounts,
     allowSharing = allowSharing,
+    aiGenerated = aiGenerated,
+    aiLabelSource = aiLabelSource,
 )
 
 // MARK: - Filter Chip

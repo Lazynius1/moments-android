@@ -401,6 +401,9 @@ data class Moment(
     val disableComments: Boolean = false,
     val hideLikeCounts: Boolean = false,
     val allowSharing: Boolean = true,
+    // Etiqueta de contenido generado con IA
+    val aiGenerated: Boolean = false,
+    val aiLabelSource: String? = null,
 ) {
     /** Ratio ancho/alto resuelto desde aspectRatio ("w:h") o la resolución de vídeo ("WxH"). */
     val resolvedAspectRatioValue: Float?
@@ -569,6 +572,8 @@ data class Moment(
             disableComments = data["disableComments"] as? Boolean ?: false,
             hideLikeCounts = data["hideLikeCounts"] as? Boolean ?: false,
             allowSharing = data["allowSharing"] as? Boolean ?: true,
+            aiGenerated = data["aiGenerated"] as? Boolean ?: false,
+            aiLabelSource = data["aiLabelSource"] as? String,
         )
     }
 }
@@ -1176,6 +1181,9 @@ data class Story(
     val chainId: String? = null,
     val chainPosition: Int? = null,
     val chainTitle: String? = null,
+    // Etiqueta de contenido generado con IA
+    val aiGenerated: Boolean = false,
+    val aiLabelSource: String? = null,
 ) {
     /**
      * `convertStickersToStickerItems` (UIImage/UIKit) → módulo Creator / viewer.
@@ -1220,7 +1228,9 @@ data class Story(
             backgroundBlurredFrameURL == other.backgroundBlurredFrameURL &&
             chainId == other.chainId &&
             chainPosition == other.chainPosition &&
-            chainTitle == other.chainTitle
+            chainTitle == other.chainTitle &&
+            aiGenerated == other.aiGenerated &&
+            aiLabelSource == other.aiLabelSource
     }
 
     override fun hashCode(): Int {
@@ -1260,6 +1270,8 @@ data class Story(
         result = 31 * result + (chainId?.hashCode() ?: 0)
         result = 31 * result + (chainPosition ?: 0)
         result = 31 * result + (chainTitle?.hashCode() ?: 0)
+        result = 31 * result + aiGenerated.hashCode()
+        result = 31 * result + (aiLabelSource?.hashCode() ?: 0)
         return result
     }
 
@@ -1320,6 +1332,8 @@ data class Story(
                 chainId = chainId,
                 chainPosition = (data["chainPosition"] as? Number)?.toInt(),
                 chainTitle = data["chainTitle"] as? String,
+                aiGenerated = data["aiGenerated"] as? Boolean ?: false,
+                aiLabelSource = data["aiLabelSource"] as? String,
             )
         }
     }
@@ -1667,6 +1681,11 @@ fun Moment.toMap(): Map<String, Any> = buildMap {
     gridPreviewFitMode?.let { put("gridPreviewFitMode", it) }
     gridPreviewBackground?.let { put("gridPreviewBackground", it) }
     put("disableComments", disableComments); put("hideLikeCounts", hideLikeCounts); put("allowSharing", allowSharing)
+    // Solo se escribe cuando es true
+    if (aiGenerated) {
+        put("aiGenerated", true)
+        aiLabelSource?.let { put("aiLabelSource", it) }
+    }
     put("hasHiddenLayers", hasHiddenLayers); put("hiddenLayerCount", hiddenLayerCount)
     isModerationHidden?.let { put("isModerationHidden", it) }
     originalAudience?.let { put("originalAudience", it) }
@@ -1767,6 +1786,11 @@ fun Story.toMap(): Map<String, Any> = buildMap {
     chainId?.let { put("chainId", it) }
     chainPosition?.let { put("chainPosition", it) }
     chainTitle?.let { put("chainTitle", it) }
+    // Solo se escribe cuando es true
+    if (aiGenerated) {
+        put("aiGenerated", true)
+        aiLabelSource?.let { put("aiLabelSource", it) }
+    }
     // Compat: imagePath/videoUrl según el tipo del media.
     if (mediaItem.type == MediaItem.MediaType.IMAGE) put("imagePath", mediaItem.url) else put("videoUrl", mediaItem.url)
 }

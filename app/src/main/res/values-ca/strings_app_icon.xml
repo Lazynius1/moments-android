@@ -29,4 +29,12 @@
     <string name="app_icon_name_planet">Planeta</string>
     <string name="app_icon_changed_title">Icona canviada</string>
     <string name="app_icon_changed_message">La nova icona apareixerà a la pantalla d\'inici quan surtis de Moments.</string>
+    <string name="app_icon_name_santa_hat">Barret</string>
+    <string name="app_icon_name_candy_cane">Bastó de caramel</string>
+    <string name="app_icon_name_snow">Neu</string>
+    <string name="app_icon_name_baubles">Boles</string>
+    <string name="app_icon_name_lights">Llums</string>
+    <string name="app_icon_name_gingerbread">Galeta</string>
+    <string name="app_icon_name_christmas_tree">Arbret</string>
+    <string name="app_icon_name_snowman">Ninot de neu</string>
 </resources>

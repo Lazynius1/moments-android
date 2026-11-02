@@ -29,4 +29,12 @@
     <string name="app_icon_name_planet">Planeet</string>
     <string name="app_icon_changed_title">Icoon gewijzigd</string>
     <string name="app_icon_changed_message">Je nieuwe icoon verschijnt op je beginscherm zodra je Moments verlaat.</string>
+    <string name="app_icon_name_santa_hat">Kerstmuts</string>
+    <string name="app_icon_name_candy_cane">Zuurstok</string>
+    <string name="app_icon_name_snow">Sneeuw</string>
+    <string name="app_icon_name_baubles">Kerstballen</string>
+    <string name="app_icon_name_lights">Lichtjes</string>
+    <string name="app_icon_name_gingerbread">Peperkoek</string>
+    <string name="app_icon_name_christmas_tree">Kerstboom</string>
+    <string name="app_icon_name_snowman">Sneeuwpop</string>
 </resources>

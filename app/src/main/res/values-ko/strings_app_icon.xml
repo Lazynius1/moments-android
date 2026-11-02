@@ -29,4 +29,12 @@
     <string name="app_icon_name_planet">플래닛</string>
     <string name="app_icon_changed_title">아이콘이 변경됐어요</string>
     <string name="app_icon_changed_message">Moments를 나가면 새 아이콘이 홈 화면에 표시돼요.</string>
+    <string name="app_icon_name_santa_hat">산타 모자</string>
+    <string name="app_icon_name_candy_cane">캔디케인</string>
+    <string name="app_icon_name_snow">눈</string>
+    <string name="app_icon_name_baubles">오너먼트</string>
+    <string name="app_icon_name_lights">조명</string>
+    <string name="app_icon_name_gingerbread">진저브레드</string>
+    <string name="app_icon_name_christmas_tree">트리</string>
+    <string name="app_icon_name_snowman">눈사람</string>
 </resources>

@@ -211,6 +211,8 @@ private fun Moment.toFeedMoment(): FeedMoment {
         hideLikeCounts = hideLikeCounts,
         disableComments = disableComments,
         allowSharing = allowSharing,
+        aiGenerated = aiGenerated,
+        aiLabelSource = aiLabelSource,
         hasHiddenLayers = hasHiddenLayers,
         hiddenLayerCount = hiddenLayerCount,
         audience = audience,

@@ -101,6 +101,9 @@ class UploadingStory(
     val interactionSettings: Map<String, Boolean>? = null,
     val expirationHours: Int = 24,
     val storyVideoMode: StoryVideoMode = StoryVideoMode.NORMAL,
+    /** Etiqueta IA: "creator" | "metadata"; solo si aiGenerated. */
+    val aiGenerated: Boolean = false,
+    val aiLabelSource: String? = null,
     tempId: String? = null,
     plannedStoryId: String? = null,
 ) : PendingPublication {
@@ -185,6 +188,8 @@ object BackgroundStoryUploadService {
         expirationHours: Int = 24,
         storyVideoMode: StoryVideoMode = StoryVideoMode.NORMAL,
         tempId: String? = null,
+        aiGenerated: Boolean = false,
+        aiLabelSource: String? = null,
     ): UploadingStory? {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return null
         uploadingStory?.let { cancelUpload(it.tempId) }
@@ -213,6 +218,8 @@ object BackgroundStoryUploadService {
             interactionSettings = interactionSettings,
             expirationHours = if (expirationHours == 48) 48 else 24,
             storyVideoMode = storyVideoMode,
+            aiGenerated = aiGenerated,
+            aiLabelSource = if (aiGenerated) aiLabelSource else null,
             tempId = tempId,
         )
         story.status = UploadStatus.Initializing
@@ -318,6 +325,8 @@ object BackgroundStoryUploadService {
         continuationCustomViewers: List<String>? = null,
         continuationCustomListId: String? = null,
         continuationCustomListName: String? = null,
+        aiGenerated: Boolean = false,
+        aiLabelSource: String? = null,
     ): String? {
         val story = startPreparingStory(
             media = media,
@@ -343,6 +352,8 @@ object BackgroundStoryUploadService {
             interactionSettings = interactionSettings,
             expirationHours = expirationHours,
             storyVideoMode = media.storyVideoMode,
+            aiGenerated = aiGenerated,
+            aiLabelSource = aiLabelSource,
         ) ?: return null
         publishPreparedStoryInBackground(
             uploadingStory = story,
@@ -380,6 +391,8 @@ object BackgroundStoryUploadService {
         continuationCustomListId: String? = null,
         continuationCustomListName: String? = null,
         onPrepareFailed: ((Throwable) -> Unit)? = null,
+        aiGenerated: Boolean = false,
+        aiLabelSource: String? = null,
     ): String? {
         if (appContext == null) return null
         val placeholder = CreatorMedia(uri = Uri.EMPTY, isVideo = false)
@@ -406,6 +419,8 @@ object BackgroundStoryUploadService {
             continuationCustomListName = continuationCustomListName,
             interactionSettings = interactionSettings,
             expirationHours = expirationHours,
+            aiGenerated = aiGenerated,
+            aiLabelSource = aiLabelSource,
         ) ?: return null
         // Bake/prepare también bajo FGS (ventana antes del outbox) — ≡ background task iOS.
         val ctx = appContext
@@ -532,6 +547,8 @@ object BackgroundStoryUploadService {
             drawingFileName = drawingFileName,
             stickers = cachedStickers?.takeIf { it.isNotEmpty() },
             storyVideoMode = story.mediaItem.storyVideoMode.raw,
+            aiGenerated = story.aiGenerated,
+            aiLabelSource = story.aiLabelSource,
         )
         val action = CachedAction(
             id = story.tempId,
@@ -1193,6 +1210,8 @@ object BackgroundStoryUploadService {
                 expirationHours = expirationHours,
                 duration = duration,
                 storyId = storyId,
+                aiGenerated = payload.aiGenerated,
+                aiLabelSource = payload.aiLabelSource,
             )
         } else {
             firestoreService.createStoryWithVisibility(
@@ -1222,6 +1241,8 @@ object BackgroundStoryUploadService {
                 expirationHours = expirationHours,
                 duration = duration,
                 storyId = storyId,
+                aiGenerated = payload.aiGenerated,
+                aiLabelSource = payload.aiLabelSource,
             )
         }
     }

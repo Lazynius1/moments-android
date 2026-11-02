@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_toggle_title">AI로 생성됨</string>
+    <string name="ai_toggle_subtitle">이미지, 동영상 또는 오디오가 실제처럼 보이고 AI로 생성되거나 편집된 경우 켜 주세요.</string>
+    <string name="ai_toggle_detected">이 콘텐츠가 AI로 생성된 것으로 감지되었어요.</string>
+    <string name="ai_badge">AI 정보</string>
+    <string name="ai_info_title">AI로 생성된 콘텐츠</string>
+    <string name="ai_info_creator">게시자가 이 콘텐츠를 인공지능으로 생성하거나 편집했다고 밝혔어요.</string>
+    <string name="ai_info_metadata">이 콘텐츠에는 인공지능으로 생성되거나 편집되었음을 나타내는 데이터가 포함되어 있어요.</string>
+    <string name="ai_info_footer">라벨은 보고 있는 콘텐츠를 이해하는 데 도움이 돼요. 라벨이 없는 AI 콘텐츠를 보면 신고할 수 있어요.</string>
+    <string name="report_category_unlabeledAI_title">라벨 없는 AI 콘텐츠</string>
+    <string name="report_category_unlabeledAI_subtitle">라벨 없이 AI로 만든 실제 같은 이미지, 동영상, 오디오</string>
+</resources>

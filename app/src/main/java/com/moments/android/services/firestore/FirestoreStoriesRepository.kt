@@ -76,12 +76,16 @@ suspend fun FirestoreService.createStoryWithVisibility(
     duration: Double? = null,
     storyId: String? = null,
     interactionSettings: Map<String, Boolean>? = null,
+    aiGenerated: Boolean = false,
+    aiLabelSource: String? = null,
 ): String = createStoryDocument(
     userId, mediaItem, audienceSetting.raw, null, customViewers, text, textPosition, textStyle,
     textOverlay, textOverlays, stickers, drawingData, aspectRatio, backgroundFrameURL,
     backgroundBlurredFrameURL, chainId, chainPosition, chainTitle, expirationHours,
     allowOthersToContinue, continuationAudience, continuationCustomViewers,
     continuationCustomListId, continuationCustomListName, duration, storyId, interactionSettings,
+    aiGenerated = aiGenerated,
+    aiLabelSource = aiLabelSource,
 )
 
 suspend fun FirestoreService.createStoryWithCustomList(
@@ -110,12 +114,16 @@ suspend fun FirestoreService.createStoryWithCustomList(
     duration: Double? = null,
     storyId: String? = null,
     interactionSettings: Map<String, Boolean>? = null,
+    aiGenerated: Boolean = false,
+    aiLabelSource: String? = null,
 ): String = createStoryDocument(
     userId, mediaItem, ContentAudience.CUSTOM_LIST.raw, customListId, null, text, textPosition,
     textStyle, textOverlay, textOverlays, stickers, drawingData, aspectRatio, backgroundFrameURL,
     backgroundBlurredFrameURL, chainId, chainPosition, chainTitle, expirationHours,
     allowOthersToContinue, continuationAudience, continuationCustomViewers,
     continuationCustomListId, continuationCustomListName, duration, storyId, interactionSettings,
+    aiGenerated = aiGenerated,
+    aiLabelSource = aiLabelSource,
 )
 
 private suspend fun FirestoreService.createStoryDocument(
@@ -146,6 +154,8 @@ private suspend fun FirestoreService.createStoryDocument(
     duration: Double?,
     storyId: String?,
     interactionSettings: Map<String, Boolean>? = null,
+    aiGenerated: Boolean = false,
+    aiLabelSource: String? = null,
 ): String {
     val user = fetchUser(userId)
     val isChain = chainId != null
@@ -199,6 +209,8 @@ private suspend fun FirestoreService.createStoryDocument(
         chainId = chainId,
         chainPosition = chainPosition,
         chainTitle = chainTitle,
+        aiGenerated = aiGenerated,
+        aiLabelSource = if (aiGenerated) aiLabelSource else null,
     )
 
     var storyData = makeStoryPayload(story, textPosition, stickers).toMutableMap()

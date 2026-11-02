@@ -54,6 +54,9 @@ fun StoryShareSheet(
     canShareOriginalAudio: Boolean,
     allowOriginalAudioReuse: Boolean,
     onAudioReuseChange: (Boolean) -> Unit,
+    aiGenerated: Boolean = false,
+    onAIGeneratedChange: (Boolean) -> Unit = {},
+    aiDetectedFromMetadata: Boolean = false,
     onAudience: () -> Unit,
     onChainSettings: () -> Unit,
     onShare: () -> Unit,
@@ -119,6 +122,19 @@ fun StoryShareSheet(
                                 enabled = canShareOriginalAudio && !isPublishing,
                                 colors = SwitchDefaults.colors(checkedTrackColor = SettingsProfileColors.toggleTint, checkedThumbColor = Color.White))
                         }
+                    }
+                    // Etiqueta de contenido generado con IA
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(stringResource(R.string.ai_toggle_title), style = MaterialTheme.typography.bodyLarge)
+                            Text(stringResource(if (aiDetectedFromMetadata && aiGenerated) R.string.ai_toggle_detected else R.string.ai_toggle_subtitle),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = aiGenerated, onCheckedChange = onAIGeneratedChange,
+                            enabled = !isPublishing,
+                            colors = SwitchDefaults.colors(checkedTrackColor = SettingsProfileColors.toggleTint, checkedThumbColor = Color.White))
                     }
                     Text(stringResource(if (isChain) R.string.story_share_chain_audience else R.string.story_share_only_this_story),
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,

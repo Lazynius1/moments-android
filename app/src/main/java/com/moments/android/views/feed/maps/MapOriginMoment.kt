@@ -12,6 +12,7 @@ fun FeedMoment.mapOriginMoment(): Moment = Moment(
     location = location, locationCoordinate = locationCoordinate,
     profileImagePath = profileImagePath, imagePath = imagePath, thumbnailUrl = thumbnailUrl,
     aspectRatio = aspectRatio, isArchived = isArchived, allowSharing = allowSharing,
+    aiGenerated = aiGenerated, aiLabelSource = aiLabelSource,
     commentCount = commentCount, hideLikeCounts = hideLikeCounts, disableComments = disableComments,
     mediaItems = visibleMediaItems.map { item ->
         MediaItem(id = item.id, type = MediaItem.MediaType.entries.firstOrNull { it.raw.equals(item.type, ignoreCase = true) } ?: MediaItem.MediaType.IMAGE,

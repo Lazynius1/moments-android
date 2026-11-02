@@ -208,6 +208,8 @@ data class CreatorMedia(
     val immersiveUri: Uri? = null,
     /** Aspect del archivo inmersivo si difiere de [aspectRatio]. */
     val immersiveAspectRatio: Float? = null,
+    /** Metadatos del archivo original marcan contenido generado con IA. */
+    val isAIGenerated: Boolean = false,
 ) {
     companion object {
         /** iOS `maxMomentVideoDuration` = 5 min */

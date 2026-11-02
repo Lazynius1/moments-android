@@ -1240,6 +1240,10 @@ private fun encodeCachedMoment(cached: CachedMoment): JSONObject = JSONObject().
     put("disableComments", cached.disableComments)
     put("hideLikeCounts", cached.hideLikeCounts)
     put("allowSharing", cached.allowSharing)
+    if (cached.aiGenerated == true) {
+        put("aiGenerated", true)
+        cached.aiLabelSource?.let { put("aiLabelSource", it) }
+    }
     cached.scheduledDate?.let { put("scheduledDate", it.time) }
     cached.isPinned?.let { put("isPinned", it) }
     cached.pinnedAt?.let { put("pinnedAt", it.time) }
@@ -1282,6 +1286,8 @@ private fun decodeCachedMoment(obj: JSONObject): CachedMoment? = runCatching {
         disableComments = if (obj.has("disableComments")) obj.optBoolean("disableComments") else false,
         hideLikeCounts = if (obj.has("hideLikeCounts")) obj.optBoolean("hideLikeCounts") else false,
         allowSharing = obj.optBoolean("allowSharing", true),
+        aiGenerated = obj.optBoolean("aiGenerated", false),
+        aiLabelSource = obj.stringOrNull("aiLabelSource"),
         scheduledDate = obj.optLongOrNull("scheduledDate")?.let { Date(it) },
         isPinned = if (obj.has("isPinned") && !obj.isNull("isPinned")) obj.optBoolean("isPinned") else null,
         pinnedAt = obj.optLongOrNull("pinnedAt")?.let { Date(it) },
@@ -1328,6 +1334,10 @@ private fun encodeCachedStory(story: CachedStory): JSONObject = JSONObject().app
     put("chainId", story.chainId)
     put("chainPosition", story.chainPosition)
     put("chainTitle", story.chainTitle)
+    if (story.aiGenerated == true) {
+        put("aiGenerated", true)
+        story.aiLabelSource?.let { put("aiLabelSource", it) }
+    }
     story.drawingData?.let { put("drawingData", Base64.getEncoder().encodeToString(it)) }
     put("cachedAt", story.cachedAt.time)
 }
@@ -1360,6 +1370,8 @@ private fun decodeCachedStory(obj: JSONObject): CachedStory? = runCatching {
         chainId = obj.stringOrNull("chainId"),
         chainPosition = obj.optIntOrNull("chainPosition"),
         chainTitle = obj.stringOrNull("chainTitle"),
+        aiGenerated = obj.optBoolean("aiGenerated", false),
+        aiLabelSource = obj.stringOrNull("aiLabelSource"),
         drawingData = obj.stringOrNull("drawingData")?.let { Base64.getDecoder().decode(it) },
         cachedAt = Date(obj.optLong("cachedAt", System.currentTimeMillis())),
     )

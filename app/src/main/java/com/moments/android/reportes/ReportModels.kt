@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.moments.android.R
 import com.moments.android.models.Moment
@@ -32,6 +33,7 @@ enum class ReportCategory(val raw: String) {
     NUDITY("desnudos_actividad_sexual"),
     SCAMS("estafas_fraudes_spam"),
     FALSE_INFO("informacion_falsa"),
+    UNLABELED_AI("ia_sin_etiquetar"),
     INTELLECTUAL_PROPERTY("propiedad_intelectual"),
     ;
 
@@ -46,6 +48,7 @@ enum class ReportCategory(val raw: String) {
             NUDITY -> R.string.report_category_nudity_title
             SCAMS -> R.string.report_category_scams_title
             FALSE_INFO -> R.string.report_category_falseInfo_title
+            UNLABELED_AI -> R.string.report_category_unlabeledAI_title
             INTELLECTUAL_PROPERTY -> R.string.report_category_intellectualProperty_title
         }
 
@@ -60,6 +63,7 @@ enum class ReportCategory(val raw: String) {
             NUDITY -> R.string.report_category_nudity_subtitle
             SCAMS -> R.string.report_category_scams_subtitle
             FALSE_INFO -> R.string.report_category_falseInfo_subtitle
+            UNLABELED_AI -> R.string.report_category_unlabeledAI_subtitle
             INTELLECTUAL_PROPERTY -> R.string.report_category_intellectualProperty_subtitle
         }
 
@@ -73,13 +77,14 @@ enum class ReportCategory(val raw: String) {
             NUDITY -> Icons.Default.VisibilityOff
             SCAMS -> Icons.Default.Error
             FALSE_INFO -> Icons.Default.Info
+            UNLABELED_AI -> Icons.Outlined.AutoAwesome
             INTELLECTUAL_PROPERTY -> Icons.Default.Copyright
         }
 
     val priority: ReportPriority
         get() = when (this) {
             DISLIKE -> ReportPriority.LOW
-            BULLYING, SCAMS, FALSE_INFO, INTELLECTUAL_PROPERTY -> ReportPriority.MEDIUM
+            BULLYING, SCAMS, FALSE_INFO, UNLABELED_AI, INTELLECTUAL_PROPERTY -> ReportPriority.MEDIUM
             SELF_HARM, VIOLENCE, NUDITY, RESTRICTED_SALES -> ReportPriority.HIGH
         }
 

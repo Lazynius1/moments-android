@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_toggle_title">AIで作成</string>
+    <string name="ai_toggle_subtitle">画像・動画・音声がリアルで、AIで生成または編集されている場合はオンにしてください。</string>
+    <string name="ai_toggle_detected">このコンテンツはAIで作成されたことが検出されました。</string>
+    <string name="ai_badge">AI情報</string>
+    <string name="ai_info_title">AIで作成されたコンテンツ</string>
+    <string name="ai_info_creator">投稿者は、このコンテンツが人工知能で生成または編集されたことを示しています。</string>
+    <string name="ai_info_metadata">このコンテンツには、人工知能で生成または編集されたことを示すデータが含まれています。</string>
+    <string name="ai_info_footer">ラベルは表示内容を理解するのに役立ちます。ラベルのないAIコンテンツを見つけたら報告できます。</string>
+    <string name="report_category_unlabeledAI_title">ラベルのないAIコンテンツ</string>
+    <string name="report_category_unlabeledAI_subtitle">ラベルなしでAIで作られたリアルな画像・動画・音声</string>
+</resources>

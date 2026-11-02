@@ -29,4 +29,12 @@
     <string name="app_icon_name_planet">Planet</string>
     <string name="app_icon_changed_title">Symbol geändert</string>
     <string name="app_icon_changed_message">Dein neues Symbol erscheint auf dem Home-Bildschirm, sobald du Moments verlässt.</string>
+    <string name="app_icon_name_santa_hat">Mütze</string>
+    <string name="app_icon_name_candy_cane">Zuckerstange</string>
+    <string name="app_icon_name_snow">Schnee</string>
+    <string name="app_icon_name_baubles">Kugeln</string>
+    <string name="app_icon_name_lights">Lichter</string>
+    <string name="app_icon_name_gingerbread">Lebkuchen</string>
+    <string name="app_icon_name_christmas_tree">Tannenbaum</string>
+    <string name="app_icon_name_snowman">Schneemann</string>
 </resources>

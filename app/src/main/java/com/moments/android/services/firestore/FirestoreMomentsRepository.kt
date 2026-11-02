@@ -290,6 +290,8 @@ suspend fun FirestoreService.createMoment(
     hideLikeCounts: Boolean = false,
     allowSharing: Boolean = true,
     scheduledDate: Date? = null,
+    aiGenerated: Boolean = false,
+    aiLabelSource: String? = null,
 ) {
     val user = fetchUser(userId)
     val imagePath = mediaItems.firstOrNull { it.type == MediaItem.MediaType.IMAGE }?.url
@@ -318,6 +320,8 @@ suspend fun FirestoreService.createMoment(
         hideLikeCounts = hideLikeCounts,
         allowSharing = allowSharing,
         scheduledDate = scheduledDate,
+        aiGenerated = aiGenerated,
+        aiLabelSource = if (aiGenerated) aiLabelSource else null,
     )
     val momentData = moment.toMap().toMutableMap()
     momentData["mediaItems"] = serializedMediaItems(mediaItems)
@@ -344,6 +348,8 @@ suspend fun FirestoreService.createMomentWithVisibility(
     allowSharing: Boolean = true,
     scheduledDate: Date? = null,
     momentId: String? = null,
+    aiGenerated: Boolean = false,
+    aiLabelSource: String? = null,
 ): String {
     val resolvedMomentId = momentId ?: UUID.randomUUID().toString()
     if (audience == ContentAudience.CUSTOM && !customViewers.isNullOrEmpty()) {
@@ -354,6 +360,8 @@ suspend fun FirestoreService.createMomentWithVisibility(
         locationCoordinate, audience.raw, selectedListId, aspectRatio,
         disableComments, hideLikeCounts, allowSharing, scheduledDate, resolvedMomentId,
         includeMapVisibility = true,
+        aiGenerated = aiGenerated,
+        aiLabelSource = aiLabelSource,
     )
 }
 
@@ -372,11 +380,15 @@ suspend fun FirestoreService.createMomentWithCustomList(
     allowSharing: Boolean = true,
     scheduledDate: Date? = null,
     momentId: String? = null,
+    aiGenerated: Boolean = false,
+    aiLabelSource: String? = null,
 ): String = createMomentDocument(
     userId, content, mediaItems, taggedUsers, mentionedUsers, location,
     locationCoordinate, ContentAudience.CUSTOM_LIST.raw, customListId, aspectRatio,
     disableComments, hideLikeCounts, allowSharing, scheduledDate, momentId,
     includeMapVisibility = true,
+    aiGenerated = aiGenerated,
+    aiLabelSource = aiLabelSource,
 )
 
 /** createMomentWithVisibility / CustomList iOS: `setData` con ID + `mapVisibility`. */
@@ -397,6 +409,8 @@ private suspend fun FirestoreService.createMomentDocument(
     scheduledDate: Date?,
     momentId: String?,
     includeMapVisibility: Boolean,
+    aiGenerated: Boolean = false,
+    aiLabelSource: String? = null,
 ): String {
     val user = fetchUser(userId)
     val imagePath = mediaItems.firstOrNull { it.type == MediaItem.MediaType.IMAGE }?.url
@@ -425,6 +439,8 @@ private suspend fun FirestoreService.createMomentDocument(
         hideLikeCounts = hideLikeCounts,
         allowSharing = allowSharing,
         scheduledDate = scheduledDate,
+        aiGenerated = aiGenerated,
+        aiLabelSource = if (aiGenerated) aiLabelSource else null,
     )
     val momentData = moment.toMap().toMutableMap()
     momentData["mediaItems"] = serializedMediaItems(mediaItems)

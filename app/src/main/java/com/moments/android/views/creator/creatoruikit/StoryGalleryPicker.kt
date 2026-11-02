@@ -98,7 +98,7 @@ fun StoryGalleryPicker(
         }
         scope.launch {
             val media = withContext(Dispatchers.IO) {
-                storyMediaFromUri(context, uri)?.copy(
+                storyMediaFromUri(context, uri, detectAIMetadata = true)?.copy(
                     aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
                     recommendedAspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
                 )
@@ -211,7 +211,8 @@ fun StoryGalleryPicker(
             },
             onComplete = { trimmed ->
                 isTrimming = false
-                onSelect(trimmed)
+                // El recorte genera un archivo nuevo: conservar la marca IA del original
+                onSelect(trimmed.copy(isAIGenerated = media.isAIGenerated))
             },
         )
     }

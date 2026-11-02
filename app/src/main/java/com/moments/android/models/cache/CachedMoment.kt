@@ -35,6 +35,8 @@ data class CachedMoment(
     val disableComments: Boolean? = false,
     val hideLikeCounts: Boolean? = false,
     val allowSharing: Boolean? = true,
+    val aiGenerated: Boolean? = false,
+    val aiLabelSource: String? = null,
     val scheduledDate: Date? = null,
     val isPinned: Boolean? = null,
     val pinnedAt: Date? = null,
@@ -93,6 +95,8 @@ data class CachedMoment(
             disableComments = disableComments ?: false,
             hideLikeCounts = hideLikeCounts ?: false,
             allowSharing = allowSharing ?: true,
+            aiGenerated = aiGenerated ?: false,
+            aiLabelSource = aiLabelSource,
             scheduledDate = scheduledDate,
             isPinned = isPinned,
             pinnedAt = pinnedAt,
@@ -129,6 +133,8 @@ data class CachedMoment(
             disableComments == other.disableComments &&
             hideLikeCounts == other.hideLikeCounts &&
             allowSharing == other.allowSharing &&
+            aiGenerated == other.aiGenerated &&
+            aiLabelSource == other.aiLabelSource &&
             scheduledDate == other.scheduledDate &&
             isPinned == other.isPinned &&
             pinnedAt == other.pinnedAt &&
@@ -170,6 +176,8 @@ data class CachedMoment(
         result = 31 * result + (disableComments?.hashCode() ?: 0)
         result = 31 * result + (hideLikeCounts?.hashCode() ?: 0)
         result = 31 * result + (allowSharing?.hashCode() ?: 0)
+        result = 31 * result + (aiGenerated?.hashCode() ?: 0)
+        result = 31 * result + (aiLabelSource?.hashCode() ?: 0)
         result = 31 * result + (scheduledDate?.hashCode() ?: 0)
         result = 31 * result + (isPinned?.hashCode() ?: 0)
         result = 31 * result + (pinnedAt?.hashCode() ?: 0)
@@ -214,6 +222,8 @@ data class CachedMoment(
             disableComments = moment.disableComments,
             hideLikeCounts = moment.hideLikeCounts,
             allowSharing = moment.allowSharing,
+            aiGenerated = moment.aiGenerated,
+            aiLabelSource = moment.aiLabelSource,
             scheduledDate = moment.scheduledDate,
             isPinned = moment.isPinned,
             pinnedAt = moment.pinnedAt,

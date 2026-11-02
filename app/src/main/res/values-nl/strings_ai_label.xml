@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_toggle_title">Gemaakt met AI</string>
+    <string name="ai_toggle_subtitle">Zet dit aan als de afbeelding, video of audio realistisch is en met AI is gemaakt of bewerkt.</string>
+    <string name="ai_toggle_detected">We hebben gedetecteerd dat deze content met AI is gemaakt.</string>
+    <string name="ai_badge">AI-info</string>
+    <string name="ai_info_title">Met AI gemaakte content</string>
+    <string name="ai_info_creator">Degene die dit plaatste, geeft aan dat deze content met kunstmatige intelligentie is gemaakt of bewerkt.</string>
+    <string name="ai_info_metadata">Deze content bevat gegevens die laten zien dat hij met kunstmatige intelligentie is gemaakt of bewerkt.</string>
+    <string name="ai_info_footer">Labels helpen je te begrijpen wat je ziet. Zie je AI-content zonder label, dan kun je die melden.</string>
+    <string name="report_category_unlabeledAI_title">AI-content zonder label</string>
+    <string name="report_category_unlabeledAI_subtitle">Realistische AI-afbeeldingen, -video\'s of -audio zonder label</string>
+</resources>

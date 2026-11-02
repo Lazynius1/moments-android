@@ -29,4 +29,12 @@
     <string name="app_icon_name_planet">ग्रह</string>
     <string name="app_icon_changed_title">आइकन बदल गया</string>
     <string name="app_icon_changed_message">Moments से बाहर निकलने पर आपका नया आइकन होम स्क्रीन पर दिखेगा।</string>
+    <string name="app_icon_name_santa_hat">सांता टोपी</string>
+    <string name="app_icon_name_candy_cane">कैंडी केन</string>
+    <string name="app_icon_name_snow">बर्फ़</string>
+    <string name="app_icon_name_baubles">सजावटी गेंदें</string>
+    <string name="app_icon_name_lights">लाइट्स</string>
+    <string name="app_icon_name_gingerbread">जिंजरब्रेड</string>
+    <string name="app_icon_name_christmas_tree">क्रिसमस ट्री</string>
+    <string name="app_icon_name_snowman">स्नोमैन</string>
 </resources>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_toggle_title">Criado com IA</string>
+    <string name="ai_toggle_subtitle">Ative se a imagem, o vídeo ou o áudio forem realistas e tiverem sido gerados ou modificados com IA.</string>
+    <string name="ai_toggle_detected">Detectamos que este conteúdo foi criado com IA.</string>
+    <string name="ai_badge">Info de IA</string>
+    <string name="ai_info_title">Conteúdo criado com IA</string>
+    <string name="ai_info_creator">Quem publicou indicou que este conteúdo foi gerado ou modificado com inteligência artificial.</string>
+    <string name="ai_info_metadata">Este conteúdo inclui dados que indicam que foi gerado ou modificado com inteligência artificial.</string>
+    <string name="ai_info_footer">Os rótulos ajudam você a entender o que está vendo. Se encontrar conteúdo de IA sem rótulo, você pode denunciá-lo.</string>
+    <string name="report_category_unlabeledAI_title">Conteúdo de IA sem rótulo</string>
+    <string name="report_category_unlabeledAI_subtitle">Imagens, vídeos ou áudios realistas feitos com IA sem o rótulo</string>
+</resources>

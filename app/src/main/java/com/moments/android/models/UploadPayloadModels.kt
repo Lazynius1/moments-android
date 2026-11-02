@@ -117,6 +117,9 @@ data class MomentUploadPayload(
     val allowSharing: Boolean = true,
     val scheduledDate: Date? = null,
     val hiddenLayers: List<CachedHiddenLayerDraft>? = null,
+    /** Etiqueta de contenido generado con IA. */
+    val aiGenerated: Boolean = false,
+    val aiLabelSource: String? = null,
 )
 
 data class StoryUploadPayload(
@@ -146,6 +149,9 @@ data class StoryUploadPayload(
     val expirationHours: Int? = null,
     val drawingFileName: String? = null,
     val stickers: List<CachedSticker>? = null,
+    /** Etiqueta de contenido generado con IA. */
+    val aiGenerated: Boolean = false,
+    val aiLabelSource: String? = null,
 )
 
 object UploadPayloadDecoder {
@@ -216,6 +222,8 @@ object UploadPayloadDecoder {
             allowSharing = json.optBoolean("allowSharing", true),
             scheduledDate = json.optLong("scheduledDate").takeIf { json.has("scheduledDate") }?.let { Date(it) },
             hiddenLayers = hiddenLayers,
+            aiGenerated = json.optBoolean("aiGenerated", false),
+            aiLabelSource = json.optString("aiLabelSource").takeIf { json.has("aiLabelSource") && !json.isNull("aiLabelSource") },
         )
     }.getOrNull()
 
@@ -274,6 +282,8 @@ object UploadPayloadDecoder {
             expirationHours = json.optInt("expirationHours").takeIf { json.has("expirationHours") },
             drawingFileName = json.optString("drawingFileName").takeIf { json.has("drawingFileName") && !json.isNull("drawingFileName") },
             stickers = stickers,
+            aiGenerated = json.optBoolean("aiGenerated", false),
+            aiLabelSource = json.optString("aiLabelSource").takeIf { json.has("aiLabelSource") && !json.isNull("aiLabelSource") },
         )
     }.getOrNull()
 
@@ -338,6 +348,10 @@ object UploadPayloadDecoder {
         json.put("disableComments", payload.disableComments)
         json.put("hideLikeCounts", payload.hideLikeCounts)
         json.put("allowSharing", payload.allowSharing)
+        if (payload.aiGenerated) {
+            json.put("aiGenerated", true)
+            payload.aiLabelSource?.let { json.put("aiLabelSource", it) }
+        }
         payload.scheduledDate?.let { json.put("scheduledDate", it.time) }
         payload.hiddenLayers?.takeIf { it.isNotEmpty() }?.let { layers ->
             json.put(
@@ -422,6 +436,10 @@ object UploadPayloadDecoder {
         payload.interactionSettings?.let { json.put("interactionSettings", JSONObject(it)) }
         payload.expirationHours?.let { json.put("expirationHours", it) }
         payload.drawingFileName?.let { json.put("drawingFileName", it) }
+        if (payload.aiGenerated) {
+            json.put("aiGenerated", true)
+            payload.aiLabelSource?.let { json.put("aiLabelSource", it) }
+        }
         fun encodeOverlay(meta: StoryTextOverlayMetadata): JSONObject = JSONObject().apply {
             put("id", meta.id)
             put("text", meta.text)

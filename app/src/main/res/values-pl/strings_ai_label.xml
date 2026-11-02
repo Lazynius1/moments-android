@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_toggle_title">Utworzone przez AI</string>
+    <string name="ai_toggle_subtitle">Włącz, jeśli obraz, wideo lub dźwięk wyglądają realistycznie i zostały wygenerowane lub zmienione przez AI.</string>
+    <string name="ai_toggle_detected">Wykryliśmy, że ta treść została utworzona przez AI.</string>
+    <string name="ai_badge">Informacje o AI</string>
+    <string name="ai_info_title">Treść utworzona przez AI</string>
+    <string name="ai_info_creator">Osoba, która to opublikowała, wskazała, że ta treść została wygenerowana lub zmieniona przez sztuczną inteligencję.</string>
+    <string name="ai_info_metadata">Ta treść zawiera dane wskazujące, że została wygenerowana lub zmieniona przez sztuczną inteligencję.</string>
+    <string name="ai_info_footer">Etykiety pomagają zrozumieć, co oglądasz. Jeśli zobaczysz treść AI bez etykiety, możesz ją zgłosić.</string>
+    <string name="report_category_unlabeledAI_title">Treść AI bez etykiety</string>
+    <string name="report_category_unlabeledAI_subtitle">Realistyczne obrazy, wideo lub dźwięk z AI bez etykiety</string>
+</resources>

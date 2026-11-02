@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ai_toggle_title">Yapay zekâyla oluşturuldu</string>
+    <string name="ai_toggle_subtitle">Görsel, video veya ses gerçekçiyse ve yapay zekâyla oluşturulduysa ya da düzenlendiyse bunu aç.</string>
+    <string name="ai_toggle_detected">Bu içeriğin yapay zekâyla oluşturulduğunu tespit ettik.</string>
+    <string name="ai_badge">Yapay zekâ bilgisi</string>
+    <string name="ai_info_title">Yapay zekâyla oluşturulan içerik</string>
+    <string name="ai_info_creator">Paylaşan kişi bu içeriğin yapay zekâyla oluşturulduğunu veya düzenlendiğini belirtti.</string>
+    <string name="ai_info_metadata">Bu içerik, yapay zekâyla oluşturulduğunu veya düzenlendiğini gösteren veriler içeriyor.</string>
+    <string name="ai_info_footer">Etiketler ne gördüğünü anlamana yardımcı olur. Etiketsiz yapay zekâ içeriği görürsen bildirebilirsin.</string>
+    <string name="report_category_unlabeledAI_title">Etiketsiz yapay zekâ içeriği</string>
+    <string name="report_category_unlabeledAI_subtitle">Etiketsiz, yapay zekâyla yapılmış gerçekçi görsel, video veya sesler</string>
+</resources>

@@ -1099,6 +1099,8 @@ internal fun Moment.toFeedMomentForReels(): FeedMoment {
         hideLikeCounts = hideLikeCounts,
         disableComments = disableComments,
         allowSharing = allowSharing,
+        aiGenerated = aiGenerated,
+        aiLabelSource = aiLabelSource,
         hasHiddenLayers = hasHiddenLayers,
         hiddenLayerCount = hiddenLayerCount,
         audience = audience,

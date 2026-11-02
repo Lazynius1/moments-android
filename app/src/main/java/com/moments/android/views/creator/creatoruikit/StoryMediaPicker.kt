@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberUpdatedState
 import com.moments.android.views.creator.CreatorAspectRatio
 import com.moments.android.views.creator.CreatorMedia
+import com.moments.android.views.shared.AIContentProvenance
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -66,8 +67,12 @@ fun materializeStoryVideoIfNeeded(context: Context, uri: Uri): Uri {
     }.getOrDefault(uri)
 }
 
-/** Shared media decoding for the one-item Story picker and Story camera. */
-fun storyMediaFromUri(context: Context, uri: Uri): CreatorMedia? {
+/**
+ * Shared media decoding for the one-item Story picker and Story camera.
+ * [detectAIMetadata]: solo para galería (lee el archivo; llamar fuera del hilo principal).
+ */
+fun storyMediaFromUri(context: Context, uri: Uri, detectAIMetadata: Boolean = false): CreatorMedia? {
+    val isAIGenerated = detectAIMetadata && AIContentProvenance.isAIGenerated(context, uri)
     val type = context.contentResolver.getType(uri).orEmpty()
     val isVideo = type.startsWith("video") ||
         uri.toString().endsWith(".mp4", ignoreCase = true) ||
@@ -92,9 +97,15 @@ fun storyMediaFromUri(context: Context, uri: Uri): CreatorMedia? {
                 durationSeconds = duration,
                 aspectRatio = ratio,
                 recommendedAspectRatio = ratio,
+                isAIGenerated = isAIGenerated,
             )
         } catch (_: Exception) {
-            CreatorMedia(uri = uri, isVideo = true, aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN)
+            CreatorMedia(
+                uri = uri,
+                isVideo = true,
+                aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
+                isAIGenerated = isAIGenerated,
+            )
         } finally {
             runCatching { retriever.release() }
         }
@@ -126,6 +137,7 @@ fun storyMediaFromUri(context: Context, uri: Uri): CreatorMedia? {
             isVideo = false,
             aspectRatio = ratio,
             recommendedAspectRatio = ratio,
+            isAIGenerated = isAIGenerated,
         )
     }
 }

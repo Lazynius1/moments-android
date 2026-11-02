@@ -185,6 +185,13 @@ fun ModernExploreDetailHeader(
                                     )
                                 }
                             }
+                            // Etiqueta de contenido generado con IA
+                            if (m.aiGenerated) {
+                                com.moments.android.views.shared.AIContentBadge(
+                                    labelSource = m.aiLabelSource,
+                                    color = colors.secondary.copy(alpha = 0.85f),
+                                )
+                            }
                         }
                     }
 

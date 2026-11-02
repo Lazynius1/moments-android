@@ -43,6 +43,8 @@ data class CachedStory(
     val chainId: String? = null,
     val chainPosition: Int? = null,
     val chainTitle: String? = null,
+    val aiGenerated: Boolean? = false,
+    val aiLabelSource: String? = null,
     val cachedAt: Date = Date(),
 ) {
     /** ≡ iOS `toStory()`. */
@@ -91,6 +93,8 @@ data class CachedStory(
             chainId = chainId,
             chainPosition = chainPosition,
             chainTitle = chainTitle,
+            aiGenerated = aiGenerated ?: false,
+            aiLabelSource = aiLabelSource,
         )
     }
 
@@ -122,6 +126,8 @@ data class CachedStory(
             chainId == other.chainId &&
             chainPosition == other.chainPosition &&
             chainTitle == other.chainTitle &&
+            aiGenerated == other.aiGenerated &&
+            aiLabelSource == other.aiLabelSource &&
             cachedAt == other.cachedAt
     }
 
@@ -151,6 +157,8 @@ data class CachedStory(
         result = 31 * result + (chainId?.hashCode() ?: 0)
         result = 31 * result + (chainPosition ?: 0)
         result = 31 * result + (chainTitle?.hashCode() ?: 0)
+        result = 31 * result + (aiGenerated?.hashCode() ?: 0)
+        result = 31 * result + (aiLabelSource?.hashCode() ?: 0)
         result = 31 * result + cachedAt.hashCode()
         return result
     }
@@ -206,6 +214,8 @@ data class CachedStory(
                 chainId = story.chainId,
                 chainPosition = story.chainPosition,
                 chainTitle = story.chainTitle,
+                aiGenerated = story.aiGenerated,
+                aiLabelSource = story.aiLabelSource,
             )
         }
 

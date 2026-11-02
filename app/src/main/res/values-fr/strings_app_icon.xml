@@ -29,4 +29,12 @@
     <string name="app_icon_name_planet">Planète</string>
     <string name="app_icon_changed_title">Icône modifiée</string>
     <string name="app_icon_changed_message">Ta nouvelle icône apparaîtra sur ton écran d\'accueil quand tu quitteras Moments.</string>
+    <string name="app_icon_name_santa_hat">Bonnet</string>
+    <string name="app_icon_name_candy_cane">Sucre d\'orge</string>
+    <string name="app_icon_name_snow">Neige</string>
+    <string name="app_icon_name_baubles">Boules</string>
+    <string name="app_icon_name_lights">Guirlande</string>
+    <string name="app_icon_name_gingerbread">Pain d\'épices</string>
+    <string name="app_icon_name_christmas_tree">Sapin</string>
+    <string name="app_icon_name_snowman">Bonhomme</string>
 </resources>

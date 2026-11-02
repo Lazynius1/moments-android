@@ -1104,6 +1104,10 @@ fun StoryEditingView(
 
     val media = selectedMediaItems.firstOrNull()
 
+    // Etiqueta IA por historia: se activa sola si los metadatos del archivo lo indican
+    val aiDetectedFromMetadata = media?.isAIGenerated == true
+    var aiGeneratedEnabled by remember(media?.id) { mutableStateOf(aiDetectedFromMetadata) }
+
     // Bitmap fuente para EditableImageView / paleta vídeo
     LaunchedEffect(media?.id, media?.uri, media?.isVideo) {
         val current = media
@@ -1398,6 +1402,12 @@ fun StoryEditingView(
                 "allowStoryEphemeralPhotos" to allowStoryEphemeralPhotos,
                 "allowOriginalAudioReuse" to (allowOriginalAudioReuse && !isPrivateAccount && (isCreatingChain || isContinuingChain || audience == ContentAudience.EVERYONE)),
             )
+            val capturedAIGenerated = aiGeneratedEnabled
+            val capturedAILabelSource = when {
+                !capturedAIGenerated -> null
+                aiDetectedFromMetadata -> com.moments.android.views.shared.AILabelSource.METADATA
+                else -> com.moments.android.views.shared.AILabelSource.CREATOR
+            }
             val baseMedia = media
             val capturedFilter = selectedFilter
             val capturedFilterBmp = filteredImage?.let { src ->
@@ -1643,6 +1653,7 @@ fun StoryEditingView(
                             aspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
                             recommendedAspectRatio = CreatorAspectRatio.NINE_BY_SIXTEEN,
                             hasEdits = true,
+                            isAIGenerated = publishMedia.isAIGenerated,
                         )
                     }
                     publishMedia
@@ -1668,6 +1679,8 @@ fun StoryEditingView(
                 continuationCustomViewers = if (chainActive) capturedCustomUsers.takeIf { it.isNotEmpty() } else null,
                 continuationCustomListId = if (chainActive) capturedListId else null,
                 continuationCustomListName = if (chainActive) capturedListName else null,
+                aiGenerated = capturedAIGenerated,
+                aiLabelSource = capturedAILabelSource,
                 onPrepareFailed = {
                     // Toast desde main — el editor ya puede estar cerrado
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
@@ -2996,6 +3009,8 @@ fun StoryEditingView(
                     hasOriginalAudio = stickers.any { it.type == "audio" && it.originalAudioId == null },
                     canShareOriginalAudio = !isPrivateAccount && (isCreatingChain || isContinuingChain || audience == ContentAudience.EVERYONE),
                     allowOriginalAudioReuse = allowOriginalAudioReuse, onAudioReuseChange = { allowOriginalAudioReuse = it },
+                    aiGenerated = aiGeneratedEnabled, onAIGeneratedChange = { aiGeneratedEnabled = it },
+                    aiDetectedFromMetadata = aiDetectedFromMetadata,
                     onAudience = { showingAudience = true },
                     onChainSettings = { showingChainConfiguration = true },
                     onShare = { publishStory() },

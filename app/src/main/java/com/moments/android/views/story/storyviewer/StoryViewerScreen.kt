@@ -235,6 +235,7 @@ fun StoryViewerScreen(
     var messageText by remember { mutableStateOf("") }
     var originalAudioSheet by remember { mutableStateOf<com.moments.android.views.creator.components.music.StoryOriginalAudioSource?>(null) }
     var musicTrackSheet by remember { mutableStateOf<com.moments.android.models.StoryMusicTrack?>(null) }
+    var showingAIInfoSheet by remember { mutableStateOf(false) }
     var showReactions by remember { mutableStateOf(false) }
     var showQuickActions by remember { mutableStateOf(false) }
     var isSavingStory by remember { mutableStateOf(false) }
@@ -333,6 +334,7 @@ fun StoryViewerScreen(
     val isStoryInteractionBlocked =
         isMenuInteractionActive ||
             musicTrackSheet != null || originalAudioSheet != null || showQuickActions ||
+            showingAIInfoSheet ||
             showActivity ||
             showChain ||
             showReactions ||
@@ -409,6 +411,7 @@ fun StoryViewerScreen(
                 showBestFriendsOptOutConfirmation ||
                 showingReportSheet ||
                 showingBlockConfirmation ||
+                showingAIInfoSheet ||
                 profileRoute != null ||
                 isTextFieldFocused
         val canResume =
@@ -1462,6 +1465,11 @@ fun StoryViewerScreen(
                                     ?: if (story.stickers?.any { it.type == "audio" && it.audioURL != null } == true) stringResource(R.string.story_audio_original) + (if (story.stickers?.firstOrNull { it.type == "audio" }?.originalAudioId == null) " · " + story.username else "") else null,
                                 authorId = story.authorId,
                                 isOwnStory = isOwnStory,
+                                aiGenerated = story.aiGenerated,
+                                onAIInfoTap = {
+                                    pauseStoryPlayback()
+                                    showingAIInfoSheet = true
+                                },
                                 profileImagePath = story.profileImagePath,
                                 timestamp = story.timestamp,
                                 highlightTitle = null,
@@ -2085,6 +2093,15 @@ fun StoryViewerScreen(
                 resumeStoryPlayback()
             }
         }
+        if (showingAIInfoSheet) {
+            com.moments.android.views.shared.AIContentInfoSheet(
+                labelSource = story.aiLabelSource,
+                onDismiss = {
+                    showingAIInfoSheet = false
+                    resumeStoryPlayback()
+                },
+            )
+        }
         PermissionPrimerGateHost(gate = photosSaveGate)
     }
     } // UserProfileZoomNavigationHost
@@ -2097,6 +2114,8 @@ private fun StoryViewerHeaderChrome(
     onMusicTap: () -> Unit = {},
     authorId: String,
     isOwnStory: Boolean,
+    aiGenerated: Boolean = false,
+    onAIInfoTap: () -> Unit = {},
     profileImagePath: String?,
     timestamp: java.util.Date,
     highlightTitle: String?,
@@ -2170,6 +2189,13 @@ private fun StoryViewerHeaderChrome(
                         lineHeight = 14.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                // Etiqueta de contenido generado con IA
+                if (aiGenerated) {
+                    com.moments.android.views.shared.AIContentBadgeLabel(
+                        color = Color.White.copy(0.85f),
+                        onClick = onAIInfoTap,
                     )
                 }
                 musicTitle?.let {

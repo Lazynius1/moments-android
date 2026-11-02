@@ -1061,6 +1061,14 @@ private fun PostHeader(
                     )
                 }
             }
+
+            // Etiqueta de contenido generado con IA
+            if (moment.aiGenerated) {
+                com.moments.android.views.shared.AIContentBadge(
+                    labelSource = moment.aiLabelSource,
+                    color = colors.secondary,
+                )
+            }
         }
 
         if (showFollow) {

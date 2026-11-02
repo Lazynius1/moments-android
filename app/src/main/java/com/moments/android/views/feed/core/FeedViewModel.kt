@@ -1038,6 +1038,8 @@ class FeedViewModel : ViewModel() {
             hideLikeCounts = hideLikeCounts,
             disableComments = disableComments,
             allowSharing = allowSharing,
+            aiGenerated = aiGenerated,
+            aiLabelSource = aiLabelSource,
             hasHiddenLayers = hasHiddenLayers,
             hiddenLayerCount = hiddenLayerCount,
             audience = audience,
@@ -1235,6 +1237,10 @@ class FeedViewModel : ViewModel() {
                         .put("customListId", m.customListId)
                         .also { obj ->
                             m.isArchived?.let { obj.put("isArchived", it) }
+                            if (m.aiGenerated) {
+                                obj.put("aiGenerated", true)
+                                m.aiLabelSource?.let { obj.put("aiLabelSource", it) }
+                            }
                             m.locationCoordinate?.let { coord ->
                                 obj.put(
                                     "locationCoordinate",
@@ -1347,6 +1353,8 @@ class FeedViewModel : ViewModel() {
                                 hideLikeCounts = o.optBoolean("hideLikeCounts"),
                                 disableComments = o.optBoolean("disableComments"),
                                 allowSharing = o.optBoolean("allowSharing", true),
+                                aiGenerated = o.optBoolean("aiGenerated"),
+                                aiLabelSource = o.optString("aiLabelSource").ifBlank { null },
                                 hasHiddenLayers = o.optBoolean("hasHiddenLayers"),
                                 hiddenLayerCount = o.optInt("hiddenLayerCount"),
                                 audience = o.optString("audience").ifBlank { null },

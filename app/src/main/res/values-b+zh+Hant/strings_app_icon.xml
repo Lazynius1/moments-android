@@ -29,4 +29,12 @@
     <string name="app_icon_name_planet">星球</string>
     <string name="app_icon_changed_title">已更換圖示</string>
     <string name="app_icon_changed_message">離開 Moments 後，新圖示就會出現在主畫面上。</string>
+    <string name="app_icon_name_santa_hat">聖誕帽</string>
+    <string name="app_icon_name_candy_cane">拐杖糖</string>
+    <string name="app_icon_name_snow">雪</string>
+    <string name="app_icon_name_baubles">聖誕球</string>
+    <string name="app_icon_name_lights">燈飾</string>
+    <string name="app_icon_name_gingerbread">薑餅</string>
+    <string name="app_icon_name_christmas_tree">聖誕樹</string>
+    <string name="app_icon_name_snowman">雪人</string>
 </resources>

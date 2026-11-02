@@ -29,4 +29,12 @@
     <string name="app_icon_name_planet">Planet</string>
     <string name="app_icon_changed_title">Icon changed</string>
     <string name="app_icon_changed_message">Your new icon will appear on your Home Screen when you leave Moments.</string>
+    <string name="app_icon_name_santa_hat">Santa hat</string>
+    <string name="app_icon_name_candy_cane">Candy cane</string>
+    <string name="app_icon_name_snow">Snow</string>
+    <string name="app_icon_name_baubles">Baubles</string>
+    <string name="app_icon_name_lights">Lights</string>
+    <string name="app_icon_name_gingerbread">Gingerbread</string>
+    <string name="app_icon_name_christmas_tree">Tree</string>
+    <string name="app_icon_name_snowman">Snowman</string>
 </resources>
