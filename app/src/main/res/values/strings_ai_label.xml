@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ai_toggle_title">Made with AI</string>
-    <string name="ai_toggle_subtitle">Turn this on if the image, video or audio is realistic and was generated or edited with AI.</string>
+    <string name="ai_toggle_subtitle">Turn this on if you created or edited this content with AI.</string>
     <string name="ai_toggle_detected">We detected that this content was made with AI.</string>
     <string name="ai_badge">AI info</string>
     <string name="ai_info_title">Made with AI</string>

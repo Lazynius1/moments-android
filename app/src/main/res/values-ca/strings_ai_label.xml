@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ai_toggle_title">Creat amb IA</string>
-    <string name="ai_toggle_subtitle">Activa-ho si la imatge, el vídeo o l\'àudio són realistes i s\'han generat o modificat amb IA.</string>
+    <string name="ai_toggle_subtitle">Activa-ho si has creat o retocat aquest contingut amb IA.</string>
     <string name="ai_toggle_detected">Hem detectat que aquest contingut s\'ha creat amb IA.</string>
     <string name="ai_badge">Info d\'IA</string>
     <string name="ai_info_title">Contingut creat amb IA</string>

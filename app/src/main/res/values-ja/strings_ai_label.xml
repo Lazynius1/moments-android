@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ai_toggle_title">AIで作成</string>
-    <string name="ai_toggle_subtitle">画像・動画・音声がリアルで、AIで生成または編集されている場合はオンにしてください。</string>
+    <string name="ai_toggle_subtitle">このコンテンツをAIで作成または編集した場合はオンにしてください。</string>
     <string name="ai_toggle_detected">このコンテンツはAIで作成されたことが検出されました。</string>
     <string name="ai_badge">AI情報</string>
     <string name="ai_info_title">AIで作成されたコンテンツ</string>

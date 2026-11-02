@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ai_toggle_title">使用 AI 製作</string>
-    <string name="ai_toggle_subtitle">如果圖片、影片或音訊看起來真實，且是用 AI 生成或編輯的，請開啟此選項。</string>
+    <string name="ai_toggle_subtitle">如果你用 AI 製作或編輯了此內容，請開啟此選項。</string>
     <string name="ai_toggle_detected">我們偵測到此內容是用 AI 製作的。</string>
     <string name="ai_badge">AI 資訊</string>
     <string name="ai_info_title">使用 AI 製作的內容</string>

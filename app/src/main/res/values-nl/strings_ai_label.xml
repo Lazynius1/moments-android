@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ai_toggle_title">Gemaakt met AI</string>
-    <string name="ai_toggle_subtitle">Zet dit aan als de afbeelding, video of audio realistisch is en met AI is gemaakt of bewerkt.</string>
+    <string name="ai_toggle_subtitle">Zet dit aan als je deze content met AI hebt gemaakt of bewerkt.</string>
     <string name="ai_toggle_detected">We hebben gedetecteerd dat deze content met AI is gemaakt.</string>
     <string name="ai_badge">AI-info</string>
     <string name="ai_info_title">Met AI gemaakte content</string>

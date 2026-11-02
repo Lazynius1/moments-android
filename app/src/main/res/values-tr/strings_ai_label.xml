@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ai_toggle_title">Yapay zekâyla oluşturuldu</string>
-    <string name="ai_toggle_subtitle">Görsel, video veya ses gerçekçiyse ve yapay zekâyla oluşturulduysa ya da düzenlendiyse bunu aç.</string>
+    <string name="ai_toggle_subtitle">Bu içeriği yapay zekâyla oluşturduysan veya düzenlediysen bunu aç.</string>
     <string name="ai_toggle_detected">Bu içeriğin yapay zekâyla oluşturulduğunu tespit ettik.</string>
     <string name="ai_badge">Yapay zekâ bilgisi</string>
     <string name="ai_info_title">Yapay zekâyla oluşturulan içerik</string>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ai_toggle_title">Utworzone przez AI</string>
-    <string name="ai_toggle_subtitle">Włącz, jeśli obraz, wideo lub dźwięk wyglądają realistycznie i zostały wygenerowane lub zmienione przez AI.</string>
+    <string name="ai_toggle_subtitle">Włącz, jeśli ta treść została utworzona lub zmieniona przez Ciebie za pomocą AI.</string>
     <string name="ai_toggle_detected">Wykryliśmy, że ta treść została utworzona przez AI.</string>
     <string name="ai_badge">Informacje o AI</string>
     <string name="ai_info_title">Treść utworzona przez AI</string>

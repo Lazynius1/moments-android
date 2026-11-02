@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ai_toggle_title">Mit KI erstellt</string>
-    <string name="ai_toggle_subtitle">Aktiviere das, wenn Bild, Video oder Audio realistisch sind und mit KI erstellt oder bearbeitet wurden.</string>
+    <string name="ai_toggle_subtitle">Aktiviere das, wenn du diesen Inhalt mit KI erstellt oder bearbeitet hast.</string>
     <string name="ai_toggle_detected">Wir haben erkannt, dass dieser Inhalt mit KI erstellt wurde.</string>
     <string name="ai_badge">KI-Info</string>
     <string name="ai_info_title">Mit KI erstellter Inhalt</string>

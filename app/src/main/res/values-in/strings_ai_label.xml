@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ai_toggle_title">Dibuat dengan AI</string>
-    <string name="ai_toggle_subtitle">Aktifkan jika gambar, video, atau audio terlihat nyata dan dibuat atau diubah dengan AI.</string>
+    <string name="ai_toggle_subtitle">Aktifkan jika kamu membuat atau mengedit konten ini dengan AI.</string>
     <string name="ai_toggle_detected">Kami mendeteksi bahwa konten ini dibuat dengan AI.</string>
     <string name="ai_badge">Info AI</string>
     <string name="ai_info_title">Konten dibuat dengan AI</string>

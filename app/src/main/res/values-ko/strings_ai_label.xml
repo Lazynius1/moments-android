@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ai_toggle_title">AI로 생성됨</string>
-    <string name="ai_toggle_subtitle">이미지, 동영상 또는 오디오가 실제처럼 보이고 AI로 생성되거나 편집된 경우 켜 주세요.</string>
+    <string name="ai_toggle_subtitle">AI로 이 콘텐츠를 만들거나 편집했다면 켜 주세요.</string>
     <string name="ai_toggle_detected">이 콘텐츠가 AI로 생성된 것으로 감지되었어요.</string>
     <string name="ai_badge">AI 정보</string>
     <string name="ai_info_title">AI로 생성된 콘텐츠</string>

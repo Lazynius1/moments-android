@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="ai_toggle_title">AI से बनाया गया</string>
-    <string name="ai_toggle_subtitle">अगर इमेज, वीडियो या ऑडियो असली जैसा है और AI से बनाया या बदला गया है, तो इसे चालू करें।</string>
+    <string name="ai_toggle_subtitle">अगर आपने यह कंटेंट AI से बनाया या एडिट किया है, तो इसे चालू करें।</string>
     <string name="ai_toggle_detected">हमें पता चला है कि यह कंटेंट AI से बनाया गया है।</string>
     <string name="ai_badge">AI जानकारी</string>
     <string name="ai_info_title">AI से बनाया गया कंटेंट</string>
