@@ -4,6 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -21,7 +27,15 @@ fun StorySegmentProgressChrome(
     progressForSegment: (Int) -> Float,
     audienceForSegment: (Int) -> String? = { null },
     modifier: Modifier = Modifier,
+    /** Foto en marcha: la barra se redibuja en cada fotograma, sin saltos. */
+    continuous: Boolean = false,
 ) {
+    var frameNanos by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(continuous) {
+        if (continuous) while (true) withFrameNanos { frameNanos = it }
+    }
+    // Leerlo aquí suscribe solo esta barra a cada fotograma.
+    if (continuous && frameNanos < 0L) return
     Row(
         modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -31,6 +45,7 @@ fun StorySegmentProgressChrome(
                 progress = progressForSegment(index).coerceIn(0f, 1f),
                 isActive = index == storyIndex,
                 audience = audienceForSegment(index),
+                animates = !continuous,
                 modifier = Modifier.weight(1f),
             )
         }

@@ -1438,8 +1438,9 @@ fun StoryViewerScreen(
                     StorySegmentProgressChrome(
                         storyCount = storyCount.coerceAtLeast(1),
                         storyIndex = storyIndex.coerceIn(0, (storyCount - 1).coerceAtLeast(0)),
+                        continuous = playbackCoordinator.imageRun != null,
                         progressForSegment = { idx ->
-                            playbackCoordinator.progressForSegment(idx, storyIndex)
+                            playbackCoordinator.segmentDisplayProgress(idx, storyIndex)
                         },
                         audienceForSegment = ::audienceForSegment,
                     )

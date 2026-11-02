@@ -49,6 +49,29 @@ class StoryPlaybackCoordinator(
 
     var progress by mutableFloatStateOf(0f)
         private set
+
+    /** Tramo de una historia de foto en marcha: desde cuándo (System.nanoTime) y desde qué punto. */
+    data class ImageRun(val startNanos: Long, val base: Float, val durationSeconds: Double)
+
+    /**
+     * Con una foto en marcha la barra se calcula por tiempo en cada fotograma (fluida);
+     * en pausa o con vídeo es null y vale [progress].
+     */
+    var imageRun by mutableStateOf<ImageRun?>(null)
+        private set
+
+    fun displayProgress(nowNanos: Long = System.nanoTime()): Float {
+        val run = imageRun ?: return progress
+        if (run.durationSeconds <= 0) return progress
+        val elapsed = (nowNanos - run.startNanos) / 1_000_000_000.0
+        return (run.base + elapsed / run.durationSeconds).toFloat().coerceIn(0f, 1f)
+    }
+
+    fun segmentDisplayProgress(index: Int, storyIndex: Int): Float = when {
+        index < storyIndex -> 1f
+        index == storyIndex -> displayProgress()
+        else -> 0f
+    }
     var isPaused by mutableStateOf(false)
         private set
 
@@ -79,6 +102,7 @@ class StoryPlaybackCoordinator(
     }
 
     fun prepareStory(story: Story, initialElapsed: Double = 0.0, onImageComplete: () -> Unit) {
+        invalidateImageTimer()
         val duration = if (story.duration > 0) story.duration else defaultStoryDuration
         progress = if (initialElapsed > 0 && duration > 0) {
             (initialElapsed / duration).toFloat().coerceIn(0f, 0.99f)
@@ -93,10 +117,10 @@ class StoryPlaybackCoordinator(
     }
 
     fun stopStory() {
+        invalidateImageTimer()
         isPaused = true
         progress = 0f
         currentStoryId = null
-        invalidateImageTimer()
     }
 
     fun pauseStory() {
@@ -235,7 +259,8 @@ class StoryPlaybackCoordinator(
     private fun startImageTimer(story: Story, onComplete: () -> Unit) {
         val duration = if (story.duration > 0) story.duration else defaultStoryDuration
         invalidateImageTimer()
-        // ≡ Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true)
+        imageRun = ImageRun(System.nanoTime(), progress, duration)
+        // El temporizador solo detecta el final; la barra se dibuja por tiempo en cada fotograma.
         imageTimer = scope.launch {
             while (true) {
                 delay(100)
@@ -247,7 +272,7 @@ class StoryPlaybackCoordinator(
     /** @return true si el timer terminó (progress ≥ 1). */
     private fun tickImageStory(duration: Double, onComplete: () -> Unit): Boolean {
         if (isPaused) return false
-        progress += (0.1 / duration).toFloat()
+        progress = displayProgress()
         if (progress >= 1f) {
             progress = 1f
             imageTimer = null
@@ -260,5 +285,10 @@ class StoryPlaybackCoordinator(
     private fun invalidateImageTimer() {
         imageTimer?.cancel()
         imageTimer = null
+        // Congela la barra donde iba (pausa, cambio o fin de historia).
+        if (imageRun != null) {
+            progress = displayProgress()
+            imageRun = null
+        }
     }
 }

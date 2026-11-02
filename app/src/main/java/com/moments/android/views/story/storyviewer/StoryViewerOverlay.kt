@@ -99,6 +99,8 @@ fun GlassmorphicProgressBar(
     isActive: Boolean,
     audience: String?,
     modifier: Modifier = Modifier,
+    /** Suaviza entre actualizaciones (vídeo); sin animación cuando ya se dibuja en cada fotograma. */
+    animates: Boolean = true,
 ) {
     val isDark = isSystemInDarkTheme()
     val everyoneFill = if (isDark) Surface else Ink
@@ -117,7 +119,7 @@ fun GlassmorphicProgressBar(
     }
     val animatedProgress by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
-        animationSpec = if (isActive) tween(100, easing = LinearEasing) else snap(),
+        animationSpec = if (isActive && animates) tween(100, easing = LinearEasing) else snap(),
         label = "glassProgress",
     )
     BoxWithConstraints(
