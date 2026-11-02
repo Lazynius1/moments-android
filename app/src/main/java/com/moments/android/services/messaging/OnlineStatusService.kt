@@ -53,22 +53,25 @@ class OnlineStatusService private constructor() : DefaultLifecycleObserver {
 
     private fun ctx(): Context = appContext ?: error("OnlineStatusService.initialize required")
 
+    @Volatile private var isInForeground = true
+
     private fun startTracking() {
         if (trackingStarted) return
         trackingStarted = true
         ProcessLifecycleOwner.get().lifecycle.addObserver(this)
-        // Actualizar estado cada 30 segundos
+        // Latido cada 2 minutos y solo con la app delante: basta para que lastSeen no pase
+        // de los 5 que marcan "ausente", y en segundo plano no escribe el perfil.
         scope.launch {
             while (isActive) {
-                delay(30_000L)
-                updateOnlineStatus()
+                delay(120_000L)
+                if (isInForeground) updateOnlineStatus()
             }
         }
         // Actualizar lastSeen cada 5 minutos
         scope.launch {
             while (isActive) {
                 delay(300_000L)
-                updateLastSeen()
+                if (isInForeground) updateLastSeen()
             }
         }
         syncStatusWithFirestore()
@@ -76,12 +79,14 @@ class OnlineStatusService private constructor() : DefaultLifecycleObserver {
 
     /** ≡ `handleAppDidEnterBackground` */
     override fun onStop(owner: LifecycleOwner) {
+        isInForeground = false
         if (_currentUserStatus.value == OnlineStatus.ONLINE) updateLastSeen()
         cancelAutoTimers()
     }
 
     /** ≡ `handleAppWillEnterForeground` */
     override fun onStart(owner: LifecycleOwner) {
+        isInForeground = true
         cancelAutoTimers()
         when (_currentUserStatus.value) {
             OnlineStatus.ONLINE, OnlineStatus.AWAY -> setStatus(OnlineStatus.ONLINE)
