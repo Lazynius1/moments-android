@@ -1,7 +1,6 @@
 package com.moments.android.services.firestore
 
 import com.google.firebase.Timestamp
-import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Source
@@ -131,9 +130,9 @@ suspend fun FirestoreService.createUser(
     )
     if (profileImagePath != null) profile["profileImagePath"] = profileImagePath
 
+    // El índice público de nombres no guarda el email (lo resuelve el servidor).
     val index = hashMapOf<String, Any>(
         "userId" to userId,
-        "email" to email,
         "createdAt" to now,
         "updatedAt" to now,
     )
@@ -174,10 +173,8 @@ suspend fun FirestoreService.changeUsername(userId: String, oldUsername: String,
     val newUsernameData = (oldSnap.data as? Map<String, Any?>)?.toMutableMap() ?: mutableMapOf()
     newUsernameData["userId"] = userId
     newUsernameData["updatedAt"] = FieldValue.serverTimestamp()
-    val userEmail = (userData["email"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
-    val authEmail = FirebaseAuth.getInstance().currentUser?.email
-        ?.trim()?.takeIf { it.isNotEmpty() }
-    (userEmail ?: authEmail)?.let { newUsernameData["email"] = it }
+    // El índice público de nombres no guarda el email (lo resuelve el servidor).
+    newUsernameData.remove("email")
     if (newUsernameData["createdAt"] == null) newUsernameData["createdAt"] = FieldValue.serverTimestamp()
 
     db.runBatch { batch ->

@@ -38,9 +38,9 @@ suspend fun completeEmailRegistration(
 
         val now = FieldValue.serverTimestamp()
         val profile = buildProfileMap(user.uid, usernameLower, email.trim(), interests, profileImagePath, now)
+        // El índice público de nombres no guarda el email (lo resuelve el servidor).
         val index = hashMapOf<String, Any>(
             "userId" to user.uid,
-            "email" to email.trim(),
             "createdAt" to now,
             "updatedAt" to now,
         )
