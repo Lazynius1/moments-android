@@ -2,6 +2,7 @@ package com.moments.android.services.firestore
 
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.models.AppUser
+import com.moments.android.services.privacy.PrivateAccountStore
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -158,13 +159,16 @@ private suspend fun FirestoreService.applySearchVisibilityFilter(users: List<App
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return users
     // A candidate profile already carries its own block list, so hide accounts
     // that blocked the signed-in user before reading the current profile.
-    val candidates = users.filter { it.id != currentUserId && currentUserId !in it.blockedUsers }
+    PrivateAccountStore.awaitLoaded()
+    val candidates = users.filter {
+        it.id != currentUserId && currentUserId !in it.blockedUsers && !PrivateAccountStore.hasBlockedMe(it.id)
+    }
     val snap = db.collection("users").document(currentUserId).get().await()
     @Suppress("UNCHECKED_CAST")
-    val blockedUsers = (snap.data?.get("blockedUsers") as? List<*>)?.filterIsInstance<String>()
+    val publicBlocked = (snap.data?.get("blockedUsers") as? List<*>)?.filterIsInstance<String>()
         ?.filter { it.isNotEmpty() }
-        ?.toSet()
         .orEmpty()
+    val blockedUsers = PrivateAccountStore.mergedBlockedUsers(publicBlocked)
     @Suppress("UNCHECKED_CAST")
     val muteSettings = snap.data?.get("muteSettings") as? Map<String, Any?>
     val hideFromSearch = muteSettings?.get("hideFromSearch") as? Boolean ?: false

@@ -4,6 +4,7 @@ import android.os.Build
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.messaging.FirebaseMessaging
 import com.moments.android.BuildConfig
 import com.moments.android.MomentsApplication
@@ -67,7 +68,7 @@ object FCMTokenService {
         )
 
         runCatching {
-            db.collection("users").document(userId).update(userData).await()
+            writeToken(userId, userData, token)
         }.onFailure {
             android.util.Log.w(TAG, "Failed to save FCM token, retry in 30s: $it")
             delay(30_000)
@@ -79,15 +80,31 @@ object FCMTokenService {
         val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         scope.launch {
             runCatching {
-                db.collection("users").document(userId).update(
+                writeToken(
+                    userId,
                     mapOf(
                         "fcmToken" to FieldValue.delete(),
                         "fcmTokenUpdatedAt" to FieldValue.serverTimestamp(),
                     ),
-                ).await()
+                    FieldValue.delete(),
+                )
                 notifyBackendTokenCleared(userId)
             }
         }
+    }
+
+    /** Doc público (como siempre) + `private/account` en un único batch. */
+    private suspend fun writeToken(userId: String, publicData: Map<String, Any>, privateToken: Any) {
+        val userRef = db.collection("users").document(userId)
+        val privateRef = userRef.collection("private").document("account")
+        db.runBatch { batch ->
+            batch.update(userRef, publicData)
+            batch.set(
+                privateRef,
+                mapOf("fcmToken" to privateToken, "updatedAt" to FieldValue.serverTimestamp()),
+                SetOptions.merge(),
+            )
+        }.await()
     }
 
     private fun notifyBackendTokenCleared(userId: String) {

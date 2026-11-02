@@ -30,6 +30,7 @@ import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.ContentAudience
 import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.services.privacy.FollowStateStore
+import com.moments.android.services.privacy.PrivateAccountStore
 import com.moments.android.views.feed.reactions.ReactionType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -204,28 +205,48 @@ class FirestoreService(
 
     suspend fun checkIfBlocked(currentUserId: String, targetUserId: String): BlockCheckResult =
         coroutineScope {
+            // Si consulta el usuario de la sesión, se combina con sus datos privados.
+            val isMe = PrivateAccountStore.isSignedInUser(currentUserId)
+            val storeLoaded = async { if (isMe) PrivateAccountStore.awaitLoaded() }
             val currentDeferred = async {
-                runCatching {
+                val publicBlocked = runCatching {
                     val snap = db.collection("users").document(currentUserId).get().await()
                     @Suppress("UNCHECKED_CAST")
                     val blocked = (snap.data as? Map<String, Any?>)?.get("blockedUsers") as? List<*>
                     blocked?.filterIsInstance<String>()?.contains(targetUserId) == true
                 }.getOrDefault(false)
+                storeLoaded.await()
+                publicBlocked || (isMe && targetUserId in PrivateAccountStore.blockedUsers.value)
             }
             val targetDeferred = async {
-                runCatching {
+                val publicBlocked = runCatching {
                     val snap = db.collection("users").document(targetUserId).get().await()
                     @Suppress("UNCHECKED_CAST")
                     val blocked = (snap.data as? Map<String, Any?>)?.get("blockedUsers") as? List<*>
                     blocked?.filterIsInstance<String>()?.contains(currentUserId) == true
                 }.getOrDefault(false)
+                storeLoaded.await()
+                publicBlocked || (isMe && PrivateAccountStore.hasBlockedMe(targetUserId))
             }
             BlockCheckResult(currentDeferred.await(), targetDeferred.await())
         }
 
+    /** Escribe la misma operación en el doc público y en `private/account` en un único batch. */
+    private suspend fun updateOwnListField(userId: String, field: String, value: FieldValue) {
+        val userRef = db.collection("users").document(userId)
+        val privateRef = userRef.collection("private").document("account")
+        db.runBatch { batch ->
+            batch.update(userRef, field, value)
+            batch.set(
+                privateRef,
+                mapOf(field to value, "updatedAt" to FieldValue.serverTimestamp()),
+                SetOptions.merge(),
+            )
+        }.await()
+    }
+
     suspend fun blockUser(currentUserId: String, targetUserId: String, announce: Boolean = true) {
-        db.collection("users").document(currentUserId)
-            .update("blockedUsers", FieldValue.arrayUnion(targetUserId)).await()
+        updateOwnListField(currentUserId, "blockedUsers", FieldValue.arrayUnion(targetUserId))
         invalidateFollowingCache(currentUserId, targetUserId)
         invalidateFollowingCache(targetUserId, currentUserId)
         runCatching { unfollowUser(currentUserId, targetUserId, announce = false) }
@@ -261,8 +282,7 @@ class FirestoreService(
     suspend fun unblockUser(currentUserId: String, targetUserId: String) {
         invalidateFollowingCache(currentUserId, targetUserId)
         invalidateFollowingCache(targetUserId, currentUserId)
-        db.collection("users").document(currentUserId)
-            .update("blockedUsers", FieldValue.arrayRemove(targetUserId)).await()
+        updateOwnListField(currentUserId, "blockedUsers", FieldValue.arrayRemove(targetUserId))
     }
 
     /** Solo los IDs de a quién sigue, sin descargar cada perfil (para el feed). */
@@ -1072,6 +1092,10 @@ class FirestoreService(
         if (currentUserId == targetUserId) return true
         val target = fetchUserProfile(targetUserId)
         if (target.blockedUsers.contains(currentUserId)) return false
+        if (PrivateAccountStore.isSignedInUser(currentUserId)) {
+            PrivateAccountStore.awaitLoaded()
+            if (PrivateAccountStore.hasBlockedMe(targetUserId)) return false
+        }
         val current = fetchUserProfile(currentUserId)
         if (current.blockedUsers.contains(targetUserId)) return false
         if (!target.isPrivate) return true

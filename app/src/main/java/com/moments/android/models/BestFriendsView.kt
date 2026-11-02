@@ -56,6 +56,7 @@ import com.moments.android.R
 import com.moments.android.coordinators.ProfileImageView
 import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.privacy.PrivateAccountStore
 import com.moments.android.views.settings.SettingsSubsectionWrapper
 import com.moments.android.views.settings.SettingsSearchField
 import com.moments.android.services.firestore.fetchUsersInBatches
@@ -150,7 +151,7 @@ fun BestFriendsView(
             val blockedSnap = db.collection("users").document(userId).get().await()
             @Suppress("UNCHECKED_CAST")
             val blocked = (blockedSnap.get("blockedUsers") as? List<*>)?.filterIsInstance<String>().orEmpty()
-            blockedUserIds = blocked.toSet()
+            blockedUserIds = PrivateAccountStore.mergedBlockedUsers(blocked)
 
             val followingIds = db.collection("users").document(userId).collection("following")
                 .get().await().documents.map { it.id }
@@ -206,10 +207,12 @@ fun BestFriendsView(
         }
         delay(250)
         val users = runCatching { firestore.searchUsersUncapped(cleanQuery) }.getOrDefault(emptyList())
+        PrivateAccountStore.awaitLoaded()
         val filtered = users.filter { user ->
             if (user.id == currentUserId) return@filter false
             if (user.id in blockedUserIds) return@filter false
             if (currentUserId != null && currentUserId in user.blockedUsers) return@filter false
+            if (PrivateAccountStore.hasBlockedMe(user.id)) return@filter false
             true
         }
         state = state.copy(remoteResults = filtered)

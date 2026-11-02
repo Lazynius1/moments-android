@@ -4,8 +4,10 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.moments.android.models.AppUser
 import com.moments.android.services.firestore.FirestoreService
+import com.moments.android.services.privacy.PrivateAccountStore
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -24,13 +26,25 @@ class BestFriendsService(
     private val bestFriendsOptOutFunctionName = "optOutBestFriends"
 
     suspend fun addBestFriend(currentUserId: String, friendId: String) {
-        db.collection("users").document(currentUserId)
-            .update("bestFriends", FieldValue.arrayUnion(friendId)).await()
+        updateBestFriends(currentUserId, FieldValue.arrayUnion(friendId))
     }
 
     suspend fun removeBestFriend(currentUserId: String, friendId: String) {
-        db.collection("users").document(currentUserId)
-            .update("bestFriends", FieldValue.arrayRemove(friendId)).await()
+        updateBestFriends(currentUserId, FieldValue.arrayRemove(friendId))
+    }
+
+    /** Doc público y `private/account` en un único batch. */
+    private suspend fun updateBestFriends(currentUserId: String, value: FieldValue) {
+        val userRef = db.collection("users").document(currentUserId)
+        val privateRef = userRef.collection("private").document("account")
+        db.runBatch { batch ->
+            batch.update(userRef, "bestFriends", value)
+            batch.set(
+                privateRef,
+                mapOf("bestFriends" to value, "updatedAt" to FieldValue.serverTimestamp()),
+                SetOptions.merge(),
+            )
+        }.await()
     }
 
     suspend fun optOutFromBestFriends(ofOwnerId: String) {
@@ -73,8 +87,13 @@ class BestFriendsService(
         @Suppress("UNCHECKED_CAST")
         val data = snap.data as Map<String, Any?>
         val user = AppUser.from(snap.id, data)
-        if (user.bestFriends.isEmpty()) return@coroutineScope emptyList()
-        user.bestFriends.map { friendId ->
+        val bestFriends = if (PrivateAccountStore.isSignedInUser(userId)) {
+            PrivateAccountStore.mergedBestFriends(user.bestFriends).toList()
+        } else {
+            user.bestFriends
+        }
+        if (bestFriends.isEmpty()) return@coroutineScope emptyList()
+        bestFriends.map { friendId ->
             async {
                 runCatching { firestoreService.fetchUser(friendId) }.getOrNull()
                     ?.takeIf { it.isActive }

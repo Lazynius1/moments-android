@@ -31,6 +31,7 @@ import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.services.privacy.PrivacyService
+import com.moments.android.services.privacy.PrivateAccountStore
 import com.moments.android.services.privacy.VisibleConnectionTypes
 import com.moments.android.services.social.AffinityInteractionType
 import com.moments.android.services.social.AffinityTracker
@@ -437,11 +438,13 @@ class UserProfileViewModel(
             .getOrNull() ?: run { suggestedConnectionsForViewer = emptyList(); return }
 
         val excludedNetworkIds = viewerFollowingIds union viewerFollowerIds
+        PrivateAccountStore.awaitLoaded()
         val filtered = uniqueUsersPreservingOrder(users).filter { user ->
             user.id !in excludingIds &&
                 user.id !in excludedNetworkIds &&
                 user.id !in viewerBlockedUserIds &&
-                viewerId !in user.blockedUsers
+                viewerId !in user.blockedUsers &&
+                !PrivateAccountStore.hasBlockedMe(user.id)
         }.sortedWith(
             compareByDescending<AppUser> { (it.interests intersect viewerInterests.toSet()).size }
                 .thenBy { it.username.lowercase() },

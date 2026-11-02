@@ -1,6 +1,7 @@
 package com.moments.android.services.firestore
 
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.Source
@@ -8,6 +9,9 @@ import com.moments.android.models.AppUser
 import com.moments.android.services.compliance.AgePolicy
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.persistence.LocalPersistenceService
+import com.moments.android.services.privacy.PrivateAccountStore
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 import java.util.Calendar
@@ -15,8 +19,36 @@ import java.util.Date
 
 /** Port de FirestoreProfilesRepository.swift — métodos de perfil/usuario. */
 
-suspend fun FirestoreService.fetchUser(userId: String): AppUser {
+/** Lee `users/{uid}/private/account` solo si es el usuario de la sesión; null si falla o no existe. */
+private suspend fun FirestoreService.fetchPrivateAccountData(userId: String): Map<String, Any?>? {
+    if (userId.isEmpty() || userId != FirebaseAuth.getInstance().currentUser?.uid) return null
+    return runCatching {
+        val ref = db.collection("users").document(userId).collection("private").document("account")
+        val snap = if (NetworkMonitor.isConnected) ref.get(Source.DEFAULT).await() else ref.get(Source.CACHE).await()
+        snap.takeIf { it.exists() }?.data
+    }.getOrNull()
+}
+
+/** Une bloqueos/mejores amigos del doc público y del privado; el email privado tiene prioridad. */
+private fun AppUser.withPrivateAccount(data: Map<String, Any?>?): AppUser {
+    if (data == null) return this
+    val privateBlocked = (data["blockedUsers"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+    val privateBestFriends = (data["bestFriends"] as? List<*>)?.filterIsInstance<String>().orEmpty()
+    val privateEmail = (data["email"] as? String)?.takeIf { it.isNotBlank() }
+    return copy(
+        blockedUsers = (blockedUsers + privateBlocked).distinct(),
+        bestFriends = (bestFriends + privateBestFriends).distinct(),
+        email = privateEmail ?: email,
+    )
+}
+
+/** Completa el usuario de la sesión con sus datos privados (no-op para terceros). */
+suspend fun FirestoreService.overlayPrivateAccount(user: AppUser): AppUser =
+    user.withPrivateAccount(fetchPrivateAccountData(user.id))
+
+suspend fun FirestoreService.fetchUser(userId: String): AppUser = coroutineScope {
     require(userId.isNotEmpty()) { "El userId está vacío" }
+    val privateData = async { fetchPrivateAccountData(userId) }
     // ≡ iOS Source.default vs .cache según red; si Firestore dice offline con monitor online → cache.
     val snap = if (NetworkMonitor.isConnected) {
         runCatching { db.collection("users").document(userId).get(Source.DEFAULT).await() }
@@ -29,24 +61,27 @@ suspend fun FirestoreService.fetchUser(userId: String): AppUser {
     if (!snap.exists()) error("User not found: $userId")
     @Suppress("UNCHECKED_CAST")
     val data = snap.data as Map<String, Any?>
-    return AppUser.from(snap.id, data)
+    AppUser.from(snap.id, data).withPrivateAccount(privateData.await())
 }
 
-suspend fun FirestoreService.fetchUserProfile(userId: String): AppUser {
+suspend fun FirestoreService.fetchUserProfile(userId: String): AppUser = coroutineScope {
+    val privateData = async { fetchPrivateAccountData(userId) }
     // iOS: siempre Source.DEFAULT (no cache-offline).
     val snap = db.collection("users").document(userId).get(Source.DEFAULT).await()
     if (!snap.exists()) error("Document not found")
     @Suppress("UNCHECKED_CAST")
-    return AppUser.from(snap.id, snap.data as Map<String, Any?>)
+    val data = snap.data as Map<String, Any?>
+    AppUser.from(snap.id, data).withPrivateAccount(privateData.await())
 }
 
-suspend fun FirestoreService.fetchUserProfileWithAvailability(userId: String): Pair<AppUser, PublicProfileAvailability> {
+suspend fun FirestoreService.fetchUserProfileWithAvailability(userId: String): Pair<AppUser, PublicProfileAvailability> = coroutineScope {
+    val privateData = async { fetchPrivateAccountData(userId) }
     val snap = db.collection("users").document(userId).get(Source.DEFAULT).await()
     if (!snap.exists()) error("Document not found")
     @Suppress("UNCHECKED_CAST")
     val data = snap.data as Map<String, Any?>
     val availability = PublicProfileAvailability.fromUserData(data)
-    return AppUser.from(snap.id, data) to availability
+    AppUser.from(snap.id, data).withPrivateAccount(privateData.await()) to availability
 }
 
 suspend fun FirestoreService.checkPublicProfileAvailability(userId: String): PublicProfileAvailability {
@@ -247,6 +282,8 @@ suspend fun FirestoreService.fetchUsersWithSharedInterests(
     if (interests.isEmpty()) return emptyList()
     val currentUser = fetchUserProfile(excludingUserId)
     val blockedUsers = currentUser.blockedUsers.toSet()
+    val excludingIsMe = PrivateAccountStore.isSignedInUser(excludingUserId)
+    if (excludingIsMe) PrivateAccountStore.awaitLoaded()
     val seen = linkedMapOf<String, AppUser>()
     for (batch in interests.chunked(30)) {
         val snap = db.collection("users")
@@ -260,6 +297,7 @@ suspend fun FirestoreService.fetchUsersWithSharedInterests(
             val data = doc.data as? Map<String, Any?> ?: continue
             val user = AppUser.from(doc.id, data)
             if (excludingUserId in user.blockedUsers) continue
+            if (excludingIsMe && PrivateAccountStore.hasBlockedMe(doc.id)) continue
             seen[doc.id] = user
         }
     }

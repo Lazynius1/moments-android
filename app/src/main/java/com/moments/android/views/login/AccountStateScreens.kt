@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.R
@@ -97,7 +98,7 @@ suspend fun resolveAccountState(uid: String): AccountState {
             val user = AuthService.deactivatedUserData.value
             return AccountState.Deactivated(
                 username = user?.username,
-                email = user?.email,
+                email = user?.email?.takeIf { it.isNotBlank() } ?: FirebaseAuth.getInstance().currentUser?.email,
                 profileImagePath = user?.profileImagePath,
             )
         }
@@ -141,7 +142,8 @@ suspend fun resolveAccountState(uid: String): AccountState {
     if (!isActive) {
         return AccountState.Deactivated(
             username = data["username"] as? String,
-            email = data["email"] as? String,
+            // El email ya no vive en el doc público: respaldo con el de Auth.
+            email = (data["email"] as? String)?.takeIf { it.isNotBlank() } ?: FirebaseAuth.getInstance().currentUser?.email,
             profileImagePath = data["profileImagePath"] as? String,
         )
     }

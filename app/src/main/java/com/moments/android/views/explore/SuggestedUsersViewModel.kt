@@ -14,6 +14,7 @@ import com.moments.android.services.firestore.fetchUserProfile
 import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.services.privacy.PrivacyService
+import com.moments.android.services.privacy.PrivateAccountStore
 import com.moments.android.utilities.HapticManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
@@ -94,11 +95,13 @@ class SuggestedUsersViewModel(
                     return@launch
                 }
                 val existingIds = users.map { it.id }.toSet()
+                PrivateAccountStore.awaitLoaded()
                 val filtered = page.users
                     .filter { user ->
                         user.id !in existingIds &&
                             user.id !in blockedUsers &&
                             userId !in user.blockedUsers &&
+                            !PrivateAccountStore.hasBlockedMe(user.id) &&
                             user.id !in followedUserIds
                     }
                     .sortedByDescending {
@@ -149,10 +152,12 @@ class SuggestedUsersViewModel(
                 limit = pageSize,
                 startAfter = null,
             )
+            PrivateAccountStore.awaitLoaded()
             val filtered = page.users
                 .filter { user ->
                     user.id !in blockedUsers &&
                         userId !in user.blockedUsers &&
+                        !PrivateAccountStore.hasBlockedMe(user.id) &&
                         user.id !in followedUserIds
                 }
                 .sortedByDescending {

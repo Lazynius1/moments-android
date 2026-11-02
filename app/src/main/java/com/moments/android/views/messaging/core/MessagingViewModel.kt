@@ -23,6 +23,7 @@ import com.moments.android.services.messaging.MessageCatchUpService
 import com.moments.android.services.messaging.DirectMessageRoute
 import com.moments.android.services.messaging.MessageRequestService
 import com.moments.android.services.persistence.LocalPersistenceService
+import com.moments.android.services.privacy.PrivateAccountStore
 import com.moments.android.views.messaging.services.ChatDraftStore
 import com.moments.android.views.messaging.services.ChatScrollStateStore
 import com.moments.android.views.messaging.services.ChatService
@@ -257,8 +258,13 @@ class MessagingViewModel(
             val currentUser: AppUser? = if (ownId.isBlank()) null else suspendCancellableCoroutine<AppUser?> { continuation ->
                 UserCacheService.getUser(ownId) { continuation.resume(it) }
             }
-            val blockedByCurrentUser = currentUser?.blockedUsers?.contains(userId) == true
-            val blockedCurrentUser = user?.blockedUsers?.contains(ownId) == true
+            // La caché puede no tener los datos privados: se combina con el store de la sesión.
+            val ownIsMe = PrivateAccountStore.isSignedInUser(ownId)
+            if (ownIsMe) PrivateAccountStore.awaitLoaded()
+            val blockedByCurrentUser = currentUser?.blockedUsers?.contains(userId) == true ||
+                (ownIsMe && userId in PrivateAccountStore.blockedUsers.value)
+            val blockedCurrentUser = user?.blockedUsers?.contains(ownId) == true ||
+                (ownIsMe && PrivateAccountStore.hasBlockedMe(userId))
             val username = user?.username ?: conversation.otherParticipantUsername ?: localized(R.string.messaging_user_default)
             val imagePath = user?.profileImagePath ?: conversation.otherParticipantProfileImagePath.orEmpty()
             participantStateFetches.remove(userId)

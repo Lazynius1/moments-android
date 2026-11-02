@@ -21,6 +21,7 @@ import com.moments.android.services.persistence.LocalPersistenceService
 import com.moments.android.services.privacy.FollowButtonState
 import com.moments.android.services.privacy.FollowStateStore
 import com.moments.android.services.privacy.PrivacyService
+import com.moments.android.services.privacy.PrivateAccountStore
 import com.moments.android.services.content.BackendFeedService
 import com.moments.android.services.content.FeedCursor
 import kotlin.coroutines.cancellation.CancellationException
@@ -491,12 +492,15 @@ class ExploreViewModel(
         }
         val popular = async { fetchPopularUsersForExplore(userId) }
         val currentFollowed = followedUserIds
-        val discovered = (shared.await() + suggested.await() + popular.await())
+        val candidates = shared.await() + suggested.await() + popular.await()
+        PrivateAccountStore.awaitLoaded()
+        val discovered = candidates
             .distinctBy { it.id }
             .filter { user ->
                 user.id != userId &&
                     user.id !in blockedUsers &&
                     userId !in user.blockedUsers &&
+                    !PrivateAccountStore.hasBlockedMe(user.id) &&
                     user.id !in currentFollowed
             }
             .sortedByDescending { user ->
@@ -524,7 +528,11 @@ class ExploreViewModel(
         try {
             val users = firestore.searchUsers(username.lowercase(), limit = 20)
             if (searchGeneration != generation || FirebaseAuth.getInstance().currentUser?.uid != uid) return
-            searchedUsers = users.filter { it.id != uid && it.id !in blockedUsers && uid !in it.blockedUsers }
+            PrivateAccountStore.awaitLoaded()
+            searchedUsers = users.filter {
+                it.id != uid && it.id !in blockedUsers && uid !in it.blockedUsers &&
+                    !PrivateAccountStore.hasBlockedMe(it.id)
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

@@ -32,6 +32,7 @@ import com.moments.android.notifications.services.NotificationBadgeService
 import com.moments.android.notifications.services.NotificationService
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.persistence.LocalPersistenceService
+import com.moments.android.services.privacy.PrivateAccountStore
 import com.moments.android.services.storage.StorageService
 import com.moments.android.widget.MomentsWidgetStore
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +55,7 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import java.util.Date
 import com.moments.android.services.firestore.fetchUser
+import com.moments.android.services.firestore.overlayPrivateAccount
 import com.moments.android.services.firestore.createUser
 import com.moments.android.services.firestore.fetchAvailableInterests
 import com.moments.android.services.firestore.verifyUserCreation
@@ -284,6 +286,7 @@ object AuthService {
         if (user == null) {
             if (_authState.value is AuthState.Suspended) return
             stopSuspensionListener()
+            PrivateAccountStore.stop()
             _isLoggedIn.value = false
             _currentUser.value = null
             _currentFirebaseUser.value = null
@@ -1089,7 +1092,7 @@ object AuthService {
                 @Suppress("UNCHECKED_CAST")
                 val data = snap.data as? Map<String, Any?>
                 val user = data?.let { runCatching { AppUser.from(snap.id, it) }.getOrNull() }
-                ServerProfileCheck.Exists(user)
+                ServerProfileCheck.Exists(user?.let { firestoreService.overlayPrivateAccount(it) })
             }
         } catch (_: Exception) {
             ServerProfileCheck.Unreachable
@@ -1251,6 +1254,7 @@ object AuthService {
 
     private fun applyDeactivatedSession(user: FirebaseUser, userData: AppUser) {
         saveCachedAccountStatus(user.uid, CachedAccountDecision.DEACTIVATED)
+        PrivateAccountStore.stop()
         _isLoggedIn.value = false
         _currentUser.value = null
         _currentFirebaseUser.value = user
@@ -1261,6 +1265,7 @@ object AuthService {
     }
 
     private fun applySuspended(user: FirebaseUser, reason: String?, expiresAt: Date?) {
+        PrivateAccountStore.stop()
         _isLoggedIn.value = false
         _currentUser.value = null
         _currentFirebaseUser.value = user
@@ -1271,6 +1276,8 @@ object AuthService {
     }
 
     private fun startSuspensionListener() {
+        // Datos privados del propietario (bloqueos, mejores amigos, relaciones).
+        (_currentUser.value?.id ?: _currentFirebaseUser.value?.uid)?.let(PrivateAccountStore::start)
         // ≡ iOS: solo currentUser?.id (sin fallback a auth.uid)
         val userId = _currentUser.value?.id ?: return
         suspensionRegistration?.remove()
@@ -1359,6 +1366,7 @@ object AuthService {
     }
 
     private fun forceLogout(signOut: Boolean = false) {
+        PrivateAccountStore.stop()
         _isLoggedIn.value = false
         _currentUser.value = null
         _isAccountDeactivated.value = false
@@ -1586,6 +1594,7 @@ object AuthService {
                 RestoreCredentialsService.clearForLogout(context)
             }
             runCatching { auth.signOut() }
+            PrivateAccountStore.stop()
             LocalPersistenceService.clearCurrentUserAsync()
             OnboardingDraftStore.clear()
             _isLoggedIn.value = false

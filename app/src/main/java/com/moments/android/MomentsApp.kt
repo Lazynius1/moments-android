@@ -197,7 +197,7 @@ fun MomentsApp(
     val deactivatedUiState = remember(deactivatedUser) {
         AccountState.Deactivated(
             username = deactivatedUser?.username,
-            email = deactivatedUser?.email,
+            email = deactivatedUser?.email?.takeIf { it.isNotBlank() } ?: FirebaseAuth.getInstance().currentUser?.email,
             profileImagePath = deactivatedUser?.profileImagePath,
         )
     }

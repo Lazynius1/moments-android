@@ -269,12 +269,17 @@ object PrivacyService {
             ?: error("Relationship user document not found")
         check(viewerSnapshot.exists() && targetSnapshot.exists()) { "Relationship user document not found" }
 
+        // Si el viewer es el usuario de la sesión, se combina con sus datos privados.
+        val viewerIsMe = PrivateAccountStore.isSignedInUser(viewerId)
+        if (viewerIsMe) PrivateAccountStore.awaitLoaded()
         val viewerBlocked = (viewerSnapshot.get("blockedUsers") as? List<*>)
             ?.filterIsInstance<String>()
-            ?.contains(targetUserId) == true
+            ?.contains(targetUserId) == true ||
+            (viewerIsMe && targetUserId in PrivateAccountStore.blockedUsers.value)
         val targetBlocked = (targetSnapshot.get("blockedUsers") as? List<*>)
             ?.filterIsInstance<String>()
-            ?.contains(viewerId) == true
+            ?.contains(viewerId) == true ||
+            (viewerIsMe && PrivateAccountStore.hasBlockedMe(targetUserId))
         if (viewerBlocked || targetBlocked) return FollowButtonState.BLOCKED
 
         val following = db.collection("users").document(viewerId)
@@ -399,6 +404,17 @@ object PrivacyService {
 
     suspend fun checkIfBestFriend(userId: String, friendId: String): Boolean =
         dedupeInFlightBestFriend("$userId|$friendId") {
+            // Primero los datos privados de la sesión; la lectura pública queda como respaldo.
+            when {
+                PrivateAccountStore.isSignedInUser(friendId) -> {
+                    PrivateAccountStore.awaitLoaded()
+                    if (PrivateAccountStore.isBestFriendOf(userId)) return@dedupeInFlightBestFriend true
+                }
+                PrivateAccountStore.isSignedInUser(userId) -> {
+                    PrivateAccountStore.awaitLoaded()
+                    if (friendId in PrivateAccountStore.bestFriends.value) return@dedupeInFlightBestFriend true
+                }
+            }
             runCatching {
                 val snap = database.collection("users").document(userId).get().await()
                 @Suppress("UNCHECKED_CAST")

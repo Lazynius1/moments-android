@@ -22,6 +22,7 @@ import com.moments.android.services.firestore.fetchUserProfile
 import com.moments.android.services.firestore.rebuildStorySummary
 import com.moments.android.services.incognito.IncognitoModeService
 import com.moments.android.services.persistence.LocalPersistenceService
+import com.moments.android.services.privacy.PrivateAccountStore
 import com.moments.android.services.persistence.StorySeenStateService
 import com.moments.android.services.privacy.PrivacyService
 import com.moments.android.services.social.AffinityInteractionType
@@ -302,7 +303,9 @@ class StoryViewModel(
             ringOrderedStoryUserIds = if (finalSortedIds.isEmpty()) lastFetchRingUserIds else finalSortedIds
         } else {
             // Affinity sorting ≡ AffinityTracker + bestFriends/mutuals
-            val bestFriends = LocalPersistenceService.loadUserAsync(viewerId)?.bestFriends?.toSet().orEmpty()
+            // Solo para ordenar: no espera al store, usa lo que ya tenga cargado.
+            val bestFriends = LocalPersistenceService.loadUserAsync(viewerId)?.bestFriends?.toSet().orEmpty() +
+                (if (PrivateAccountStore.isSignedInUser(viewerId)) PrivateAccountStore.bestFriends.value else emptySet())
             val mutuals = LocalPersistenceService.loadConnectionsAsync(viewerId).third.map { it.id }.toSet()
             val storyUserIds = filteredStories.keys.toList()
             val affinityScores = runCatching { AffinityTracker.getScores(storyUserIds) }.getOrDefault(emptyMap())

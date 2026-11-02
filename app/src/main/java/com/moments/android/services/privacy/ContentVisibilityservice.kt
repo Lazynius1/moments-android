@@ -87,13 +87,25 @@ object ContentVisibilityService {
     private suspend fun checkConnectionsVisibility(contentOwnerId: String, viewerId: String): Boolean =
         checkMutualConnection(viewerId, contentOwnerId)
 
-    private suspend fun checkBestFriendsVisibility(contentOwnerId: String, viewerId: String): Boolean =
-        runCatching {
+    private suspend fun checkBestFriendsVisibility(contentOwnerId: String, viewerId: String): Boolean {
+        // Primero los datos privados de la sesión; la lectura pública queda como respaldo.
+        when {
+            PrivateAccountStore.isSignedInUser(viewerId) -> {
+                PrivateAccountStore.awaitLoaded()
+                if (PrivateAccountStore.isBestFriendOf(contentOwnerId)) return true
+            }
+            PrivateAccountStore.isSignedInUser(contentOwnerId) -> {
+                PrivateAccountStore.awaitLoaded()
+                if (viewerId in PrivateAccountStore.bestFriends.value) return true
+            }
+        }
+        return runCatching {
             val snap = db.collection("users").document(contentOwnerId).get().await()
             @Suppress("UNCHECKED_CAST")
             val bestFriends = (snap.data as? Map<String, Any?>)?.get("bestFriends") as? List<*>
             bestFriends?.filterIsInstance<String>()?.contains(viewerId) == true
         }.getOrDefault(false)
+    }
 
     private suspend fun checkCustomVisibility(
         contentOwnerId: String,

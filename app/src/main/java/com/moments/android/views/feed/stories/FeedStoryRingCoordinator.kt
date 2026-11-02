@@ -12,6 +12,7 @@ import com.moments.android.services.firestore.fetchStorySummariesForUsers
 import com.moments.android.services.firestore.prefetchStoriesForUser
 import com.moments.android.services.network.NetworkMonitor
 import com.moments.android.services.persistence.LocalPersistenceService
+import com.moments.android.services.privacy.PrivateAccountStore
 import com.moments.android.services.social.AffinityTracker
 import com.moments.android.services.social.StoryRingCacheService
 import com.moments.android.services.social.StoryRingResolverService
@@ -411,7 +412,9 @@ class FeedStoryRingCoordinator(
             AffinityTracker.getScores(sortedOthers.map { it.userId })
         }.getOrDefault(emptyMap())
 
-        val bestFriends = LocalPersistenceService.loadUserAsync(currentUserId)?.bestFriends?.toSet().orEmpty()
+        // Solo para ordenar: no espera al store, usa lo que ya tenga cargado.
+        val bestFriends = LocalPersistenceService.loadUserAsync(currentUserId)?.bestFriends?.toSet().orEmpty() +
+            (if (PrivateAccountStore.isSignedInUser(currentUserId)) PrivateAccountStore.bestFriends.value else emptySet())
         val mutuals = LocalPersistenceService.loadConnectionsAsync(currentUserId).third.map { it.id }.toSet()
 
         sortedOthers.sortWith { user1, user2 ->
