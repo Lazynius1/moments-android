@@ -45,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -204,6 +205,7 @@ private fun AppIconPicker(
                 val progress = min(abs(offset), 1f)
                 Box(
                     Modifier
+                        .zIndex(1f - progress)
                         .size(iconSize)
                         .graphicsLayer {
                             val scale = 1f - progress * 0.3f
@@ -211,7 +213,8 @@ private fun AppIconPicker(
                             scaleY = scale
                             // Como en iOS: se apartan hacia el borde y ese desplazamiento gira con el
                             // icono alrededor de su sitio, así el de la derecha sube y el de la izquierda baja.
-                            val angle = -progress * iconSize.value / 2f
+                            // Mismo giro que en iOS (allí sale de medio tamaño del icono en puntos, ~105°).
+                            val angle = -progress * 105f
                             val radians = Math.toRadians(angle.toDouble())
                             val shift = offset * iconSizePx / 2f
                             translationX = shift * cos(radians).toFloat()
@@ -219,7 +222,7 @@ private fun AppIconPicker(
                             rotationZ = angle
                         }
                         // Sin recorte: con el recorte cuadrado la sombra asomaba en picos por las esquinas.
-                        .blur((progress * 4f).dp, BlurredEdgeTreatment.Unbounded)
+                        .blur((progress * 6f).dp, BlurredEdgeTreatment.Unbounded)
                         .shadow(10.dp, corner)
                         .clip(corner),
                 ) {
