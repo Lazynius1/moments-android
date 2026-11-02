@@ -225,10 +225,16 @@ fun StoryViewerScreen(
         StoryPlaybackCoordinator(context.applicationContext)
     }
 
+    // El progreso se lee sin suscribir la pantalla: leído aquí, cada tick (10 por segundo)
+    // recomponía el visor entero. Música y audio solo lo usan al empezar, pausar o reanudar,
+    // y ahí la pantalla ya se recompone por el cambio de pausa.
+    val elapsedNow = androidx.compose.runtime.snapshots.Snapshot.withoutReadObservation {
+        playbackCoordinator.progress
+    } * story.duration
     val musicPlaying = com.moments.android.views.creator.components.music.StoryMusicPlayback(
         selection = story.stickers?.firstOrNull { it.music != null }?.music,
         storyId = story.id, active = isDeckPageActive && !playbackCoordinator.isPaused,
-        elapsed = playbackCoordinator.progress * story.duration,
+        elapsed = elapsedNow,
     )
 
     // MARK: - State (espejo @State iOS)
@@ -1285,7 +1291,7 @@ fun StoryViewerScreen(
                     androidx.compose.runtime.CompositionLocalProvider(
                         com.moments.android.views.creator.components.music.LocalStoryMusicPlaying provides musicPlaying,
                         com.moments.android.views.components.LocalStoryAudioPlaybackClock provides com.moments.android.views.components.StoryAudioPlaybackClock(
-                            elapsed = playbackCoordinator.progress * story.duration,
+                            elapsed = elapsedNow,
                             active = isDeckPageActive && !playbackCoordinator.isPaused,
                         ),
                     ) {
