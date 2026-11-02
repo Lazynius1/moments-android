@@ -59,7 +59,9 @@ import com.moments.android.R
 import com.moments.android.utilities.HapticManager
 import com.moments.android.views.shared.MomentsModalSheet
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.min
+import kotlin.math.sin
 
 /** Iconos de la app. Cada uno es un acceso del manifiesto (`.AppIcon<Nombre>`); solo uno está activo. */
 enum class MomentsAppIcon(
@@ -202,9 +204,14 @@ private fun AppIconPicker(
                             val scale = 1f - progress * 0.3f
                             scaleX = scale
                             scaleY = scale
-                            // Los de los lados se apartan hacia el borde y giran, como en iOS.
-                            translationX = offset * iconSizePx / 2f
-                            rotationZ = -progress * 85f
+                            // Como en iOS: se apartan hacia el borde y ese desplazamiento gira con el
+                            // icono alrededor de su sitio, así el de la derecha sube y el de la izquierda baja.
+                            val angle = -progress * iconSize.value / 2f
+                            val radians = Math.toRadians(angle.toDouble())
+                            val shift = offset * iconSizePx / 2f
+                            translationX = shift * cos(radians).toFloat()
+                            translationY = shift * sin(radians).toFloat()
+                            rotationZ = angle
                         }
                         // Sin recorte: con el recorte cuadrado la sombra asomaba en picos por las esquinas.
                         .blur((progress * 4f).dp, BlurredEdgeTreatment.Unbounded)
