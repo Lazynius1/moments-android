@@ -3,7 +3,6 @@ package com.moments.android.views.shared
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,9 +57,9 @@ fun AppErrorBanner(
             fontWeight = FontWeight.Medium,
             maxLines = 3,
             overflow = TextOverflow.Ellipsis,
+            // El mensaje se lleva el espacio sobrante; el botón conserva su ancho.
+            modifier = Modifier.weight(1f),
         )
-
-        Spacer(Modifier.weight(1f))
 
         if (onRetry != null) {
             Text(
@@ -68,6 +67,8 @@ fun AppErrorBanner(
                 color = MaterialTheme.colorScheme.primary,
                 fontSize = with(density) { legacyPoppinsSize(context, 11).toSp() },
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
                 modifier = Modifier.clickable(onClick = onRetry),
             )
         }
