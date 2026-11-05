@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="whats_new_title_130">New in Moments!</string>
+    <string name="whats_new_subtitle_130">Choose your icon, label what you make with AI and swipe between tabs.</string>
+    <string name="whats_new_button_130">Explore Moments 1.3.0</string>
+    <string name="whats_new_note_closing_130">Thanks for coming along on this journey! ⚡🤖</string>
+    <string name="whats_new_section_personalize_130">Personalize</string>
+    <string name="whats_new_section_create_130">Create</string>
+    <string name="whats_new_section_more_130">And more</string>
+    <string name="whats_new_app_icons_130_title">Choose your icon</string>
+    <string name="whats_new_app_icons_130_description">21 new icons for your home screen, in Settings.</string>
+    <string name="whats_new_seasonal_icons_130_title">Seasonal icons</string>
+    <string name="whats_new_seasonal_icons_130_description">For now, 8 Christmas icons, based on your country\'s calendar.</string>
+    <string name="whats_new_ai_label_130_title">Content made with AI</string>
+    <string name="whats_new_ai_label_130_description">Label what you create or edit with AI. We detect many images for you.</string>
+    <string name="whats_new_tab_swipe_130_title">Swipe between tabs</string>
+    <string name="whats_new_tab_swipe_130_description">Move between them with a swipe, and from Home into the creator.</string>
+    <string name="whats_new_voice_notes_130_title">Unlimited voice messages</string>
+    <string name="whats_new_voice_notes_130_description">Record as long as you like and listen while you use the app.</string>
+    <string name="whats_new_comments_130_title">Faster comments</string>
+    <string name="whats_new_comments_130_description">Posts with lots of comments load sooner.</string>
+    <string name="whats_new_privacy_130_title">More privacy</string>
+    <string name="whats_new_privacy_130_description">We\'ve strengthened the protection of your data and account.</string>
+    <string name="whats_new_fluid_130_title">Faster and smoother</string>
+    <string name="whats_new_fluid_130_description">Performance improvements in the feed, stories and chats.</string>
+</resources>

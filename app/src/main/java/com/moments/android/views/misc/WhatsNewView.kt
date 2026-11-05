@@ -21,17 +21,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Comment
-import androidx.compose.material.icons.automirrored.filled.Reply
-import androidx.compose.material.icons.filled.AddReaction
-import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Swipe
 import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.MarkEmailUnread
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.PlayCircle
-import androidx.compose.material.icons.filled.SignalCellularAlt
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -59,6 +54,7 @@ import com.moments.android.extensions.momentsChromeGlass
 import com.moments.android.services.performance.MotionPolicy
 import com.moments.android.views.feed.rememberAdaptiveColors
 import kotlinx.coroutines.delay
+import com.moments.android.icons.MomentsIcons
 
 /** ≡ WhatsNew 1.2.0 — título corto + frase breve, icono de Material Icons. */
 private data class WhatsNewFeature(
@@ -84,30 +80,26 @@ fun WhatsNewView(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val sections = remember {
         listOf(
             WhatsNewSection(
-                title = R.string.whats_new_section_chat_120,
+                title = R.string.whats_new_section_personalize_130,
                 features = listOf(
-                    WhatsNewFeature(R.string.whats_new_chat_style_120_title, R.string.whats_new_chat_style_120_description, Icons.Default.Palette),
-                    WhatsNewFeature(R.string.whats_new_reactions_120_title, R.string.whats_new_reactions_120_description, Icons.Default.AddReaction),
-                    WhatsNewFeature(R.string.whats_new_replies_120_title, R.string.whats_new_replies_120_description, Icons.AutoMirrored.Filled.Reply),
-                    WhatsNewFeature(R.string.whats_new_view_once_120_title, R.string.whats_new_view_once_120_description, Icons.Default.PlayCircle),
-                    WhatsNewFeature(R.string.whats_new_requests_120_title, R.string.whats_new_requests_120_description, Icons.Default.MarkEmailUnread),
-                    WhatsNewFeature(R.string.whats_new_reliability_120_title, R.string.whats_new_reliability_120_description, Icons.Default.SignalCellularAlt),
-                    WhatsNewFeature(R.string.whats_new_notifications_120_title, R.string.whats_new_notifications_120_description, Icons.Default.NotificationsActive),
+                    WhatsNewFeature(R.string.whats_new_app_icons_130_title, R.string.whats_new_app_icons_130_description, Icons.Default.Apps),
+                    WhatsNewFeature(R.string.whats_new_seasonal_icons_130_title, R.string.whats_new_seasonal_icons_130_description, Icons.Default.AcUnit),
                 ),
             ),
             WhatsNewSection(
-                title = R.string.whats_new_section_stories_120,
+                title = R.string.whats_new_section_create_130,
                 features = listOf(
-                    WhatsNewFeature(R.string.whats_new_story_publish_120_title, R.string.whats_new_story_publish_120_description, Icons.Default.Tune),
-                    WhatsNewFeature(R.string.whats_new_original_audio_120_title, R.string.whats_new_original_audio_120_description, Icons.Default.GraphicEq),
+                    WhatsNewFeature(R.string.whats_new_ai_label_130_title, R.string.whats_new_ai_label_130_description, MomentsIcons.AILabel),
                 ),
             ),
             WhatsNewSection(
-                title = R.string.whats_new_section_more_120,
+                title = R.string.whats_new_section_more_130,
                 features = listOf(
-                    WhatsNewFeature(R.string.whats_new_maps_120_title, R.string.whats_new_maps_120_description, Icons.Default.Map),
-                    WhatsNewFeature(R.string.whats_new_banner_120_title, R.string.whats_new_banner_120_description, Icons.Default.Campaign),
-                    WhatsNewFeature(R.string.whats_new_comments_120_title, R.string.whats_new_comments_120_description, Icons.AutoMirrored.Filled.Comment),
+                    WhatsNewFeature(R.string.whats_new_tab_swipe_130_title, R.string.whats_new_tab_swipe_130_description, Icons.Default.Swipe),
+                    WhatsNewFeature(R.string.whats_new_voice_notes_130_title, R.string.whats_new_voice_notes_130_description, Icons.Default.GraphicEq),
+                    WhatsNewFeature(R.string.whats_new_comments_130_title, R.string.whats_new_comments_130_description, Icons.AutoMirrored.Filled.Comment),
+                    WhatsNewFeature(R.string.whats_new_privacy_130_title, R.string.whats_new_privacy_130_description, Icons.Default.Shield),
+                    WhatsNewFeature(R.string.whats_new_fluid_130_title, R.string.whats_new_fluid_130_description, Icons.Default.Bolt),
                 ),
             ),
         )
@@ -165,13 +157,13 @@ fun WhatsNewView(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(
-                        stringResource(R.string.whats_new_title_120),
+                        stringResource(R.string.whats_new_title_130),
                         color = colors.primary,
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        stringResource(R.string.whats_new_subtitle_120),
+                        stringResource(R.string.whats_new_subtitle_130),
                         color = colors.secondary,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
@@ -208,7 +200,7 @@ fun WhatsNewView(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
             }
 
             Text(
-                stringResource(R.string.whats_new_note_closing_120),
+                stringResource(R.string.whats_new_note_closing_130),
                 color = colors.secondary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
@@ -232,7 +224,7 @@ fun WhatsNewView(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    stringResource(R.string.whats_new_button_120),
+                    stringResource(R.string.whats_new_button_130),
                     color = colors.primary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,

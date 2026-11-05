@@ -1,0 +1,176 @@
+<es-ES>
+• Elige tu icono — 29 iconos nuevos: 21 para todo el año y 8 de Navidad durante las fiestas.
+
+• Contenido creado con IA — Etiqueta tus momentos e historias; detectamos muchas imágenes por ti.
+
+• Desliza entre pestañas — Y desde Inicio, hacia el creador.
+
+• Notas de voz — Sin límite y siguen sonando mientras usas la app.
+
+• Más privacidad, rendimiento y estabilidad.
+</es-ES>
+<ca>
+• Tria la teva icona — 29 icones noves: 21 per a tot l'any i 8 de Nadal durant les festes.
+
+• Contingut creat amb IA — Etiqueta els teus moments i històries; detectem moltes imatges per tu.
+
+• Llisca entre pestanyes — I des d'Inici, cap al creador.
+
+• Notes de veu — Sense límit i continuen sonant mentre fas servir l'app.
+
+• Més privadesa, rendiment i estabilitat.
+</ca>
+<de-DE>
+• Wähle dein Icon — 29 neue Icons: 21 fürs ganze Jahr und 8 weihnachtliche zu den Feiertagen.
+
+• Mit KI erstellt — Kennzeichne deine Moments und Stories; viele Bilder erkennen wir für dich.
+
+• Zwischen Tabs wischen — Und von Start aus direkt zum Erstellen.
+
+• Sprachnachrichten — Ohne Zeitlimit, und sie laufen weiter, während du die App nutzt.
+
+• Mehr Datenschutz, Leistung und Stabilität.
+</de-DE>
+<en-US>
+• Choose your icon — 29 new icons: 21 year-round and 8 Christmas ones during the holidays.
+
+• Content made with AI — Label your moments and stories; we detect many images for you.
+
+• Swipe between tabs — And from Home, into the creator.
+
+• Voice messages — No time limit, and they keep playing while you use the app.
+
+• More privacy, performance and stability.
+</en-US>
+<fr-FR>
+• Choisis ton icône — 29 nouvelles icônes : 21 pour toute l'année et 8 de Noël pendant les fêtes.
+
+• Contenu créé avec l'IA — Étiquette tes moments et stories ; on détecte beaucoup d'images pour toi.
+
+• Balaye entre les onglets — Et depuis l'Accueil, vers la création.
+
+• Messages vocaux — Sans limite, et ils continuent pendant que tu utilises l'app.
+
+• Plus de confidentialité, de performances et de stabilité.
+</fr-FR>
+<hi-IN>
+• अपना आइकन चुनें — 29 नए आइकन: पूरे साल के लिए 21 और त्योहारों में क्रिसमस के 8।
+
+• AI से बनाया गया कंटेंट — अपने मोमेंट और स्टोरी पर लेबल लगाएँ; कई इमेज हम खुद पहचान लेते हैं।
+
+• टैब के बीच स्वाइप करें — और होम से सीधे क्रिएटर तक।
+
+• वॉइस मैसेज — बिना समय सीमा के, और ऐप इस्तेमाल करते समय भी चलते रहते हैं।
+
+• ज़्यादा प्राइवेसी, परफ़ॉर्मेंस और स्थिरता।
+</hi-IN>
+<id>
+• Pilih ikonmu — 29 ikon baru: 21 untuk sepanjang tahun dan 8 ikon Natal selama musim liburan.
+
+• Dibuat dengan AI — Beri label pada momen dan story-mu; banyak gambar kami deteksi untukmu.
+
+• Geser antar-tab — Dan dari Beranda, langsung ke pembuat konten.
+
+• Pesan suara — Tanpa batas durasi dan tetap diputar saat kamu memakai aplikasi.
+
+• Privasi, performa, dan stabilitas yang lebih baik.
+</id>
+<it-IT>
+• Scegli la tua icona — 29 nuove icone: 21 per tutto l'anno e 8 di Natale durante le feste.
+
+• Contenuti creati con l'IA — Etichetta momenti e storie; molte immagini le rileviamo noi.
+
+• Scorri tra le schede — E dalla Home, verso la creazione.
+
+• Messaggi vocali — Senza limiti, e continuano mentre usi l'app.
+
+• Più privacy, prestazioni e stabilità.
+</it-IT>
+<ja-JP>
+• アイコンを選べる — 新しいアイコンが29種類。通年の21種類と、ホリデーシーズンのクリスマスアイコン8種類。
+
+• AIで作成したコンテンツ — モーメントやストーリーにラベルを付けられます。多くの画像は自動で検出します。
+
+• タブをスワイプで切り替え — ホームからは作成画面へ。
+
+• 音声メッセージ — 時間制限なし。アプリを使いながら再生を続けられます。
+
+• プライバシー、パフォーマンス、安定性を向上。
+</ja-JP>
+<ko-KR>
+• 아이콘 선택 — 새 아이콘 29개: 연중 21개와 연말 시즌 크리스마스 아이콘 8개.
+
+• AI로 생성한 콘텐츠 — 모먼트와 스토리에 라벨을 달 수 있어요. 많은 이미지는 자동으로 감지해요.
+
+• 탭 사이 스와이프 — 홈에서는 만들기 화면으로 바로 이동해요.
+
+• 음성 메시지 — 시간 제한 없이, 앱을 쓰는 동안에도 계속 재생돼요.
+
+• 개인정보 보호, 성능, 안정성 향상.
+</ko-KR>
+<nl-NL>
+• Kies je icoon — 29 nieuwe iconen: 21 voor het hele jaar en 8 kersticonen tijdens de feestdagen.
+
+• Content gemaakt met AI — Label je momenten en verhalen; veel afbeeldingen herkennen we voor je.
+
+• Swipe tussen tabbladen — En vanaf Start meteen iets maken.
+
+• Spraakberichten — Zonder limiet, en ze blijven spelen terwijl je de app gebruikt.
+
+• Meer privacy, prestaties en stabiliteit.
+</nl-NL>
+<pl-PL>
+• Wybierz ikonę — 29 nowych ikon: 21 na cały rok i 8 bożonarodzeniowych w okresie świąt.
+
+• Treści utworzone przez AI — Oznaczaj momenty i relacje; wiele obrazów wykrywamy za Ciebie.
+
+• Przesuwaj między kartami — A ze strony głównej do kreatora.
+
+• Wiadomości głosowe — Bez limitu i grają dalej, gdy korzystasz z aplikacji.
+
+• Więcej prywatności, wydajności i stabilności.
+</pl-PL>
+<pt-BR>
+• Escolha seu ícone — 29 ícones novos: 21 para o ano todo e 8 de Natal durante as festas.
+
+• Conteúdo criado com IA — Identifique seus momentos e stories; detectamos muitas imagens para você.
+
+• Deslize entre as abas — E, no Início, até o criador.
+
+• Mensagens de voz — Sem limite e tocando enquanto você usa o app.
+
+• Mais privacidade, desempenho e estabilidade.
+</pt-BR>
+<pt-PT>
+• Escolhe o teu ícone — 29 ícones novos: 21 para todo o ano e 8 de Natal durante as festas.
+
+• Conteúdo criado com IA — Identifica os teus momentos e histórias; detetamos muitas imagens por ti.
+
+• Desliza entre separadores — E, no Início, até ao criador.
+
+• Mensagens de voz — Sem limite e a tocar enquanto usas a app.
+
+• Mais privacidade, desempenho e estabilidade.
+</pt-PT>
+<tr-TR>
+• Simgeni seç — 29 yeni simge: yıl boyu 21 simge ve tatil döneminde 8 Noel simgesi.
+
+• Yapay zekâyla oluşturuldu — Anlarını ve hikâyelerini etiketle; birçok görseli senin için algılıyoruz.
+
+• Sekmeler arasında kaydır — Ana sayfadan da oluşturma ekranına.
+
+• Sesli mesajlar — Süre sınırı yok ve uygulamayı kullanırken çalmaya devam eder.
+
+• Daha fazla gizlilik, performans ve kararlılık.
+</tr-TR>
+<zh-TW>
+• 選擇圖示 — 29 款全新圖示：21 款全年可用，節慶期間另有 8 款聖誕圖示。
+
+• 使用 AI 製作的內容 — 為你的 Moment 和限時動態加上標示；許多圖片我們會自動偵測。
+
+• 滑動切換分頁 — 在首頁也能直接滑到建立畫面。
+
+• 語音訊息 — 沒有時間限制，使用 App 時也會繼續播放。
+
+• 隱私、效能與穩定性全面提升。
+</zh-TW>

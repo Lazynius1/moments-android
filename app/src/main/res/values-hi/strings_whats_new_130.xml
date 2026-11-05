@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="whats_new_title_130">Moments में नया क्या है!</string>
+    <string name="whats_new_subtitle_130">अपना आइकन चुनें, AI से बनाए कंटेंट पर लेबल लगाएँ और टैब के बीच स्वाइप करें।</string>
+    <string name="whats_new_button_130">Moments 1.3.0 देखें</string>
+    <string name="whats_new_note_closing_130">इस सफ़र में साथ रहने के लिए शुक्रिया! ⚡🤖</string>
+    <string name="whats_new_section_personalize_130">पर्सनलाइज़ करें</string>
+    <string name="whats_new_section_create_130">बनाएँ</string>
+    <string name="whats_new_section_more_130">और भी</string>
+    <string name="whats_new_app_icons_130_title">अपना आइकन चुनें</string>
+    <string name="whats_new_app_icons_130_description">सेटिंग्स में होम स्क्रीन के लिए 21 नए आइकन।</string>
+    <string name="whats_new_seasonal_icons_130_title">सीज़नल आइकन</string>
+    <string name="whats_new_seasonal_icons_130_description">फ़िलहाल क्रिसमस के 8 आइकन, आपके देश के कैलेंडर के हिसाब से।</string>
+    <string name="whats_new_ai_label_130_title">AI से बनाया गया कंटेंट</string>
+    <string name="whats_new_ai_label_130_description">AI से बनाए या एडिट किए कंटेंट पर लेबल लगाएँ। कई इमेज हम खुद पहचान लेते हैं।</string>
+    <string name="whats_new_tab_swipe_130_title">टैब के बीच स्वाइप करें</string>
+    <string name="whats_new_tab_swipe_130_description">उंगली से एक टैब से दूसरे पर जाएँ, और होम से क्रिएटर तक।</string>
+    <string name="whats_new_voice_notes_130_title">बिना सीमा के वॉइस मैसेज</string>
+    <string name="whats_new_voice_notes_130_description">जितना चाहें रिकॉर्ड करें और ऐप इस्तेमाल करते हुए सुनें।</string>
+    <string name="whats_new_comments_130_title">तेज़ कमेंट</string>
+    <string name="whats_new_comments_130_description">ज़्यादा कमेंट वाली पोस्ट जल्दी लोड होती हैं।</string>
+    <string name="whats_new_privacy_130_title">ज़्यादा प्राइवेसी</string>
+    <string name="whats_new_privacy_130_description">हमने आपके डेटा और अकाउंट की सुरक्षा मज़बूत की है।</string>
+    <string name="whats_new_fluid_130_title">ज़्यादा तेज़ और सहज</string>
+    <string name="whats_new_fluid_130_description">फ़ीड, स्टोरी और चैट में बेहतर परफ़ॉर्मेंस।</string>
+</resources>

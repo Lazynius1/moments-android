@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="whats_new_title_130">Novità in Moments!</string>
+    <string name="whats_new_subtitle_130">Scegli la tua icona, etichetta ciò che crei con l\'IA e scorri tra le schede.</string>
+    <string name="whats_new_button_130">Esplora Moments 1.3.0</string>
+    <string name="whats_new_note_closing_130">Grazie per fare questo viaggio con noi! ⚡🤖</string>
+    <string name="whats_new_section_personalize_130">Personalizza</string>
+    <string name="whats_new_section_create_130">Crea</string>
+    <string name="whats_new_section_more_130">E inoltre</string>
+    <string name="whats_new_app_icons_130_title">Scegli la tua icona</string>
+    <string name="whats_new_app_icons_130_description">21 nuove icone per la schermata Home, dalle Impostazioni.</string>
+    <string name="whats_new_seasonal_icons_130_title">Icone stagionali</string>
+    <string name="whats_new_seasonal_icons_130_description">Per ora, 8 di Natale, in base al calendario del tuo Paese.</string>
+    <string name="whats_new_ai_label_130_title">Contenuti creati con l\'IA</string>
+    <string name="whats_new_ai_label_130_description">Etichetta ciò che crei o ritocchi con l\'IA. Molte immagini le rileviamo noi.</string>
+    <string name="whats_new_tab_swipe_130_title">Scorri tra le schede</string>
+    <string name="whats_new_tab_swipe_130_description">Passa dall\'una all\'altra con un dito, e dalla Home alla creazione.</string>
+    <string name="whats_new_voice_notes_130_title">Messaggi vocali senza limiti</string>
+    <string name="whats_new_voice_notes_130_description">Registra quanto vuoi e ascoltali mentre usi l\'app.</string>
+    <string name="whats_new_comments_130_title">Commenti più veloci</string>
+    <string name="whats_new_comments_130_description">I post con molti commenti si caricano prima.</string>
+    <string name="whats_new_privacy_130_title">Più privacy</string>
+    <string name="whats_new_privacy_130_description">Abbiamo rafforzato la protezione dei tuoi dati e del tuo account.</string>
+    <string name="whats_new_fluid_130_title">Più rapidità e fluidità</string>
+    <string name="whats_new_fluid_130_description">Prestazioni migliori nel feed, nelle storie e nelle chat.</string>
+</resources>

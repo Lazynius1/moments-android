@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="whats_new_title_130">Moments\'ta yeni neler var!</string>
+    <string name="whats_new_subtitle_130">Simgeni seç, yapay zekâyla oluşturduklarını etiketle ve sekmeler arasında kaydır.</string>
+    <string name="whats_new_button_130">Moments 1.3.0\'ı keşfet</string>
+    <string name="whats_new_note_closing_130">Bu yolculukta bizimle olduğun için teşekkürler! ⚡🤖</string>
+    <string name="whats_new_section_personalize_130">Kişiselleştir</string>
+    <string name="whats_new_section_create_130">Oluştur</string>
+    <string name="whats_new_section_more_130">Ve dahası</string>
+    <string name="whats_new_app_icons_130_title">Simgeni seç</string>
+    <string name="whats_new_app_icons_130_description">Ana ekranın için 21 yeni simge, Ayarlar\'da.</string>
+    <string name="whats_new_seasonal_icons_130_title">Sezonluk simgeler</string>
+    <string name="whats_new_seasonal_icons_130_description">Şimdilik ülkenin takvimine göre 8 Noel simgesi.</string>
+    <string name="whats_new_ai_label_130_title">Yapay zekâyla oluşturulan içerik</string>
+    <string name="whats_new_ai_label_130_description">Yapay zekâyla oluşturduğun veya düzenlediğin içeriği etiketle. Birçok görseli senin için algılıyoruz.</string>
+    <string name="whats_new_tab_swipe_130_title">Sekmeler arasında kaydır</string>
+    <string name="whats_new_tab_swipe_130_description">Parmağınla geçiş yap, Ana sayfadan da oluşturma ekranına git.</string>
+    <string name="whats_new_voice_notes_130_title">Sınırsız sesli mesajlar</string>
+    <string name="whats_new_voice_notes_130_description">İstediğin kadar kaydet ve uygulamayı kullanırken dinle.</string>
+    <string name="whats_new_comments_130_title">Daha hızlı yorumlar</string>
+    <string name="whats_new_comments_130_description">Çok yorum alan gönderiler daha çabuk yüklenir.</string>
+    <string name="whats_new_privacy_130_title">Daha fazla gizlilik</string>
+    <string name="whats_new_privacy_130_description">Verilerinin ve hesabının korumasını güçlendirdik.</string>
+    <string name="whats_new_fluid_130_title">Daha hızlı ve akıcı</string>
+    <string name="whats_new_fluid_130_description">Akış, hikâyeler ve sohbetlerde performans iyileştirmeleri.</string>
+</resources>

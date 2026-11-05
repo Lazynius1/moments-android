@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="whats_new_title_130">Yang baru di Moments!</string>
+    <string name="whats_new_subtitle_130">Pilih ikonmu, beri label pada yang kamu buat dengan AI, dan geser antar-tab.</string>
+    <string name="whats_new_button_130">Jelajahi Moments 1.3.0</string>
+    <string name="whats_new_note_closing_130">Terima kasih sudah ikut dalam perjalanan ini! ⚡🤖</string>
+    <string name="whats_new_section_personalize_130">Personalisasi</string>
+    <string name="whats_new_section_create_130">Buat</string>
+    <string name="whats_new_section_more_130">Dan lainnya</string>
+    <string name="whats_new_app_icons_130_title">Pilih ikonmu</string>
+    <string name="whats_new_app_icons_130_description">21 ikon baru untuk layar utama, di Pengaturan.</string>
+    <string name="whats_new_seasonal_icons_130_title">Ikon musiman</string>
+    <string name="whats_new_seasonal_icons_130_description">Untuk saat ini, 8 ikon Natal sesuai kalender negaramu.</string>
+    <string name="whats_new_ai_label_130_title">Konten yang dibuat dengan AI</string>
+    <string name="whats_new_ai_label_130_description">Beri label pada yang kamu buat atau edit dengan AI. Banyak gambar kami deteksi untukmu.</string>
+    <string name="whats_new_tab_swipe_130_title">Geser antar-tab</string>
+    <string name="whats_new_tab_swipe_130_description">Pindah dengan sekali geser, dan dari Beranda ke pembuat konten.</string>
+    <string name="whats_new_voice_notes_130_title">Pesan suara tanpa batas</string>
+    <string name="whats_new_voice_notes_130_description">Rekam sepuasnya dan dengarkan sambil memakai aplikasi.</string>
+    <string name="whats_new_comments_130_title">Komentar lebih cepat</string>
+    <string name="whats_new_comments_130_description">Postingan dengan banyak komentar dimuat lebih cepat.</string>
+    <string name="whats_new_privacy_130_title">Privasi lebih terjaga</string>
+    <string name="whats_new_privacy_130_description">Kami memperkuat perlindungan data dan akunmu.</string>
+    <string name="whats_new_fluid_130_title">Lebih cepat dan lancar</string>
+    <string name="whats_new_fluid_130_description">Peningkatan performa di feed, story, dan chat.</string>
+</resources>
