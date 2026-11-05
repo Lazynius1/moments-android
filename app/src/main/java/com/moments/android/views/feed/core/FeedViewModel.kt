@@ -523,7 +523,8 @@ class FeedViewModel : ViewModel() {
             throw ce
         } catch (t: Throwable) {
             isLoading = false
-            errorMessage = t.localizedMessage
+            // Aviso traducido; el mensaje técnico (p. ej. de permisos) no es para el usuario.
+            errorMessage = "feed_error"
         }
     }
 
@@ -686,7 +687,6 @@ class FeedViewModel : ViewModel() {
             } catch (ce: kotlinx.coroutines.CancellationException) {
                 throw ce
             } catch (e: Throwable) {
-                errorMessage = e.message
                 followers = emptyList()
             }
         }
