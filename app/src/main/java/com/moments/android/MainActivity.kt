@@ -48,6 +48,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Modo capturas (solo debug): puede reiniciar el proceso para aislar Firebase desde el arranque.
         if (BuildConfig.DEBUG && ScreenshotMode.handleActivityCreate(this, savedInstanceState)) return
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            // Modo capturas: pantalla encendida mientras se captura (el sistema puede ignorar stayon).
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
         // Skill: enableEdgeToEdge before setContent; transparent bars (auto light/dark icons).
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(
