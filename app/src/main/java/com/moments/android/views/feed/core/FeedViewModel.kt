@@ -1,5 +1,8 @@
 package com.moments.android.views.feed.core
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotFixtures
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.cancel
 import android.content.Context
@@ -65,6 +68,18 @@ class FeedViewModel : ViewModel() {
     var followingMoments by mutableStateOf<List<FeedMoment>>(emptyList())
     var connections by mutableStateOf<List<FeedConnection>>(emptyList())
     var followers by mutableStateOf<List<FeedFollowerRecord>>(emptyList())
+
+    init {
+        // Modo capturas: feed de demostración.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            val fixtures = ScreenshotFixtures.feedMomentsForFeed
+            moments = fixtures
+            followingMoments = fixtures
+            forYouMoments = fixtures
+            isLoading = false
+            hasLoadedInitialFeed = true
+        }
+    }
 
     private val cursors = mutableMapOf<FeedType, FeedCursor?>()
     private val reachedEnd = mutableMapOf(
@@ -207,6 +222,11 @@ class FeedViewModel : ViewModel() {
 
     /** Port 1:1 de `fetchMoments(userId:feedType:)`. */
     fun fetchMoments(scope: CoroutineScope, userId: String, feedType: FeedType? = null) {
+        // Modo capturas: el feed de demo no se recarga.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            isLoading = false
+            return
+        }
         feedGeneration++
         val generation = feedGeneration
         hasLoadedInitialFeed = false
@@ -263,6 +283,7 @@ class FeedViewModel : ViewModel() {
 
     /** Port 1:1 de `loadMoreMoments(userId:)`. */
     fun loadMoreMoments(scope: CoroutineScope, userId: String) {
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         if (isLoadingMore || isPausedForUploads) return
         isLoadingMore = true
         val feed = currentFeedType
@@ -369,6 +390,7 @@ class FeedViewModel : ViewModel() {
 
     /** Alias iOS `refreshMoments(userId:)`. */
     suspend fun refreshMoments(userId: String) {
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         cursors.clear()
         feedLoadedFromBackend[FeedType.Following] = false
         feedLoadedFromBackend[FeedType.ForYou] = false
@@ -704,6 +726,8 @@ class FeedViewModel : ViewModel() {
      * debounce 0.2s + buffer de índices alrededor de momentos visibles.
      */
     fun syncMomentListeners(visibilityByMomentId: Map<String, Float>) {
+        // Modo capturas: sin listeners (los momentos de demo no existen en Firestore).
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         if (isPausedForUploads) return
         latestVisibilitySnapshot = visibilityByMomentId
         listenerSyncJob?.cancel()
@@ -840,6 +864,10 @@ class FeedViewModel : ViewModel() {
     }
 
     fun fetchUserData(scope: CoroutineScope, userId: String) {
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            userProfileImage = ScreenshotFixtures.me.profileImagePath
+            return
+        }
         // iOS: snapshot listener sobre users/{id} → profileImagePath
         userListener?.remove()
         userListener = FirebaseFirestore.getInstance()

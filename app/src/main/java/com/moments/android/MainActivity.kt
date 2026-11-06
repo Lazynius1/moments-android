@@ -29,6 +29,8 @@ import com.moments.android.views.shared.MomentsSystemBarsHost
 import com.moments.android.adaptive.AdaptiveWindowProvider
 import com.moments.android.adaptive.ApplyMomentsOrientationPolicy
 import com.moments.android.adaptive.LocalAdaptiveWindowState
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotRoot
 
 /**
  * Deep links desde push + edge-to-edge (skill `edge-to-edge`).
@@ -44,6 +46,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Modo capturas (solo debug): puede reiniciar el proceso para aislar Firebase desde el arranque.
+        if (BuildConfig.DEBUG && ScreenshotMode.handleActivityCreate(this, savedInstanceState)) return
         // Skill: enableEdgeToEdge before setContent; transparent bars (auto light/dark icons).
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(
@@ -80,14 +84,19 @@ class MainActivity : ComponentActivity() {
                     val incognitoActive by IncognitoModeService.isActive.collectAsState()
                     Box(Modifier.fillMaxSize()) {
                         MomentsSystemBarsHost {
-                            MomentsApp(
-                                deepLinkUri = pendingDeepLink,
-                                deepLinkFromNewTask = pendingDeepLinkNewTask,
-                                onDeepLinkHandled = {
-                                    pendingDeepLink = null
-                                    pendingDeepLinkNewTask = false
-                                },
-                            )
+                            if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+                                // Modo capturas: pantalla de demo sin login ni onboarding.
+                                ScreenshotRoot()
+                            } else {
+                                MomentsApp(
+                                    deepLinkUri = pendingDeepLink,
+                                    deepLinkFromNewTask = pendingDeepLinkNewTask,
+                                    onDeepLinkHandled = {
+                                        pendingDeepLink = null
+                                        pendingDeepLinkNewTask = false
+                                    },
+                                )
+                            }
                         }
                         if (incognitoActive) {
                             IncognitoGlobalOverlay(Modifier.fillMaxSize())
@@ -107,6 +116,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         NotificationBadgeService.setupListeners()
         FCMTokenService.updateFCMToken()
     }

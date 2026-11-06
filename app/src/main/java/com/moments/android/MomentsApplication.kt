@@ -58,6 +58,8 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.imageLoader
 import com.moments.android.services.cache.MomentsImageLoader
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotSandbox
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -83,6 +85,9 @@ class MomentsApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        // Modo capturas (solo debug): Firebase aislado antes de cualquier uso.
+        val screenshotMode = BuildConfig.DEBUG && ScreenshotMode.detectAtProcessStart(this)
+        if (screenshotMode) ScreenshotSandbox.configure(this)
         // El icono elegido en Ajustes se aplica al salir de la app: cambiarlo dentro la cierra.
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {
@@ -94,9 +99,11 @@ class MomentsApplication : Application(), ImageLoaderFactory {
             MapboxOptions.accessToken = BuildConfig.MAPBOX_ACCESS_TOKEN
         }
         // iOS: AppCheck.setAppCheckProviderFactory antes de FirebaseApp.configure().
-        FirebaseAppCheck.getInstance().installAppCheckProviderFactory(MomentsAppCheckProviderFactory)
-        // ≡ iOS MomentsApp.init PersistentCacheSettings — antes de Auth/Firestore.
-        configureFirestorePersistence()
+        if (!screenshotMode) {
+            FirebaseAppCheck.getInstance().installAppCheckProviderFactory(MomentsAppCheckProviderFactory)
+            // ≡ iOS MomentsApp.init PersistentCacheSettings — antes de Auth/Firestore.
+            configureFirestorePersistence()
+        }
         NetworkMonitor.initialize(this)
         TimeSpentManager.initialize(this)
         VideoCompressionService.initialize(this)
@@ -149,6 +156,11 @@ class MomentsApplication : Application(), ImageLoaderFactory {
         ChatCommunicationIntentDonor.initialize(this)
         EncryptionService.initialize(this)
         OnlineStatusService.initialize(this)
+        if (screenshotMode) {
+            // Modo capturas: datos de demo y sin sincronizaciones, limpiezas ni notificaciones.
+            ScreenshotMode.bootstrap(this)
+            return
+        }
         // ≡ MomentsApp @StateObject EphemeralCleanupManager
         com.moments.android.views.messaging.services.EphemeralCleanupManager.startCleanupSystem()
         // LocalFirstMessaging / ChatCache ya inicializados arriba (antes de CacheManager)

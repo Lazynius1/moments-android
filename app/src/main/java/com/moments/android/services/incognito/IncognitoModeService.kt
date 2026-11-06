@@ -1,5 +1,7 @@
 package com.moments.android.services.incognito
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
 import android.content.Context
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
@@ -107,6 +109,8 @@ object IncognitoModeService {
     fun initialize(context: Context) {
         if (appContext == null) {
             appContext = context.applicationContext
+            // Modo capturas: sin aura de incógnito de la sesión real (no se borra nada).
+            if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
             hydrateFromMirror()
         }
     }

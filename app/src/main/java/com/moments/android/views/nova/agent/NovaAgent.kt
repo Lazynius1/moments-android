@@ -1,5 +1,8 @@
 package com.moments.android.views.nova.agent
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotFixtures
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.annotation.StringRes
@@ -113,6 +116,15 @@ class NovaAgent(
         get() = NovaWelcomeSuggestion.defaults
 
     fun fetchUserData() {
+        // Modo capturas: conversación de demostración, sin llamadas al modelo.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            userData = ScreenshotFixtures.me
+            conversationHistory = ScreenshotFixtures.novaMessages
+            showSuggestedOptions = false
+            hasMemoryLoaded = true
+            isLoading = false
+            return
+        }
         val userId = auth.currentUser?.uid ?: return
         isLoading = true
         installMemoryObserver(userId)
@@ -622,6 +634,8 @@ class NovaAgent(
     }
 
     private suspend fun saveCurrentConversation() {
+        // Modo capturas: la demo no se guarda en el historial real.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         val userId = auth.currentUser?.uid ?: return
         if (conversationHistory.none { it.isUser }) return
         val existingId = currentConversationId
@@ -646,6 +660,7 @@ class NovaAgent(
     suspend fun finalizeOnExit() = finalizeConversationIfNeeded()
 
     private suspend fun finalizeConversationIfNeeded() {
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         val userId = auth.currentUser?.uid ?: return
         val fingerprint = conversationFingerprint() ?: return
         if (fingerprint == lastFinalizedFingerprint) return

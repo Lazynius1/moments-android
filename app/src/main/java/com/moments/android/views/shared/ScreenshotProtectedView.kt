@@ -1,5 +1,6 @@
 package com.moments.android.views.shared
 
+import com.moments.android.BuildConfig
 import android.view.Window
 import android.view.WindowManager
 import androidx.compose.foundation.layout.Box
@@ -167,6 +168,8 @@ private object SecureFlagRegistry {
     }
 
     private fun applySecure(window: Window) {
+        // Modo capturas (solo debug): contenido de demo, se deja capturar para las tiendas.
+        if (BuildConfig.DEBUG && com.moments.android.debugscreenshots.ScreenshotMode.isActive) return
         window.setFlags(
             WindowManager.LayoutParams.FLAG_SECURE,
             WindowManager.LayoutParams.FLAG_SECURE,

@@ -1,5 +1,8 @@
 package com.moments.android.services.auth
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotFixtures
 import android.content.Context
 import android.graphics.Bitmap
 import com.google.firebase.FirebaseApp
@@ -210,6 +213,13 @@ object AuthService {
     fun initialize(context: Context) {
         if (appContext != null) return
         appContext = context.applicationContext
+        // Modo capturas: sesión ficticia fija, sin listener de Auth (nunca cambia ni escribe).
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            _currentUser.value = ScreenshotFixtures.me
+            _isLoggedIn.value = true
+            _authState.value = AuthState.Authenticated
+            return
+        }
         cleanupExpiredOnboardingDraft()
         attachAuthListener()
         scope.launch { bootstrapIncompleteOnboardingIfNeeded() }

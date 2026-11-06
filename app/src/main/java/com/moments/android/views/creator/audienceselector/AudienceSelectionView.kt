@@ -1,5 +1,8 @@
 package com.moments.android.views.creator.audienceselector
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotFixtures
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedContent
@@ -169,6 +172,12 @@ fun AudienceSelectionView(
     }
 
     fun reloadLists() {
+        // Modo capturas: listas de demostración.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            customLists = ScreenshotFixtures.customLists
+            isLoadingLists = false
+            return
+        }
         scope.launch {
             isLoadingLists = true
             val uid = FirebaseAuth.getInstance().currentUser?.uid

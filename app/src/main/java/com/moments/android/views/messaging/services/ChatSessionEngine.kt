@@ -1,5 +1,7 @@
 package com.moments.android.views.messaging.services
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.MomentsApplication
 import com.moments.android.views.messaging.core.Conversation
@@ -40,7 +42,13 @@ object ChatSessionEngine {
     var activeConversationId: String? = null
         private set
 
-    private val currentUserId: String get() = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+    // Modo capturas: el usuario propio es el de la demo.
+    private val currentUserId: String
+        get() = if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            ScreenshotMode.ME_ID
+        } else {
+            FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        }
 
     /**
      * Sesión cacheada de la conversación; se crea si no existía. Las conversaciones en borrador

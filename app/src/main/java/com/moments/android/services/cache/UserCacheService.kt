@@ -1,5 +1,8 @@
 package com.moments.android.services.cache
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotFixtures
 import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.res.Configuration
@@ -50,6 +53,13 @@ object UserCacheService {
     }
 
     fun getUser(userId: String, completion: (AppUser?) -> Unit) {
+        // Modo capturas: perfiles de demo al instante (el uid real se presenta como el propio).
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            ScreenshotFixtures.resolveUser(userId)?.let {
+                completion(it)
+                return
+            }
+        }
         val lastFetch = lastFetchTimes[userId]
         val cached = userCache[userId]
         if (cached != null && lastFetch != null &&

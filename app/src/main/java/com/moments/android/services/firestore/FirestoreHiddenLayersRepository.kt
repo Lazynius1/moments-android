@@ -1,5 +1,8 @@
 package com.moments.android.services.firestore
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotFixtures
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
@@ -46,6 +49,8 @@ suspend fun FirestoreService.updateMomentHiddenLayerSummary(userId: String, mome
 }
 
 suspend fun FirestoreService.fetchHiddenLayers(userId: String, momentId: String): List<MomentHiddenLayer> {
+    // Modo capturas: capas de demostración.
+    if (BuildConfig.DEBUG && ScreenshotMode.isActive) return ScreenshotFixtures.hiddenLayers(momentId)
     val snap = db.collection("users").document(userId).collection("moments")
         .document(momentId).collection("hiddenLayers")
         .orderBy("zIndex", Query.Direction.ASCENDING)

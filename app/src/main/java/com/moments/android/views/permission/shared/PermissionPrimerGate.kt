@@ -1,5 +1,7 @@
 package com.moments.android.views.permission.shared
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -40,6 +42,8 @@ class PermissionPrimerGate(val kind: Kind) {
     private var onGranted: (() -> Unit)? = null
 
     fun requestAccess(context: Context, onGranted: () -> Unit) {
+        // Modo capturas: sin primers de permisos.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         when (currentState(context)) {
             State.AUTHORIZED -> onGranted()
             State.NOT_DETERMINED -> {

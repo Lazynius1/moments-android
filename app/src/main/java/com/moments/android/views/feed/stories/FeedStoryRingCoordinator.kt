@@ -1,5 +1,8 @@
 package com.moments.android.views.feed.stories
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotFixtures
 import android.content.Context
 import com.google.firebase.firestore.FirebaseFirestore
 import com.moments.android.services.content.BackendStoryTrayResponse
@@ -52,10 +55,19 @@ class FeedStoryRingCoordinator(
     private var prefetchJob: kotlinx.coroutines.Job? = null
     private var widgetReloadJob: kotlinx.coroutines.Job? = null
 
+    init {
+        // Modo capturas: anillo de historias de demostración.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            storyUsers = ScreenshotFixtures.storyRing
+            isLoadingStories = false
+        }
+    }
+
     val ringNavigationUserIds: List<String>
         get() = storyUsers.filter { it.hasStory }.map { it.userId }
 
     fun loadStoryUsers(scope: CoroutineScope, userId: String, allowInstantCache: Boolean = true) {
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         scope.launch { reloadStoryUsers(userId, allowInstantCache) }
     }
 
@@ -78,6 +90,7 @@ class FeedStoryRingCoordinator(
     }
 
     fun prefetchTopStoryUsers(excluding: String?, scope: CoroutineScope) {
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         prefetchJob?.cancel()
         prefetchJob = scope.launch {
             delay(3_000)
@@ -94,6 +107,7 @@ class FeedStoryRingCoordinator(
         currentUserId: String,
         scope: CoroutineScope,
     ) {
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         val threshold = maxOf(storyUsers.size - 4, 0)
         val cursor = ringNextCursor
         if (visibleIndex < threshold || cursor == null || isLoadingMoreRing) return

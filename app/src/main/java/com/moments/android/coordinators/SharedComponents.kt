@@ -1,5 +1,8 @@
 package com.moments.android.coordinators
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotFixtures
 import android.net.Uri
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -202,7 +205,12 @@ fun AsyncProfileImageView(
     var isLoading by remember(userId) { mutableStateOf(true) }
 
     DisposableEffect(userId) {
-        if (userId.isEmpty()) {
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            // Modo capturas: avatar de demostración (el id vacío o el real es el propio).
+            profileImagePath = ScreenshotFixtures.avatarURL(userId)
+            isLoading = false
+            onDispose { }
+        } else if (userId.isEmpty()) {
             isLoading = false
             onDispose { }
         } else {

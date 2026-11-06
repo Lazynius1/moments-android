@@ -1,5 +1,7 @@
 package com.moments.android.views.messaging.components
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -553,6 +555,12 @@ fun GlassmorphicAudioMessage(
 
     // ≡ iOS checkAudioAvailability + PersistentAudioCache
     LaunchedEffect(audioUrl, isSending) {
+        // Modo capturas: la nota de voz se muestra con su onda, sin descargar el audio.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            isAudioAvailable = true
+            isCheckingAvailability = false
+            return@LaunchedEffect
+        }
         if (isSending) {
             isAudioAvailable = true
             isCheckingAvailability = false

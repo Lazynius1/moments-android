@@ -1,5 +1,7 @@
 package com.moments.android.views.messaging.services
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.MomentsApplication
 import com.moments.android.R
@@ -39,6 +41,11 @@ object ChatAccessCoordinator {
 
     /** Devuelve el estado cacheado o lo resuelve si aún no se ha hecho en esta sesión. */
     suspend fun ensureAccess(): ChatAccessState = mutex.withLock {
+        // Modo capturas: chat siempre disponible, sin claves.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            _accessState.value = ChatAccessState.Available
+            return ChatAccessState.Available
+        }
         val userId = FirebaseAuth.getInstance().currentUser?.uid
         if (userId == null) {
             invalidateAllUnlocked()
@@ -79,6 +86,10 @@ object ChatAccessCoordinator {
 
     /** Tras PIN setup/restore o retry manual. */
     suspend fun refreshAccess() {
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            _accessState.value = ChatAccessState.Available
+            return
+        }
         val userId = FirebaseAuth.getInstance().currentUser?.uid
         if (userId == null) {
             invalidateAll()

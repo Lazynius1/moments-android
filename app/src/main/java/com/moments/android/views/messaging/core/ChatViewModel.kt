@@ -1,5 +1,8 @@
 package com.moments.android.views.messaging.core
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotFixtures
 import com.moments.android.views.messaging.components.ChatListUpdateKind
 import com.moments.android.views.messaging.components.ChatTimelineUpdateReason
 import com.moments.android.views.messaging.services.ChatService
@@ -460,6 +463,7 @@ open class EnhancedChatViewModel(
 
     fun loadInitialMessages(limit: Int = initialWindowSize()) = scope.launch {
         if (conversationId.isBlank()) return@launch
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return@launch
         _isLoading.value = true
         chatService.fetchRecentMessages(
             conversationId,
@@ -706,7 +710,8 @@ open class EnhancedChatViewModel(
                 changed = true
             }
         }
-        if (changed && conversationId.isNotBlank()) {
+        // Modo capturas: los mensajes de demo no se guardan en la base local.
+        if (changed && conversationId.isNotBlank() && !(BuildConfig.DEBUG && ScreenshotMode.isActive)) {
             scope.launch {
                 LocalPersistenceService.saveMessagesInBackground(warmed, conversationId, sync = false)
             }
@@ -811,6 +816,8 @@ open class EnhancedChatViewModel(
     }
 
     fun attachChatListenersIfNeeded() {
+        // Modo capturas: sin listeners de Firestore.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         if (conversationId.isBlank() || sessionListenersAttached) return
         sessionListenersAttached = true
         chatService.rememberHistoryCutoffs(
@@ -1451,6 +1458,14 @@ open class EnhancedChatViewModel(
     fun loadCachedMessagesIfNeeded() = scope.launch {
         if (didLoadCache || conversationId.isBlank()) return@launch
         didLoadCache = true
+        // Modo capturas: mensajes de demostración en lugar de la caché local.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            historicalMessages.clear()
+            historicalMessages += ScreenshotFixtures.messages(conversationId).sortedWith(messageTimelineComparator)
+            rebuildMessagesList()
+            (this@EnhancedChatViewModel as? MomentsChatViewModel)?.syncMessagePresentation()
+            return@launch
+        }
         val cutoff = effectiveDeletedAtCutoff()
         val windowSize = initialWindowSize()
         val scanLimit = maxOf(windowSize, 50)
@@ -2091,6 +2106,7 @@ open class EnhancedChatViewModel(
      * Al salir del chat pasar `sealsVanish = false` para no expirar vanish no visto.
      */
     fun markVisibleConversationAsRead(sealsVanish: Boolean = true) {
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         if (!isChatVisible) return
         val markedIds = applyOptimisticReadLocally(sealsVanish)
         markUnreadMessagesAsRead(markedIds)

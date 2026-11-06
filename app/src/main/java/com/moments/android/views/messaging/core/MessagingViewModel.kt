@@ -1,5 +1,8 @@
 package com.moments.android.views.messaging.core
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotFixtures
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -116,6 +119,15 @@ class MessagingViewModel(
     }
 
     fun fetchConversations(userId: String) {
+        // Modo capturas: bandeja de demostración, sin listener ni caché local.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            conversations = ScreenshotFixtures.conversations
+            hasLoadedConversations = true
+            hasUnreadMessages = true
+            errorMessage = null
+            isLoading = false
+            return
+        }
         if (conversations.isEmpty() && archivedConversations.isEmpty()) {
             isLoading = true
             errorMessage = null
@@ -246,6 +258,18 @@ class MessagingViewModel(
         if (!force && participantStates[userId] != null &&
             now - (participantStateFetchTimes[userId] ?: 0L) < participantStateTtlMillis
         ) return
+        // Modo capturas: perfiles de demo disponibles.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            val user = ScreenshotFixtures.user(userId) ?: return
+            participantStateFetchTimes[userId] = now
+            participantStates = participantStates + (userId to InboxParticipantState(
+                username = user.username,
+                imagePath = user.profileImagePath.orEmpty(),
+                isUnavailable = false,
+                isBlockedByCurrentUser = false,
+            ))
+            return
+        }
         if (!participantStateFetches.add(userId)) return
 
         viewModelScope.launch {

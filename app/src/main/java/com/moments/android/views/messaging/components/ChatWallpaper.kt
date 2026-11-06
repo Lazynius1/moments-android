@@ -1,5 +1,8 @@
 package com.moments.android.views.messaging.components
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotImages
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -100,6 +103,12 @@ internal class ChatWallpaperState(context: Context, val uid: String, val convers
     private val key = "$uid:$conversationId"
     private val prefs = app.getSharedPreferences("chat_wallpapers", Context.MODE_PRIVATE)
     fun start() {
+        // Modo capturas: fondo de foto local, sin Firestore, Storage ni preferencias.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            wallpaper = ChatWallpaper(kind = "photo", dimming = 0.15, bubbleColorHex = "5B2C6F")
+            image = ScreenshotImages.bitmap(app, "ss_wallpaper")
+            return
+        }
         if (uid.isEmpty() || conversationId.isEmpty()) return
         runCatching {
             val obj = JSONObject(prefs.getString(key, "{}")!!)

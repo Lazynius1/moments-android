@@ -5,6 +5,9 @@ import coil.ImageLoader
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotImages
+import com.moments.android.debugscreenshots.ScreenshotMode
 
 /**
  * ImageLoader de app: límites de RAM/disco para el feed.
@@ -13,7 +16,7 @@ import coil.request.CachePolicy
 object MomentsImageLoader {
     fun create(context: Context): ImageLoader {
         val app = context.applicationContext
-        return ImageLoader.Builder(app)
+        val builder = ImageLoader.Builder(app)
             .crossfade(false)
             .memoryCache {
                 MemoryCache.Builder(app)
@@ -29,6 +32,10 @@ object MomentsImageLoader {
             .respectCacheHeaders(false)
             .memoryCachePolicy(CachePolicy.ENABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
-            .build()
+        // Modo capturas: imágenes de demo desde assets y sin peticiones a Google / Firebase.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            builder.components { add(ScreenshotImages.CoilInterceptor) }
+        }
+        return builder.build()
     }
 }

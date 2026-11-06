@@ -1,5 +1,8 @@
 package com.moments.android.views.feed.maps
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotFixtures
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
@@ -68,6 +71,11 @@ object LocationUtilities {
 
     @SuppressLint("MissingPermission")
     fun getCurrentLocation(context: Context, completion: (Point?) -> Unit) {
+        // Modo capturas: sin ubicación real (el mapa se centra en Barcelona).
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            completion(null)
+            return
+        }
         if (!hasForegroundPermission(context)) {
             completion(null)
             return
@@ -162,6 +170,8 @@ object MapRegionStore {
     )
 
     fun save(context: Context, region: Region) {
+        // Modo capturas: no se pisa la última región guardada del usuario.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putString(
                 LAST_REGION_KEY,
@@ -227,6 +237,11 @@ object LocationSearchService {
         region: MapRegionStore.Region,
         completion: (MapDiscoverPayload) -> Unit,
     ) {
+        // Modo capturas: contenido de demostración en Barcelona.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            CoroutineScope(Dispatchers.Main).launch { completion(ScreenshotFixtures.mapPayload) }
+            return
+        }
         if (FirebaseAuth.getInstance().currentUser == null) {
             completion(
                 MapDiscoverPayload(
@@ -272,6 +287,10 @@ object LocationSearchService {
         loadStories: Boolean = true,
         completion: (MapDiscoverPayload) -> Unit,
     ) {
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            CoroutineScope(Dispatchers.Main).launch { completion(ScreenshotFixtures.mapPayload) }
+            return
+        }
         val mode = if (locationName != null) MapQueryMode.Location(locationName)
             else MapQueryMode.Region(requireNotNull(region))
         CoroutineScope(Dispatchers.Main).launch {

@@ -1,5 +1,7 @@
 package com.moments.android.services.messaging
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -148,6 +150,11 @@ class OnlineStatusService private constructor() : DefaultLifecycleObserver {
     }
 
     fun observeUserStatus(userId: String, onUpdate: (OnlineStatus, Date?) -> Unit): () -> Unit {
+        // Modo capturas: todos en línea, sin listener.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            onUpdate(OnlineStatus.ONLINE, Date())
+            return {}
+        }
         val registration = db.collection("users").document(userId)
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot == null) return@addSnapshotListener
@@ -272,6 +279,12 @@ class OnlineStatusService private constructor() : DefaultLifecycleObserver {
 
         fun initialize(application: Application) {
             shared.initialize(application)
+            // Modo capturas: siempre en línea, sin latidos ni escrituras.
+            if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+                shared._currentUserStatus.value = OnlineStatus.ONLINE
+                shared._isOnline.value = true
+                return
+            }
             shared.startTracking()
         }
     }

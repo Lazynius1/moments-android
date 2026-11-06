@@ -1,5 +1,8 @@
 package com.moments.android.services.privacy
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import kotlinx.coroutines.flow.flowOf
 import com.google.firebase.auth.FirebaseAuth
 import com.moments.android.MomentsApplication
 import com.moments.android.services.persistence.LocalPersistenceService
@@ -120,6 +123,8 @@ object FollowStateStore {
     }
 
     fun state(viewerId: String, targetUserId: String): FollowButtonState? {
+        // Modo capturas: los amigos de prueba son mutuos (sin botón «Seguir»).
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive && viewerId != targetUserId) return FollowButtonState.MUTUALS
         removeObsoletePersistenceOnce()
         val key = relationshipKey(viewerId, targetUserId)
         val result: FollowButtonState?
@@ -138,6 +143,9 @@ object FollowStateStore {
     }
 
     fun observe(viewerId: String, targetUserId: String): Flow<FollowButtonState?> {
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive && viewerId != targetUserId) {
+            return flowOf(FollowButtonState.MUTUALS)
+        }
         removeObsoletePersistenceOnce()
         val key = relationshipKey(viewerId, targetUserId)
         return stateSnapshots.map { it[key] }.distinctUntilChanged()
@@ -154,6 +162,7 @@ object FollowStateStore {
     }
 
     suspend fun resolve(viewerId: String, targetUserId: String): FollowButtonState? {
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive && viewerId != targetUserId) return FollowButtonState.MUTUALS
         if (viewerId == targetUserId) {
             setState(FollowButtonState.OWN_PROFILE, viewerId, targetUserId)
             return FollowButtonState.OWN_PROFILE

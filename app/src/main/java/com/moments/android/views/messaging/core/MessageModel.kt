@@ -1,5 +1,7 @@
 package com.moments.android.views.messaging.core
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
 import android.content.Context
 import android.text.format.Formatter
 import com.google.firebase.Timestamp
@@ -863,6 +865,8 @@ data class Conversation(
     fun unreadCount(currentUserId: String): Int {
         if (currentUserId.isBlank()) return 0
         if (readStatus[currentUserId] != false) return 0
+        // Modo capturas: los chats de demo no tienen mensajes en la base local.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return 1
         val conversationId = id ?: return 1
         return com.moments.android.services.persistence.UnreadMessageCountStore.countFor(
             conversationId = conversationId,

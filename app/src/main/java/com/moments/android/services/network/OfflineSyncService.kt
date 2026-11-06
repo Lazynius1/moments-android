@@ -1,5 +1,7 @@
 package com.moments.android.services.network
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
 import com.moments.android.services.network.NetworkMonitor
 import android.graphics.BitmapFactory
 import com.google.firebase.auth.FirebaseAuth
@@ -106,6 +108,8 @@ object OfflineSyncService {
         requireAutomaticSync: Boolean = true,
         ignoreBackoff: Boolean = false,
     ) {
+        // Modo capturas: la cola real no se toca (Firestore está aislado).
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return
         if (requireAutomaticSync) {
             if (!isAutomaticSyncEnabled || !NetworkMonitor.isConnected) return
         } else if (!NetworkMonitor.isConnected) {

@@ -1,5 +1,8 @@
 package com.moments.android.viewmodels
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
+import com.moments.android.debugscreenshots.ScreenshotFixtures
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -154,6 +157,11 @@ class EchoViewModel(
     }
 
     fun loadEcho() {
+        // Modo capturas: el Echo inicial ya viene completo, sin listener.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            _isLoading.value = false
+            return
+        }
         _isLoading.value = true
         listener?.remove()
         listener = db.collection("echoes").document(echoId).addSnapshotListener { snapshot, _ ->
@@ -294,6 +302,11 @@ class EchoViewModel(
             }
             return
         }
+        // Modo capturas: momento de demostración.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            applyLoadedMoment(ScreenshotFixtures.echoMoment(post.momentId), post)
+            return
+        }
         scope.launch(Dispatchers.IO) {
             val snapshot = runCatching {
                 db.collection("users").document(post.authorId)
@@ -354,6 +367,11 @@ class EchoViewModel(
     }
 
     private fun validateMomentsLive() {
+        // Modo capturas: los momentos de demo están todos disponibles.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) {
+            _momentAvailability.value = allMoments.associate { it.momentId to true }
+            return
+        }
         val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val privacyService = PrivacyService
         for (momentRef in allMoments) {

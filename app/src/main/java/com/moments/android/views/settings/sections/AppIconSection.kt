@@ -258,6 +258,19 @@ fun AppIconSection() {
     }
 }
 
+/**
+ * Modo capturas (solo debug): el selector abierto como desde Ajustes. Aplicar no hace
+ * nada para no cambiar el icono real del teléfono.
+ */
+@Composable
+fun ScreenshotAppIconPickerHost() {
+    val context = LocalContext.current
+    val currentIcon = remember { AppIconManager.current(context) }
+    MomentsModalSheet(onDismissRequest = {}, allowExpanded = false) { _ ->
+        AppIconPicker(currentIcon = currentIcon, onApply = {})
+    }
+}
+
 /** Carrusel: el del centro se elige; los de los lados giran, se encogen y se desenfocan. */
 @Composable
 private fun AppIconPicker(

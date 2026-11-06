@@ -1,5 +1,7 @@
 package com.moments.android.ad
 
+import com.moments.android.BuildConfig
+import com.moments.android.debugscreenshots.ScreenshotMode
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -83,6 +85,8 @@ object FeedAdPlacement {
         minGap: Int,
         maxGap: Int,
     ): Set<Int> {
+        // Modo capturas: feed sin anuncios.
+        if (BuildConfig.DEBUG && ScreenshotMode.isActive) return emptySet()
         val minG = minGap.coerceAtLeast(1)
         val maxG = maxGap.coerceAtLeast(minG)
         val lastEligible = momentIds.size - 2
